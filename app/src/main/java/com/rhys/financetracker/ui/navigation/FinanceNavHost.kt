@@ -262,7 +262,16 @@ private fun NavGraphBuilder.editorDestinations(
         val accountId = entry.arguments?.getLong(Routes.ARG_ACCOUNT_ID) ?: Routes.NEW_ID
         ImportScreen(
             onBack = { navController.popBackStack() },
-            onFinished = { navController.navigateToTab(Routes.DASHBOARD) },
+            // Unwind to the dashboard rather than navigating to it.
+            // navigateToTab is the tab-switching pattern — popUpTo(start) with
+            // saveState, then restoreState — and using it to reach the very
+            // destination it is popping to depends on saved-stack keying that
+            // is easy to get wrong. Popping says what is meant and nothing else.
+            onFinished = {
+                if (!navController.popBackStack(Routes.DASHBOARD, inclusive = false)) {
+                    navController.popBackStack()
+                }
+            },
             preselectedAccountId = accountId.takeIf { it != Routes.NEW_ID },
             incomingFile = importFile,
             onIncomingFileHandled = onImportFileHandled,

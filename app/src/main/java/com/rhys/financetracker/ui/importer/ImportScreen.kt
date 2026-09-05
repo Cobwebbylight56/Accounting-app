@@ -734,6 +734,19 @@ private fun DoneStep(
                     Text("${it.transactionsCreated} transactions added")
                 }
             }
+            if (it.skipped > 0) {
+                // "14 skipped" on its own reads like something went wrong
+                // without saying what, and the rows are already gone from view
+                // by this point.
+                Text(
+                    text = "${it.skipped} rows were left unticked on the review screen. " +
+                        "That is usually rows the balance check could not confirm — " +
+                        "import the statement again and tick any you want to keep.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
             if (it.problems.isNotEmpty()) {
                 SectionCard(title = "Rows that were skipped") {
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
