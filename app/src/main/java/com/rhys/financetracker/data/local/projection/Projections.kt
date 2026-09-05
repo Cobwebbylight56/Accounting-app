@@ -1,0 +1,118 @@
+package com.rhys.financetracker.data.local.projection
+
+import androidx.room.ColumnInfo
+import androidx.room.Embedded
+import com.rhys.financetracker.data.local.entity.AccountEntity
+import com.rhys.financetracker.data.local.entity.RecurringRuleEntity
+import com.rhys.financetracker.data.local.entity.SavingsGoalEntity
+import com.rhys.financetracker.data.local.entity.TransactionEntity
+import java.time.LocalDate
+
+/**
+ * Read models returned by DAO queries.
+ *
+ * These are deliberately flat: joining and aggregating in SQL keeps lists fast
+ * even with tens of thousands of transactions, whereas loading entities and
+ * combining them in Kotlin would not.
+ */
+
+/** A transaction together with the names it needs for display. */
+data class TransactionWithDetails(
+    @Embedded val transaction: TransactionEntity,
+    @ColumnInfo(name = "account_name") val accountName: String?,
+    @ColumnInfo(name = "transfer_account_name") val transferAccountName: String?,
+    @ColumnInfo(name = "category_name") val categoryName: String?,
+    @ColumnInfo(name = "category_color") val categoryColor: String?,
+    @ColumnInfo(name = "person_name") val personName: String?,
+    @ColumnInfo(name = "person_color") val personColor: String?,
+)
+
+/** An account with its computed running balance. */
+data class AccountWithBalance(
+    @Embedded val account: AccountEntity,
+    @ColumnInfo(name = "balance_minor") val balanceMinor: Long,
+    @ColumnInfo(name = "person_name") val personName: String?,
+) {
+    /** Liabilities contribute negatively to net worth. */
+    val netWorthContributionMinor: Long
+        get() = if (!account.includeInNetWorth) 0L else balanceMinor
+
+    val isSavings: Boolean get() = account.type.isSavings
+    val isLiability: Boolean get() = account.type.isLiability
+    val availableMinor: Long get() = balanceMinor + account.overdraftLimitMinor
+}
+
+/** Total for one category over a period, used by pie charts and reports. */
+data class CategoryTotal(
+    @ColumnInfo(name = "category_id") val categoryId: Long?,
+    @ColumnInfo(name = "category_name") val categoryName: String?,
+    @ColumnInfo(name = "category_color") val categoryColor: String?,
+    @ColumnInfo(name = "total_minor") val totalMinor: Long,
+    @ColumnInfo(name = "transaction_count") val transactionCount: Int,
+)
+
+/** Income/expense totals for one calendar month. */
+data class MonthTotals(
+    @ColumnInfo(name = "year_month") val yearMonth: String,
+    @ColumnInfo(name = "income_minor") val incomeMinor: Long,
+    @ColumnInfo(name = "expense_minor") val expenseMinor: Long,
+) {
+    val netMinor: Long get() = incomeMinor - expenseMinor
+}
+
+/** Totals for one person, used by the household comparison view. */
+data class PersonTotals(
+    @ColumnInfo(name = "person_id") val personId: Long?,
+    @ColumnInfo(name = "person_name") val personName: String?,
+    @ColumnInfo(name = "person_color") val personColor: String?,
+    @ColumnInfo(name = "income_minor") val incomeMinor: Long,
+    @ColumnInfo(name = "expense_minor") val expenseMinor: Long,
+) {
+    val netMinor: Long get() = incomeMinor - expenseMinor
+}
+
+/** A recurring rule plus display names, and whether it is currently overdue. */
+data class RecurringRuleWithDetails(
+    @Embedded val rule: RecurringRuleEntity,
+    @ColumnInfo(name = "account_name") val accountName: String?,
+    @ColumnInfo(name = "category_name") val categoryName: String?,
+    @ColumnInfo(name = "category_color") val categoryColor: String?,
+    @ColumnInfo(name = "person_name") val personName: String?,
+) {
+    fun isOverdue(today: LocalDate): Boolean = !rule.isPaused && rule.nextDueDate.isBefore(today)
+    fun isDueWithin(days: Long, today: LocalDate): Boolean =
+        !rule.isPaused && !rule.nextDueDate.isBefore(today) &&
+            rule.nextDueDate <= today.plusDays(days)
+}
+
+/** A savings goal with its current balance resolved from account or tagged transactions. */
+data class SavingsGoalWithProgress(
+    @Embedded val goal: SavingsGoalEntity,
+    @ColumnInfo(name = "current_amount_minor") val currentAmountMinor: Long,
+    @ColumnInfo(name = "account_name") val accountName: String?,
+) {
+    val remainingMinor: Long get() = (goal.targetAmountMinor - currentAmountMinor).coerceAtLeast(0L)
+
+    /** 0f..1f, safe when the target is zero. */
+    val progressFraction: Float
+        get() = if (goal.targetAmountMinor <= 0L) {
+            0f
+        } else {
+            (currentAmountMinor.toDouble() / goal.targetAmountMinor.toDouble())
+                .coerceIn(0.0, 1.0).toFloat()
+        }
+
+    val percentComplete: Int get() = (progressFraction * 100f).toInt()
+}
+
+/** Aggregated income/expense pair used across the dashboard and reports. */
+data class IncomeExpenseTotals(
+    @ColumnInfo(name = "income_minor") val incomeMinor: Long,
+    @ColumnInfo(name = "expense_minor") val expenseMinor: Long,
+) {
+    val netMinor: Long get() = incomeMinor - expenseMinor
+
+    companion object {
+        val EMPTY = IncomeExpenseTotals(0L, 0L)
+    }
+}

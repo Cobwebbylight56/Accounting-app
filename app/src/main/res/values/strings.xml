@@ -1,0 +1,30 @@
+<resources>
+    <string name="app_name">Finance Tracker</string>
+
+    <!-- Navigation -->
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_transactions">Transactions</string>
+    <string name="nav_savings">Savings</string>
+    <string name="nav_reports">Reports</string>
+    <string name="nav_more">More</string>
+
+    <!-- Notification channels -->
+    <string name="channel_bills_name">Bill reminders</string>
+    <string name="channel_bills_desc">Reminders for upcoming and overdue bills</string>
+    <string name="channel_goals_name">Savings goals</string>
+    <string name="channel_goals_desc">Progress updates for your savings goals</string>
+    <string name="channel_balance_name">Balance alerts</string>
+    <string name="channel_balance_desc">Warnings when an account balance runs low</string>
+    <string name="channel_system_name">Background updates</string>
+    <string name="channel_system_desc">Monthly rollover and automatic backups</string>
+
+    <!-- Common actions -->
+    <string name="action_save">Save</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_duplicate">Duplicate</string>
+    <string name="action_archive">Archive</string>
+    <string name="action_restore">Restore</string>
+    <string name="action_add">Add</string>
+</resources>
