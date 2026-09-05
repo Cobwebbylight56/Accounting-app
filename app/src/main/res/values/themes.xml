@@ -2,12 +2,18 @@
 <resources>
     <!--
         A minimal platform theme.  All real styling is done in Compose
-        (ui/theme/Theme.kt); this only controls the launch window so that the
-        app does not flash a white screen in dark mode.
+        (ui/theme/Theme.kt); this only controls the launch window so the app
+        does not flash a white rectangle before the first frame is drawn.
+
+        The parent is a plain platform theme, not a "DayNight" one: those come
+        from AppCompat and Material Components, and a Compose-only app depends
+        on neither.  Dark mode is handled by the values-night copy of this file
+        instead, which is the mechanism DayNight themes are built on anyway.
     -->
-    <style name="Theme.FinanceTracker" parent="android:Theme.Material.DayNight.NoActionBar">
+    <style name="Theme.FinanceTracker" parent="@android:style/Theme.Material.Light.NoActionBar">
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowBackground">@color/launch_background</item>
+        <item name="android:windowLightStatusBar">true</item>
     </style>
 </resources>

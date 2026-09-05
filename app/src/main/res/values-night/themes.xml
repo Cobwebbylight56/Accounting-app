@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The dark counterpart of the launch theme; see the note in values/themes.xml. -->
+    <style name="Theme.FinanceTracker" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowBackground">@color/launch_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>
