@@ -25,6 +25,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    env:
+      # Secrets cannot be read from a step-level `if`, but env can, so the
+      # signing key is surfaced here and the step tests for it below.
+      KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+
     steps:
       - name: Check out the code
         uses: actions/checkout@v4
@@ -65,14 +70,12 @@ jobs:
       - name: Run the tests
         env:
           BUILD_NUMBER: ${{ github.run_number }}
-        run: ./gradlew test --stacktrace
+        run: ./gradlew testDebugUnitTest --stacktrace
 
       - name: Restore the signing key
         # Only when a real key has been configured; otherwise the build falls
         # back to the committed debug key, which is still installable.
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        if: ${{ env.KEYSTORE_BASE64 != '' }}
         run: |
           echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
           echo "KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"

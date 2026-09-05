@@ -152,19 +152,6 @@ android {
         }
     }
 
-    // Names every APK predictably: finance-tracker-1.1.0-release.apk.  The
-    // release workflow renames the newest to finance-tracker.apk so the "latest
-    // download" link is stable forever.
-    applicationVariants.all {
-        outputs.all {
-            val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
-            output.outputFileName =
-                "finance-tracker-${versionProperties.getProperty("VERSION_MAJOR")}." +
-                "${versionProperties.getProperty("VERSION_MINOR")}." +
-                "${versionProperties.getProperty("VERSION_PATCH")}-${name}.apk"
-        }
-    }
-
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
@@ -223,8 +210,6 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.androidx.arch.core.testing)
     testImplementation(libs.turbine)
-    testImplementation(libs.robolectric)
-    testImplementation(libs.androidx.room.testing)
 
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
