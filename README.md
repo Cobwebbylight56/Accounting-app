@@ -30,6 +30,7 @@ bank holiday calendar, and that is off until you turn it on.
 | **Backup** | Manual and automatic backups to anywhere the system file picker can reach — including Drive, OneDrive or Dropbox — plus restore. |
 | **Notifications** | Bills due, overdue payments, low balances and savings milestones, each switchable on its own. |
 | **Security** | PIN (PBKDF2-hashed in hardware-backed encrypted storage), fingerprint or face unlock, and automatic locking. |
+| **Advice** | Plain-English guidance on where you could spend less and save more, each item carrying the actual figure and what acting on it is worth over a year — plus a projection of the next six months and a warning if the balance is heading below zero. |
 | **Design** | Material 3, light and dark, large tap targets, and a "larger text" setting. |
 
 ## Documentation
@@ -43,6 +44,7 @@ bank holiday calendar, and that is off until you turn it on.
 | [docs/EXTENDING.md](docs/EXTENDING.md) | How to add features later |
 | [docs/EXTERNAL_DATA.md](docs/EXTERNAL_DATA.md) | Which live figures are possible and which are not |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | How the code is arranged |
+| [docs/RELEASING.md](docs/RELEASING.md) | Versioning, signing, and getting the APK onto a phone |
 
 ## Technology
 
@@ -58,6 +60,19 @@ No charting library, no networking library and no Excel library: the charts, the
 `.xlsx` reader and writer, and the two HTTP calls are all written against the
 platform. That keeps the APK small and the dependency list short enough to
 audit.
+
+## Install it on a phone
+
+The newest build is always at this link — bookmark it on the phone:
+
+**<https://github.com/Cobwebbylight56/Accounting-app/releases/latest/download/finance-tracker.apk>**
+
+Tap it, allow the one-off "install from this source" prompt, and it installs.
+Installing over an existing copy keeps your data.
+
+The link starts working once the first version tag is pushed; see
+[docs/RELEASING.md](docs/RELEASING.md), which also covers why a sideloaded
+update sometimes appears to do nothing and how this project prevents it.
 
 ## Quick start
 

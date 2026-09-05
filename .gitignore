@@ -12,4 +12,7 @@ local.properties
 *.apk
 *.aab
 *.keystore
-!debug.keystore
+# The debug keystore is committed on purpose: a fixed signing key is what lets
+# builds from different machines update each other. See docs/RELEASING.md.
+!app/debug.keystore
+keystore.properties

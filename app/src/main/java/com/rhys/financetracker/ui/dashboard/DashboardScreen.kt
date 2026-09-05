@@ -62,6 +62,7 @@ fun DashboardScreen(
     onOpenSettings: () -> Unit,
     onOpenDashboardSettings: () -> Unit,
     onOpenExternalData: () -> Unit,
+    onOpenInsights: () -> Unit,
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -134,6 +135,7 @@ fun DashboardScreen(
                         onOpenRecurring = onOpenRecurring,
                         onOpenSavings = onOpenSavings,
                         onOpenExternalData = onOpenExternalData,
+                        onOpenInsights = onOpenInsights,
                         onCategoryClick = viewModel::showCategoryDetail,
                         onMonthClick = viewModel::showMonth,
                     )
@@ -247,6 +249,7 @@ private fun DashboardCard(
     onOpenRecurring: () -> Unit,
     onOpenSavings: () -> Unit,
     onOpenExternalData: () -> Unit,
+    onOpenInsights: () -> Unit,
     onCategoryClick: (Long?, String, String?) -> Unit,
     onMonthClick: (java.time.YearMonth) -> Unit,
 ) {
@@ -265,6 +268,7 @@ private fun DashboardCard(
         DashboardWidget.NET_WORTH -> NetWorthCard(state)
         DashboardWidget.ACCOUNTS_LIST -> AccountsListCard(state, onOpenAccounts)
         DashboardWidget.EXTERNAL_DATA -> ExternalDataCard(state, onOpenExternalData)
+        DashboardWidget.INSIGHTS -> InsightsCard(state, onOpenInsights)
     }
 }
 

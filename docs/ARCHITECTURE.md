@@ -153,6 +153,30 @@ the middle. The bar chart treats the whole column as the target rather than the
 bar, so a quiet month is as easy to hit as a busy one. Every chart's
 `contentDescription` says what tapping does.
 
+### `InsightEngine` and `Forecaster`
+
+Both are pure: values in, advice out, no database and no clock of their own, so
+every rule is testable. `InsightRepository` is the only part that knows how to
+gather the inputs.
+
+Three constraints shape every rule, because advice that is wrong or nagging is
+worse than none:
+
+* **Every message contains the figure.** "£42 more on takeaways than usual",
+  not "spending has increased".
+* **Each rule states how much history it needs** and stays silent below it. A
+  200% rise on £1 is not a finding; nor is a 2% rise on £1,000. A change must
+  clear both a percentage and a cash threshold.
+* **Comparisons wait until they are fair.** Measuring a full month's average
+  against the first three days of a new one always flatters, so category
+  comparisons hold off until the month is far enough through.
+
+The forecaster is deliberately boring. Known amounts are counted exactly, using
+the same recurrence engine that actually posts them, so an annual premium lands
+in the month it is due rather than being smeared across twelve. Only the
+discretionary remainder is averaged. Below two complete months it declines to
+project at all and the UI says why.
+
 ### `HouseholdLayoutDetector`
 
 Recognises the shape of a hand-built budget sheet — a column of figures per
@@ -194,6 +218,8 @@ Unit tests cover the parts where a bug would be expensive and silent:
 | `XlsxWriterTest` | The archive contains every part Excel needs; text is escaped |
 | `TransactionQueryTest` | Filters build correctly, and user input is bound rather than concatenated |
 | `HouseholdLayoutDetectorTest` | The example sheet's layout is read correctly: both people found, the "both" column ignored, total rows excluded |
+| `InsightEngineTest` | Real changes are reported with their figures; noise, and anything without enough history, stays quiet |
+| `ForecasterTest` | Known bills land in the month they are due; no projection is offered without enough history |
 | `SampleDataTest` | The sample figures still agree with the original spreadsheet |
 | `DateUtilsTest`, `ValidatorsTest` | Date handling and input rules |
 

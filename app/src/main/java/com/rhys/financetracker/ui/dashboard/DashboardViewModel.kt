@@ -17,12 +17,15 @@ import com.rhys.financetracker.data.local.projection.TransactionWithDetails
 import com.rhys.financetracker.data.remote.ExternalDataRepository
 import com.rhys.financetracker.data.remote.ExternalDataSnapshot
 import com.rhys.financetracker.data.repository.AccountRepository
+import com.rhys.financetracker.data.repository.InsightRepository
 import com.rhys.financetracker.data.repository.PeopleRepository
 import com.rhys.financetracker.data.repository.RecurringRepository
 import com.rhys.financetracker.data.repository.SavingsRepository
 import com.rhys.financetracker.data.repository.TransactionRepository
 import com.rhys.financetracker.domain.model.DashboardWidget
 import com.rhys.financetracker.domain.model.TransactionType
+import com.rhys.financetracker.domain.insight.Insight
+import com.rhys.financetracker.domain.insight.InsightReport
 import com.rhys.financetracker.domain.report.FinancialSummary
 import com.rhys.financetracker.domain.report.MonthPoint
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -57,6 +60,7 @@ class DashboardViewModel @Inject constructor(
     private val peopleRepository: PeopleRepository,
     private val externalDataRepository: ExternalDataRepository,
     private val widgetDao: DashboardWidgetDao,
+    private val insightRepository: InsightRepository,
 ) : ViewModel() {
 
     private val scope = MutableStateFlow(DashboardScope())
@@ -116,6 +120,28 @@ class DashboardViewModel @Inject constructor(
     }
 
     /**
+     * The single most pressing piece of advice, for the dashboard card.
+     *
+     * Built on the IO dispatcher because assembling the full report runs several
+     * queries; the dashboard must not wait on it, so it flows in separately and
+     * the card fills itself once it arrives.
+     */
+    private val insightReport: StateFlow<InsightReport> =
+        combine(visibleMonth, scope) { month, currentScope -> month to currentScope }
+            .flatMapLatest { (month, currentScope) ->
+                flow {
+                    emit(
+                        insightRepository.buildReport(
+                            month = month,
+                            personId = currentScope.personId,
+                            accountId = currentScope.accountId,
+                        ),
+                    )
+                }
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), InsightReport.EMPTY)
+
+    /**
      * Money already promised to bills between today and the end of the month.
      * Recomputed whenever any recurring rule changes.
      */
@@ -144,6 +170,7 @@ class DashboardViewModel @Inject constructor(
             visibleMonth,
             scope,
             committed,
+            insightReport,
         ),
     ) { values -> buildState(values) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DashboardState())
@@ -166,6 +193,7 @@ class DashboardViewModel @Inject constructor(
         val month = values[11] as YearMonth
         val currentScope = values[12] as DashboardScope
         val committed = values[13] as Long
+        val insights = values[14] as InsightReport
 
         val inScope = accountList.filter { currentScope.matches(it) }
         val savingsTotal = inScope.filter { it.isSavings }.sumOf { it.balanceMinor }
@@ -195,6 +223,8 @@ class DashboardViewModel @Inject constructor(
             recentTransactions = recent,
             savingsGoals = goals,
             externalData = external,
+            topInsight = insights.topPriority,
+            insightCount = insights.insights.size,
             widgets = widgets
                 .mapNotNull { entity ->
                     DashboardWidget.fromKey(entity.widgetKey)?.let { widget ->
@@ -354,6 +384,8 @@ data class DashboardState(
     val recentTransactions: List<TransactionWithDetails> = emptyList(),
     val savingsGoals: List<SavingsGoalWithProgress> = emptyList(),
     val externalData: ExternalDataSnapshot = ExternalDataSnapshot(),
+    val topInsight: Insight? = null,
+    val insightCount: Int = 0,
     val widgets: List<VisibleWidget> = emptyList(),
 ) {
     val isCurrentMonth: Boolean get() = month == DateUtils.currentYearMonth()

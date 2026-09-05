@@ -204,6 +204,39 @@ follows.
 
 ---
 
+## Advice and what is coming
+
+**More → Advice**, or the Advice card on the home screen.
+
+This is the part a spreadsheet cannot do. It looks at what you have recorded and
+says, in plain words:
+
+- **Where spending has moved** — "You have spent £90 on takeaways this month —
+  £30 more than your usual £60 (50% up on the last 3 months)", and what that
+  would come to over a year.
+- **Where it has fallen**, which is worth knowing too.
+- **Where most of it goes** — your three biggest categories, their share, and
+  what trimming them by a tenth would free up.
+- **Your savings rate** — the share of income you keep, against the 15% usually
+  suggested.
+- **Whether your savings would cover an emergency**, measured in months of your
+  own real bills rather than a round number.
+- **What your small regular payments add up to.** Four subscriptions at a tenner
+  is £480 a year.
+- **What is likely to happen next** — your balance projected six months ahead,
+  and a warning naming the month if it is heading below zero.
+
+Two things it will not do:
+
+- **It will not guess.** Each piece of advice needs enough history to mean
+  something; below that it stays quiet rather than reading significance into one
+  unusual month. Early on it will say so.
+- **It will not tell you off.** It reports what the figures show and what the
+  arithmetic implies. What to do about it is your call.
+
+The projection assumes your regular payments carry on and that everything else
+stays near its recent average. It is arithmetic, not a promise.
+
 ## Reports and printing
 
 **Reports** offers:

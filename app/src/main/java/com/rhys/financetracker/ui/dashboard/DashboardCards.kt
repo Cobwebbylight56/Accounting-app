@@ -22,6 +22,7 @@ import com.rhys.financetracker.core.time.DateUtils
 import com.rhys.financetracker.data.local.projection.RecurringRuleWithDetails
 import com.rhys.financetracker.data.local.projection.SavingsGoalWithProgress
 import com.rhys.financetracker.data.local.projection.TransactionWithDetails
+import com.rhys.financetracker.domain.insight.InsightSeverity
 import com.rhys.financetracker.domain.model.TransactionType
 import com.rhys.financetracker.ui.components.BarGroup
 import com.rhys.financetracker.ui.components.ChartEntry
@@ -492,6 +493,69 @@ internal fun ExternalDataCard(state: DashboardState, onOpenExternalData: () -> U
                         Text(item.displayValue, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * The advice card.
+ *
+ * It shows only the single most pressing item, because a dashboard full of
+ * advice is a dashboard nobody reads. The rest is a tap away.
+ */
+@Composable
+internal fun InsightsCard(
+    state: DashboardState,
+    onOpenInsights: () -> Unit,
+) {
+    val colors = FinanceTheme.colors
+    val insight = state.topInsight
+
+    SectionCard(
+        title = "Advice",
+        action = { TextButton(onClick = onOpenInsights) { Text("All") } },
+    ) {
+        if (insight == null) {
+            Text(
+                text = "Once there is a month or two of records, this is where the app " +
+                    "points out where the money goes and what is likely to happen next.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            return@SectionCard
+        }
+
+        val accent = when (insight.severity) {
+            InsightSeverity.ACT -> colors.negative
+            InsightSeverity.WATCH -> colors.warning
+            InsightSeverity.GOOD -> colors.positive
+            InsightSeverity.INFO -> colors.neutral
+        }
+
+        Column(modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenInsights)) {
+            Text(
+                text = insight.title,
+                style = MaterialTheme.typography.titleSmall,
+                color = accent,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(text = insight.message, style = MaterialTheme.typography.bodyMedium)
+            insight.annualImpactMinor?.takeIf { it > 0L }?.let { impact ->
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = "Worth ${Money.format(impact)} over a year",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (state.insightCount > 1) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "and ${state.insightCount - 1} more",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

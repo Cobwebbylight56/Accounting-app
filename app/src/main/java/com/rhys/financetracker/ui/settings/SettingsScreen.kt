@@ -197,8 +197,12 @@ fun SettingsScreen(
 
             SettingsItem(
                 title = "About",
-                subtitle = "Finance Tracker ${BuildConfig.VERSION_NAME} · " +
-                    "everything is stored on this device",
+                // The version code is what Android compares when deciding
+                // whether an update is newer, so it is worth being able to read
+                // it off the phone when a build looks like it has not applied.
+                subtitle = "Finance Tracker ${BuildConfig.VERSION_NAME}\n" +
+                    "Version code ${BuildConfig.VERSION_CODE_VALUE} · " +
+                    "built ${BuildConfig.BUILD_TIME}",
                 icon = Icons.Outlined.Info,
             )
             SettingsNote(

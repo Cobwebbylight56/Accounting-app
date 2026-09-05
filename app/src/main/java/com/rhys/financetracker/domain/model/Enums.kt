@@ -101,6 +101,7 @@ enum class DashboardWidget(val key: String, val title: String, val defaultVisibl
     RECENT_TRANSACTIONS("recent_transactions", "Recent transactions", true),
     SAVINGS_PROGRESS("savings_progress", "Savings goals", true),
     SPENDING_BY_CATEGORY("spending_by_category", "Spending by category", true),
+    INSIGHTS("insights", "Advice", true),
     INCOME_VS_EXPENSE("income_vs_expense", "Income vs expenses", true),
     NET_WORTH("net_worth", "Net worth", false),
     ACCOUNTS_LIST("accounts_list", "Accounts", false),

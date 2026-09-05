@@ -102,6 +102,38 @@ Two things to keep right:
 
 ---
 
+## Add a new piece of advice
+
+Rules live in `domain/insight/InsightEngine.kt`, grouped by the question they
+answer. Add one to the relevant `…Advice` function:
+
+```kotlin
+add(
+    Insight(
+        id = "fuel-vs-public-transport",
+        kind = InsightKind.SPENDING,
+        severity = InsightSeverity.INFO,
+        title = "Fuel is your third largest cost",
+        message = "£${...} a month. A monthly bus pass locally is £65.",
+        annualImpactMinor = saving * 12,
+    ),
+)
+```
+
+Hold to the three rules the existing ones follow, or the advice screen stops
+being worth opening:
+
+1. **Put the figure in the message.** Never "spending has increased".
+2. **State what history the rule needs, and return nothing below it.** One
+   unusual month is not a trend.
+3. **Give `annualImpactMinor` when it can be worked out.** £15 a week does not
+   sound like £780, and that is the number that changes behaviour.
+
+Add a test to `InsightEngineTest` covering both the case that should fire and a
+near-miss that should not.
+
+---
+
 ## Add a new report
 
 1. **Constant** — add to `ReportType` in `domain/report/ReportModels.kt`.

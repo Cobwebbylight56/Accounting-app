@@ -25,6 +25,7 @@ import com.rhys.financetracker.ui.categories.CategoriesScreen
 import com.rhys.financetracker.ui.categories.CategoryEditScreen
 import com.rhys.financetracker.ui.dashboard.DashboardScreen
 import com.rhys.financetracker.ui.importer.ImportScreen
+import com.rhys.financetracker.ui.insights.InsightsScreen
 import com.rhys.financetracker.ui.people.PeopleScreen
 import com.rhys.financetracker.ui.people.PersonEditScreen
 import com.rhys.financetracker.ui.recurring.RecurringEditScreen
@@ -109,6 +110,7 @@ private fun NavGraphBuilder.topLevelDestinations(
             onOpenSettings = { navController.navigate(Routes.SETTINGS) },
             onOpenDashboardSettings = { navController.navigate(Routes.SETTINGS_DASHBOARD) },
             onOpenExternalData = { navController.navigate(Routes.SETTINGS_EXTERNAL_DATA) },
+            onOpenInsights = { navController.navigate(Routes.INSIGHTS) },
         )
     }
 
@@ -133,6 +135,7 @@ private fun NavGraphBuilder.topLevelDestinations(
 
     composable(Routes.MORE) {
         MoreScreen(
+            onOpenInsights = { navController.navigate(Routes.INSIGHTS) },
             onOpenAccounts = { navController.navigate(Routes.ACCOUNTS) },
             onOpenPeople = { navController.navigate(Routes.PEOPLE) },
             onOpenRecurring = { navController.navigate(Routes.RECURRING) },
@@ -218,6 +221,17 @@ private fun NavGraphBuilder.editorDestinations(navController: NavHostController)
         arguments = listOf(navArgument(Routes.ARG_ID) { type = NavType.StringType }),
     ) {
         SavingsEditScreen(onBack = { navController.popBackStack() })
+    }
+
+    composable(Routes.INSIGHTS) {
+        InsightsScreen(
+            onBack = { navController.popBackStack() },
+            onOpenCategory = { _, _ ->
+                // Tapping through from advice lands on the ledger, where the
+                // full filter set is available.
+                navController.navigateToTab(Routes.TRANSACTIONS)
+            },
+        )
     }
 
     composable(Routes.IMPORT) {

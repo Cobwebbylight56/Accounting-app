@@ -33,6 +33,7 @@ object Routes {
     const val RECURRING_EDIT = "recurring/edit"
     const val SAVINGS_EDIT = "savings/edit"
     const val REPORT_DETAIL = "report"
+    const val INSIGHTS = "insights"
     const val SETTINGS = "settings"
     const val SETTINGS_APPEARANCE = "settings/appearance"
     const val SETTINGS_SECURITY = "settings/security"

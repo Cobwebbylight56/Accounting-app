@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountBalance
 import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.EventRepeat
+import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.People
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.UploadFile
@@ -31,6 +32,7 @@ import com.rhys.financetracker.ui.settings.SettingsNote
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MoreScreen(
+    onOpenInsights: () -> Unit,
     onOpenAccounts: () -> Unit,
     onOpenPeople: () -> Unit,
     onOpenRecurring: () -> Unit,
@@ -74,6 +76,12 @@ fun MoreScreen(
             )
 
             SettingsGroupHeader("Tools")
+            SettingsItem(
+                title = "Advice",
+                subtitle = "Where you could spend less, and what is coming",
+                icon = Icons.Outlined.Lightbulb,
+                onClick = onOpenInsights,
+            )
             SettingsItem(
                 title = "Import a spreadsheet",
                 subtitle = "Bring in an existing Excel or CSV budget",
