@@ -74,6 +74,10 @@ class ImportViewModel @Inject constructor(
                 is AppResult.Failure -> _state.value = _state.value.copy(
                     isBusy = false,
                     error = result.message,
+                    // A PDF the reader could not make sense of is worth showing:
+                    // the layout is what needs fixing, and it cannot be seen
+                    // from here.
+                    unreadablePdfText = importer.readPdfText(uri)?.takeIf { it.isNotBlank() },
                 )
             }
         }
@@ -260,6 +264,10 @@ class ImportViewModel @Inject constructor(
         _state.value = ImportState()
     }
 
+    fun clearUnreadablePdf() {
+        _state.value = _state.value.copy(unreadablePdfText = null)
+    }
+
     fun clearError() {
         _state.value = _state.value.copy(error = null)
     }
@@ -301,6 +309,8 @@ data class ImportState(
     val detectedStatement: ImportMapping? = null,
     /** The account this import was started from, when it began on one. */
     val preselectedAccountId: Long? = null,
+    /** Text pulled from a PDF whose layout was not recognised, for showing. */
+    val unreadablePdfText: String? = null,
     val usingDetectedLayout: Boolean = false,
     val candidates: List<ImportCandidate> = emptyList(),
     val outcome: ImportOutcome? = null,

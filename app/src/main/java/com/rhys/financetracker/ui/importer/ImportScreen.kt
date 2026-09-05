@@ -5,6 +5,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -19,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.UploadFile
@@ -44,6 +46,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -134,6 +139,16 @@ fun ImportScreen(
                 )
             }
 
+            state.unreadablePdfText?.let { text ->
+                Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    UnreadablePdfCard(
+                        text = text,
+                        onDismiss = viewModel::clearUnreadablePdf,
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
+            }
+
             when (state.step) {
                 ImportStep.CHOOSE_FILE -> ChooseFileStep(
                     onChoose = {
@@ -163,6 +178,66 @@ fun ImportScreen(
         }
     }
 }
+
+/**
+ * What the PDF actually contained, when its layout was not recognised.
+ *
+ * Every bank lays a statement out differently and this app cannot have met
+ * them all. Showing the text turns a dead end into something that can be
+ * fixed: copy it, send it on, and the reader can be taught this layout.
+ */
+@Composable
+private fun UnreadablePdfCard(text: String, onDismiss: () -> Unit) {
+    val clipboard = LocalClipboardManager.current
+    val preview = remember(text) {
+        text.split("\n").filter { it.isNotBlank() }.take(PREVIEW_LINES)
+    }
+
+    SectionCard(
+        title = "What was read from the PDF",
+        subtitle = "The text is there, but no transaction rows were recognised",
+    ) {
+        Text(
+            text = "Copy this and send it on, and the app can be taught your bank's " +
+                "layout. Blank out anything you would rather not share — the shape " +
+                "of the lines is what matters, not the figures.",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Spacer(Modifier.height(12.dp))
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                preview.forEach { line ->
+                    Text(
+                        text = line,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = { clipboard.setText(AnnotatedString(text)) },
+                modifier = Modifier.weight(1f),
+            ) {
+                Text("Copy all text")
+            }
+            OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
+                Text("Dismiss")
+            }
+        }
+    }
+}
+
+/** Enough lines to show the shape of a statement without filling the screen. */
+private const val PREVIEW_LINES = 25
 
 @Composable
 private fun ChooseFileStep(onChoose: () -> Unit) {

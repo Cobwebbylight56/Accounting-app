@@ -118,6 +118,22 @@ class SpreadsheetImporter @Inject constructor(
      * Returns null when the sheet is not that shape, in which case the user
      * maps the columns by hand as before.
      */
+    /**
+     * The raw text of a PDF, for showing when it could not be read.
+     *
+     * Read on the failure path only, so the ordinary import pays nothing for
+     * it. Returns null for anything that is not a PDF.
+     */
+    suspend fun readPdfText(uri: Uri): String? = withContext(ioDispatcher) {
+        val name = DocumentFile.fromSingleUri(context, uri)?.name.orEmpty()
+        if (!name.endsWith(".pdf", ignoreCase = true)) return@withContext null
+        runCatching {
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                PdfStatementReader.extractTextForDiagnostics(input)
+            }
+        }.getOrNull()
+    }
+
     fun detectHouseholdLayout(sheet: SheetData): DetectedLayout? =
         HouseholdLayoutDetector.detect(sheet)?.takeIf { it.isUsable }
 

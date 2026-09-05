@@ -36,13 +36,29 @@ object PdfStatementReader {
 
         val sheet = PdfStatementParser.toSheet(lines, fileName.removeSuffix(".pdf"))
             ?: error(
-                "No transactions were found in that PDF. If it is a scanned or " +
-                    "photographed statement the text cannot be read — download the " +
-                    "statement again from your bank, or use a CSV export if one is offered.",
+                if (text.isBlank()) {
+                    "There is no text in that PDF to read. It is a scan or a photograph " +
+                        "of a statement rather than one downloaded from the bank, so the " +
+                        "figures are a picture. Download the statement from online banking."
+                } else {
+                    "That PDF has text in it, but none of it looks like transaction rows " +
+                        "— so the layout is one this app does not recognise yet. Tap " +
+                        "\"Show what was read\" to see it."
+                },
             )
 
         return WorkbookData(fileName = fileName, sheets = listOf(sheet))
     }
+
+    /**
+     * The raw text of the PDF, for showing the user when it could not be read.
+     *
+     * A layout this app has not met before is the likeliest reason a real
+     * statement fails, and that cannot be diagnosed without seeing it. Rather
+     * than a dead end, the extracted text is put on screen so it can be sent
+     * on and the reader taught the layout.
+     */
+    fun extractTextForDiagnostics(input: InputStream): String = extractText(input)
 
     private fun extractText(input: InputStream): String =
         try {

@@ -152,6 +152,79 @@ class PdfStatementParserTest {
     }
 
     @Test
+    fun `a year from the statement heading dates rows that have none`() {
+        // Lloyds, Halifax and others print the year once and then date each row
+        // "01 Mar". Without this every one of those rows is dropped, which is
+        // what made a real statement come back empty.
+        val rows = PdfStatementParser.parse(
+            listOf(
+                "Statement period 1 March 2026 to 31 March 2026",
+                "01 Mar Balance brought forward           2,000.00",
+                "02 Mar TESCO STORES 3294        42.15    1,957.85",
+                "03 Mar SALARY ACME LTD       1,862.23    3,820.08",
+            ),
+        )
+        assertEquals(2, rows.size)
+        assertEquals(LocalDate.of(2026, 3, 2), rows[0].date)
+        assertEquals(4215L, rows[0].moneyOutMinor)
+        assertEquals(186223L, rows[1].moneyInMinor)
+    }
+
+    @Test
+    fun `a row without a year is dropped when the document never states one`() {
+        // Guessing a year files transactions into the wrong one, which is
+        // worse than declining them.
+        assertNull(PdfStatementParser.inferYear(listOf("01 Mar TESCO 42.15")))
+        assertEquals(
+            emptyList<PdfStatementParser.Row>(),
+            PdfStatementParser.parse(listOf("01 Mar TESCO 42.15 1,957.85")),
+        )
+    }
+
+    @Test
+    fun `a row repeating the previous date is still a transaction`() {
+        // Statements print the date only when it changes.
+        val rows = PdfStatementParser.parse(
+            listOf(
+                "01 Mar 2026 Balance brought forward       2,000.00",
+                "02 Mar 2026 TESCO STORES 3294    42.15    1,957.85",
+                "            GREGGS PLC 1042      3.60     1,954.25",
+            ),
+        )
+        assertEquals(2, rows.size)
+        assertEquals(LocalDate.of(2026, 3, 2), rows[1].date)
+        assertEquals("GREGGS PLC 1042", rows[1].description)
+        assertEquals(360L, rows[1].moneyOutMinor)
+    }
+
+    @Test
+    fun `a debit or credit letter after the figure is not read as part of it`() {
+        // Barclays and others mark direction with a letter rather than a column.
+        val rows = PdfStatementParser.parse(
+            listOf(
+                "01 Mar 2026 Balance brought forward        2,000.00",
+                "02 Mar 2026 TESCO STORES 3294    42.15 D   1,957.85",
+                "03 Mar 2026 SALARY ACME LTD   1,862.23 CR  3,820.08",
+            ),
+        )
+        assertEquals(2, rows.size)
+        assertEquals(4215L, rows[0].moneyOutMinor)
+        assertEquals(186223L, rows[1].moneyInMinor)
+    }
+
+    @Test
+    fun `the latest year in the document is the one used`() {
+        // A statement spanning a year end names both; most of its rows sit in
+        // the later one.
+        assertEquals(
+            2026,
+            PdfStatementParser.inferYear(
+                listOf("Statement period 28 December 2025 to 27 January 2026"),
+            ),
+        )
+    }
+
+    @Test
     fun `a document with no transactions is not offered as a statement`() {
         assertNull(
             PdfStatementParser.toSheet(

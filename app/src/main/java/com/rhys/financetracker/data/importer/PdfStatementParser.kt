@@ -88,15 +88,31 @@ object PdfStatementParser {
         val result = mutableListOf<Row>()
         var previousBalance: Long? = null
 
+        // Many statements print the year once, in the period heading, and then
+        // date each row "01 Mar". Without a year those rows cannot be placed,
+        // so one is taken from the document itself rather than assumed.
+        val documentYear = inferYear(lines)
+
+        // Others print the date only when it changes, leaving later rows for
+        // the same day blank. Those rows are still transactions.
+        var lastDate: LocalDate? = null
+
         for (raw in lines) {
             val line = raw.trim()
             if (line.isEmpty()) continue
 
-            val date = leadingDate(line) ?: continue
             val amounts = trailingAmounts(line)
             if (amounts.isEmpty()) continue
 
-            val description = describe(line, amounts)
+            val date = leadingDate(line, documentYear)
+                // Only carried forward for a row that looks like a full
+                // transaction — an amount and a balance. A single figure with
+                // no date is more likely a total than a payment.
+                ?: lastDate?.takeIf { amounts.size >= 2 }
+                ?: continue
+            lastDate = date
+
+            val description = describe(line)
             if (description.isBlank()) continue
 
             // A brought-forward line states the opening balance and is not a
@@ -195,7 +211,7 @@ object PdfStatementParser {
      * is rejected here rather than guessed, since a wrong year files a
      * transaction in the wrong month.
      */
-    internal fun leadingDate(line: String): LocalDate? {
+    internal fun leadingDate(line: String, fallbackYear: Int? = null): LocalDate? {
         NUMERIC_DATE.find(line)?.let { match ->
             val (d, m, y) = match.destructured
             val year = y.toInt().let { if (it < 100) 2000 + it else it }
@@ -204,10 +220,33 @@ object PdfStatementParser {
         NAMED_DATE.find(line)?.let { match ->
             val (d, name, y) = match.destructured
             val month = MONTHS[name.lowercase().take(3)] ?: return null
-            return runCatching { LocalDate.of(y.toInt(), month, d.toInt()) }.getOrNull()
+            val year = y.toInt().let { if (it < 100) 2000 + it else it }
+            return runCatching { LocalDate.of(year, month, d.toInt()) }.getOrNull()
+        }
+        // "01 Mar" with the year in the statement heading. Only read when a
+        // year was found in the document: guessing one files transactions in
+        // the wrong year, which is worse than declining the row.
+        if (fallbackYear != null) {
+            SHORT_DATE.find(line)?.let { match ->
+                val (d, name) = match.destructured
+                val month = MONTHS[name.lowercase().take(3)] ?: return null
+                return runCatching { LocalDate.of(fallbackYear, month, d.toInt()) }.getOrNull()
+            }
         }
         return null
     }
+
+    /**
+     * A year for rows that do not carry one, taken from anywhere in the
+     * document — the statement period, a printed-on date, a fully dated row.
+     *
+     * The latest year present is used, since a statement covering a year end
+     * mentions both and the later one is where most of its rows sit.
+     */
+    internal fun inferYear(lines: List<String>): Int? =
+        lines.flatMap { YEAR.findAll(it).map { match -> match.value.toInt() } }
+            .filter { it in FIRST_PLAUSIBLE_YEAR..LAST_PLAUSIBLE_YEAR }
+            .maxOrNull()
 
     /**
      * The run of figures at the end of a line, in order.
@@ -217,9 +256,13 @@ object PdfStatementParser {
      * money. Requiring pence, brackets or a sign keeps them out.
      */
     internal fun trailingAmounts(line: String): List<Long> {
-        val tokens = line.trim().split(WHITESPACE)
         val amounts = mutableListOf<Long>()
-        for (token in tokens.asReversed()) {
+        for (token in line.trim().split(WHITESPACE).asReversed()) {
+            // Some banks mark the direction with a letter beside each figure
+            // rather than by column — "42.15 D   1,957.85". The marker sits
+            // between the figures, so it is stepped over rather than only
+            // trimmed off the end. The balance still decides the direction.
+            if (token.uppercase() in DIRECTION_MARKERS) continue
             if (!looksLikeMoney(token)) break
             val minor = Money.parseOrNull(token) ?: break
             amounts += if (token.startsWith("-") || token.endsWith("-") ||
@@ -242,16 +285,34 @@ object PdfStatementParser {
     private fun looksLikeMoney(token: String): Boolean =
         MONEY.matches(token) && Money.parseOrNull(token) != null
 
-    /** Everything between the date and the figures. */
-    private fun describe(line: String, amounts: List<Long>): String {
-        var text = line.trim()
-        // Remove the figures from the end, one token at a time.
-        repeat(amounts.size) {
-            text = text.substringBeforeLast(' ', "").trim()
+    /**
+     * Everything between the date and the figures.
+     *
+     * The tail is dropped by the same rule that read it — figures and any
+     * direction markers among them — rather than by counting tokens, so a
+     * stray "D" cannot leave part of the payee behind or eat a word of it.
+     */
+    private fun describe(line: String): String {
+        val tokens = line.trim().split(WHITESPACE).toMutableList()
+        while (tokens.isNotEmpty()) {
+            val last = tokens.last()
+            if (last.uppercase() in DIRECTION_MARKERS || looksLikeMoney(last)) {
+                tokens.removeAt(tokens.lastIndex)
+            } else {
+                break
+            }
         }
-        // Then the date from the front.
-        NUMERIC_DATE.find(text)?.let { text = text.removeRange(it.range).trim() }
-        NAMED_DATE.find(text)?.let { text = text.removeRange(it.range).trim() }
+        var text = tokens.joinToString(" ")
+        // Then the date from the front, whichever form it took. First match
+        // wins: the forms overlap, and "01 Mar 2026" must not be trimmed to
+        // "2026" by the short form running afterwards.
+        for (pattern in DATE_PATTERNS) {
+            val match = pattern.find(text)
+            if (match != null) {
+                text = text.removeRange(match.range)
+                break
+            }
+        }
         return text.trim(' ', '-', '–', '\t')
     }
 
@@ -267,6 +328,19 @@ object PdfStatementParser {
     private const val MIN_ROWS = 2
 
     private val WHITESPACE = Regex("\\s+")
+
+    /** Letters some banks put after a figure to mean debit or credit. */
+    private val DIRECTION_MARKERS = setOf("CR", "DR", "C", "D")
+
+    /** `01 Mar`, `1 March` — no year, which comes from the statement heading. */
+    private val SHORT_DATE = Regex("""^(\d{1,2})\s+([A-Za-z]{3,9})\.?(?!\s*\d{2,4})""")
+
+    /** Longest form first, so a fuller date is never mistaken for a shorter one. */
+    private val DATE_PATTERNS by lazy { listOf(NUMERIC_DATE, NAMED_DATE, SHORT_DATE) }
+
+    private val YEAR = Regex("""\b(19|20)\d{2}\b""")
+    private const val FIRST_PLAUSIBLE_YEAR = 1990
+    private const val LAST_PLAUSIBLE_YEAR = 2100
 
     /** `01/03/2026`, `1-3-26`, `01.03.2026` — at the start of the line. */
     private val NUMERIC_DATE = Regex("""^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})""")
