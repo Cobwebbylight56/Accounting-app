@@ -6,6 +6,7 @@ import com.rhys.financetracker.core.validation.Validators
 import com.rhys.financetracker.data.local.dao.AccountDao
 import com.rhys.financetracker.data.local.dao.PersonDao
 import com.rhys.financetracker.data.local.entity.AccountEntity
+import com.rhys.financetracker.data.local.projection.AccountOption
 import com.rhys.financetracker.data.local.projection.AccountWithBalance
 import java.time.Instant
 import java.time.LocalDate

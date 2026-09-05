@@ -23,3 +23,18 @@ at runtime with `@RawQuery`, which Room cannot check at all, so without this
 a mistake there would surface only on a phone.
 
 Nothing is written and no real database is touched.
+
+## `validate_imports.py`
+
+```bash
+python3 tools/validate_imports.py
+```
+
+Catches a project type used in a file that never imports it — the mistake that
+turns into `Unresolved reference` several minutes into a CI run. It reports
+only unambiguous cases: a type declared exactly once in the project, used in a
+file that neither declares nor imports it. Fully-qualified uses are ignored,
+since those need no import.
+
+Run all three before pushing; together they take about a second and cover the
+failures that have actually cost round trips here.

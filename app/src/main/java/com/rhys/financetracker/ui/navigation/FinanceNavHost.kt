@@ -98,7 +98,7 @@ fun FinanceNavHost(
                 modifier = Modifier.fillMaxSize(),
             ) {
                 topLevelDestinations(navController, onShareFile)
-                editorDestinations(navController)
+                editorDestinations(navController, importFile, onImportFileHandled)
                 settingsDestinations(navController)
             }
         }
@@ -158,7 +158,11 @@ private fun NavGraphBuilder.topLevelDestinations(
 }
 
 /** Everything that adds or edits a record. */
-private fun NavGraphBuilder.editorDestinations(navController: NavHostController) {
+private fun NavGraphBuilder.editorDestinations(
+    navController: NavHostController,
+    importFile: Uri?,
+    onImportFileHandled: () -> Unit,
+) {
     composable(
         route = Routes.TRANSACTION_EDIT_PATTERN,
         arguments = listOf(navArgument(Routes.ARG_ID) { type = NavType.StringType }),
