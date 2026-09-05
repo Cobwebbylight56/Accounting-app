@@ -104,6 +104,12 @@ enum class ImportTarget(val displayName: String, val description: String) {
 /** One row of the spreadsheet, interpreted but not yet saved. */
 data class ImportCandidate(
     val sourceRow: Int,
+    /**
+     * The amount column this candidate was read from.  A sheet with a column of
+     * figures per person produces one candidate per person from the same row,
+     * so the row number alone does not identify it.
+     */
+    val sourceColumn: Int = -1,
     val name: String,
     val amountMinor: Long,
     val target: ImportTarget,
@@ -119,6 +125,9 @@ data class ImportCandidate(
     val isSelected: Boolean = true,
 ) {
     val isImportable: Boolean get() = problem == null
+
+    /** Stable identity for list keys and for toggling one candidate. */
+    val id: String get() = "$sourceRow:$sourceColumn"
 }
 
 /** The outcome of writing the selected candidates to the database. */

@@ -78,6 +78,30 @@ migration if you want it to appear for them immediately.
 
 ---
 
+## Make a chart do something when it is tapped
+
+Every chart in `ui/components/Charts.kt` takes an optional click callback and an
+optional `selectedIndex`; passing null for both leaves it a plain picture.
+
+```kotlin
+DonutChart(
+    entries = entries,
+    selectedIndex = selected,
+    onSliceClick = { index -> selected = index },   // null when the hole is tapped
+)
+ChartLegend(entries, selectedIndex = selected, onEntryClick = { selected = it })
+```
+
+Two things to keep right:
+
+1. **Index against the same filtered list the chart drew.** The charts drop
+   zero-value entries, so `entries[index]` is not `totals[index]` unless you
+   filter first — see `SpendingByCategoryCard`.
+2. **Wire the legend to the same action.** A two-degree slice is not a usable
+   target; the legend row is.
+
+---
+
 ## Add a new report
 
 1. **Constant** — add to `ReportType` in `domain/report/ReportModels.kt`.
@@ -217,6 +241,7 @@ and not before.
 | **Budgets per category** | `categories.monthly_budget_minor` already exists and is editable. Add a `BudgetProgressCard` and a report comparing it with `getCategoryTotals`. |
 | **Receipt photos** | New `attachments` table with the transaction id and a `content://` URI; copy the file into app storage so the URI stays valid. |
 | **Bank import (OFX/QIF)** | New reader beside `CsvReader`; reuse the whole mapping and preview flow. |
+| **Another spreadsheet layout** | Add a detector beside `HouseholdLayoutDetector` returning `List<ImportMapping>`; everything below the mapping is already shared. |
 | **Multi-currency** | `accounts.currency_code` already exists. Add a stored rate per date and convert at the report layer, never at the entity layer. |
 | **Sync between phones** | The backup format is already a complete, versioned document. The honest version needs per-record timestamps (they exist: `updated_at`) and a conflict rule. |
 | **Widgets** | Glance, reading the same repositories. |

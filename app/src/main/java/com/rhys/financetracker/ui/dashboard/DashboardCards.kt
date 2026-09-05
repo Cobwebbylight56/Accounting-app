@@ -289,8 +289,12 @@ private fun GoalProgressRow(goal: SavingsGoalWithProgress) {
 }
 
 @Composable
-internal fun SpendingByCategoryCard(state: DashboardState) {
-    val entries = state.spendingByCategory.mapIndexed { index, total ->
+internal fun SpendingByCategoryCard(
+    state: DashboardState,
+    onCategoryClick: (Long?, String, String?) -> Unit,
+) {
+    val totals = state.spendingByCategory
+    val entries = totals.mapIndexed { index, total ->
         ChartEntry(
             label = total.categoryName ?: "Uncategorised",
             value = total.totalMinor.toFloat(),
@@ -298,20 +302,36 @@ internal fun SpendingByCategoryCard(state: DashboardState) {
             displayValue = Money.format(total.totalMinor),
         )
     }
+    // The chart drops zero-value entries, so index back through the same
+    // filtered list rather than the raw totals.
+    val tappable = totals.filter { it.totalMinor > 0L }
 
-    SectionCard(title = "Where the money went") {
+    fun open(index: Int) {
+        tappable.getOrNull(index)?.let {
+            onCategoryClick(it.categoryId, it.categoryName ?: "Uncategorised", it.categoryColor)
+        }
+    }
+
+    SectionCard(
+        title = "Where the money went",
+        subtitle = if (entries.isEmpty()) null else "Tap a slice to see what is in it",
+    ) {
         DonutChart(
             entries = entries,
             centreLabel = "spent",
             centreValue = Money.formatCompact(state.summary.monthExpenseMinor),
+            onSliceClick = { index -> index?.let(::open) },
         )
         Spacer(Modifier.height(14.dp))
-        ChartLegend(entries)
+        ChartLegend(entries = entries, onEntryClick = ::open)
     }
 }
 
 @Composable
-internal fun IncomeVsExpenseCard(state: DashboardState) {
+internal fun IncomeVsExpenseCard(
+    state: DashboardState,
+    onMonthClick: (java.time.YearMonth) -> Unit,
+) {
     val colors = FinanceTheme.colors
     val groups = state.monthlyTrend.map { point ->
         BarGroup(
@@ -332,16 +352,35 @@ internal fun IncomeVsExpenseCard(state: DashboardState) {
             ),
         )
     }
+    val selected = state.monthlyTrend.indexOfFirst { it.yearMonth == state.month }
+        .takeIf { it >= 0 }
 
     SectionCard(
         title = "Income against spending",
-        subtitle = "The last ${groups.size} months",
+        subtitle = "The last ${groups.size} months · tap a month to open it",
     ) {
-        GroupedBarChart(groups)
+        GroupedBarChart(
+            groups = groups,
+            selectedIndex = selected,
+            onGroupClick = { index ->
+                state.monthlyTrend.getOrNull(index)?.let { onMonthClick(it.yearMonth) }
+            },
+        )
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             LegendSwatch("Money in", colors.income)
             LegendSwatch("Money out", colors.expense)
+        }
+        state.monthlyTrend.firstOrNull { it.yearMonth == state.month }?.let { current ->
+            Spacer(Modifier.height(10.dp))
+            Text(
+                text = "${DateUtils.formatMonth(current.yearMonth)}: " +
+                    "${Money.format(current.incomeMinor)} in, " +
+                    "${Money.format(current.expenseMinor)} out, " +
+                    "${Money.format(current.netMinor, showSign = true)} left over",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

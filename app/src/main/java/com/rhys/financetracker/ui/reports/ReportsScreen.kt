@@ -296,6 +296,7 @@ private fun ScopeChips(state: ReportsState, onScopeChange: (ReportScope) -> Unit
 private fun CategoryChartCard(
     totals: List<com.rhys.financetracker.data.local.projection.CategoryTotal>,
 ) {
+    var selected by remember(totals) { mutableStateOf<Int?>(null) }
     val entries = totals.mapIndexed { index, total ->
         ChartEntry(
             label = total.categoryName ?: "Uncategorised",
@@ -304,14 +305,52 @@ private fun CategoryChartCard(
             displayValue = Money.format(total.totalMinor),
         )
     }
-    SectionCard(title = "By category") {
+    val tappable = totals.filter { it.totalMinor > 0L }
+    val grandTotal = tappable.sumOf { it.totalMinor }
+
+    SectionCard(
+        title = "By category",
+        subtitle = "Tap a slice to see its share",
+    ) {
         DonutChart(
             entries = entries,
-            centreLabel = "total",
-            centreValue = Money.formatCompact(totals.sumOf { it.totalMinor }),
+            centreLabel = selected?.let { "of the total" } ?: "total",
+            centreValue = selected?.let { index ->
+                tappable.getOrNull(index)?.let { Money.formatCompact(it.totalMinor) }
+            } ?: Money.formatCompact(grandTotal),
+            selectedIndex = selected,
+            onSliceClick = { index -> selected = if (index == selected) null else index },
         )
+
+        selected?.let { index ->
+            tappable.getOrNull(index)?.let { total ->
+                Spacer(Modifier.height(10.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    ColorDot(colorFromHex(total.categoryColor, index))
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        text = "${total.categoryName ?: "Uncategorised"} · " +
+                            "${Money.format(total.totalMinor)} across " +
+                            "${total.transactionCount} " +
+                            (if (total.transactionCount == 1) "entry" else "entries") +
+                            if (grandTotal > 0L) {
+                                " · ${(total.totalMinor * 100 / grandTotal)}% of the total"
+                            } else {
+                                ""
+                            },
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+        }
+
         Spacer(Modifier.height(14.dp))
-        ChartLegend(entries, maxItems = 12)
+        ChartLegend(
+            entries = entries,
+            maxItems = 12,
+            selectedIndex = selected,
+            onEntryClick = { index -> selected = if (index == selected) null else index },
+        )
     }
 }
 
@@ -320,7 +359,12 @@ private fun MonthlyChartCard(
     series: List<com.rhys.financetracker.domain.report.MonthPoint>,
 ) {
     val colors = FinanceTheme.colors
-    SectionCard(title = "Month by month") {
+    var selected by remember(series) { mutableStateOf<Int?>(null) }
+
+    SectionCard(
+        title = "Month by month",
+        subtitle = "Tap a column for that month's figures",
+    ) {
         GroupedBarChart(
             groups = series.map { point ->
                 BarGroup(
@@ -341,6 +385,8 @@ private fun MonthlyChartCard(
                     ),
                 )
             },
+            selectedIndex = selected,
+            onGroupClick = { index -> selected = if (index == selected) null else index },
         )
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -355,6 +401,18 @@ private fun MonthlyChartCard(
                 Text("Money out", style = MaterialTheme.typography.bodySmall)
             }
         }
+        selected?.let { index ->
+            series.getOrNull(index)?.let { point ->
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    text = "${DateUtils.formatMonth(point.yearMonth)}: " +
+                        "${Money.format(point.incomeMinor)} in, " +
+                        "${Money.format(point.expenseMinor)} out, " +
+                        "${Money.format(point.netMinor, showSign = true)} left over",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
     }
 }
 
@@ -362,14 +420,27 @@ private fun MonthlyChartCard(
 private fun BalanceChartCard(
     series: List<com.rhys.financetracker.domain.report.DatedAmount>,
 ) {
+    var selected by remember(series) { mutableStateOf<Int?>(null) }
+
     SectionCard(
         title = "Running balance",
         subtitle = "From ${DateUtils.formatShort(series.first().date)} to " +
-            DateUtils.formatShort(series.last().date),
+            "${DateUtils.formatShort(series.last().date)} · tap to read a day",
     ) {
         LineChart(
             points = series.map { DateUtils.formatShort(it.date) to it.amountMinor },
+            selectedIndex = selected,
+            onPointSelected = { index -> selected = index },
         )
+        selected?.let { index ->
+            series.getOrNull(index)?.let { point ->
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    text = "${DateUtils.format(point.date)}: ${Money.format(point.amountMinor)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
     }
 }
 

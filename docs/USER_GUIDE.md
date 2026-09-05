@@ -181,6 +181,21 @@ June's figures update — and March's archived figures still show what was
 believed at the time. That is deliberate: history should not quietly rewrite
 itself.
 
+### Tapping the charts
+
+The charts are not just pictures.
+
+- **Tap a slice of the spending pie** (or its legend row) and a panel slides up
+  listing every entry behind it, with the same category last month underneath so
+  you can see whether this month is normal. Tap any entry to edit it.
+- **Tap a column of the income-against-spending chart** and the whole dashboard
+  moves to that month.
+- **Tap the running-balance line** on a cash flow report to read that day's
+  figure.
+
+On the Reports screen, tapping a slice highlights it and shows its share of the
+total; tapping it again clears the selection.
+
 ### Household, person or account
 
 Chips at the top of the Home screen and the Reports screen switch between the
@@ -215,9 +230,16 @@ carries the title and the period.
 
 See [IMPORT.md](IMPORT.md) for a step-by-step walkthrough.
 
-In short: **More → Import a spreadsheet**, choose the file, tell the app what
-each column means, check the preview, import. Nothing is written until you press
-Import, so a wrong guess costs nothing.
+In short: **More → Import a spreadsheet**, then choose the file.
+
+If your sheet has a column of figures for each person — the way the original
+"Book r and h" workbook is built — the app recognises that and offers to import
+the whole thing in one tap, working out who the people are, which blocks are
+balances and which are bills, and which rows are totals to leave out. Otherwise
+you tell it what each column means.
+
+Either way you see exactly what it plans to create before anything is written,
+so a wrong guess costs nothing.
 
 ---
 

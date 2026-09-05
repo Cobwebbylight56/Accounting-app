@@ -65,6 +65,7 @@ fun DashboardScreen(
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val categoryDetail by viewModel.categoryDetail.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -133,6 +134,8 @@ fun DashboardScreen(
                         onOpenRecurring = onOpenRecurring,
                         onOpenSavings = onOpenSavings,
                         onOpenExternalData = onOpenExternalData,
+                        onCategoryClick = viewModel::showCategoryDetail,
+                        onMonthClick = viewModel::showMonth,
                     )
                 }
 
@@ -147,6 +150,17 @@ fun DashboardScreen(
                 }
             }
         }
+    }
+
+    categoryDetail?.let { detail ->
+        CategoryDetailSheet(
+            detail = detail,
+            onDismiss = viewModel::clearCategoryDetail,
+            onOpenTransaction = { id ->
+                viewModel.clearCategoryDetail()
+                onOpenTransaction(id)
+            },
+        )
     }
 }
 
@@ -233,6 +247,8 @@ private fun DashboardCard(
     onOpenRecurring: () -> Unit,
     onOpenSavings: () -> Unit,
     onOpenExternalData: () -> Unit,
+    onCategoryClick: (Long?, String, String?) -> Unit,
+    onMonthClick: (java.time.YearMonth) -> Unit,
 ) {
     when (widget) {
         DashboardWidget.BALANCE_SUMMARY -> BalanceSummaryCard(state, onOpenAccounts)
@@ -243,8 +259,9 @@ private fun DashboardCard(
         DashboardWidget.RECENT_TRANSACTIONS ->
             RecentTransactionsCard(state, onOpenTransaction, onAddTransaction)
         DashboardWidget.SAVINGS_PROGRESS -> SavingsProgressCard(state, onOpenSavings)
-        DashboardWidget.SPENDING_BY_CATEGORY -> SpendingByCategoryCard(state)
-        DashboardWidget.INCOME_VS_EXPENSE -> IncomeVsExpenseCard(state)
+        DashboardWidget.SPENDING_BY_CATEGORY ->
+            SpendingByCategoryCard(state, onCategoryClick)
+        DashboardWidget.INCOME_VS_EXPENSE -> IncomeVsExpenseCard(state, onMonthClick)
         DashboardWidget.NET_WORTH -> NetWorthCard(state)
         DashboardWidget.ACCOUNTS_LIST -> AccountsListCard(state, onOpenAccounts)
         DashboardWidget.EXTERNAL_DATA -> ExternalDataCard(state, onOpenExternalData)

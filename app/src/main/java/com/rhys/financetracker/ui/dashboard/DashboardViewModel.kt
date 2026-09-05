@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rhys.financetracker.core.time.DateUtils
 import com.rhys.financetracker.data.local.dao.DashboardWidgetDao
+import com.rhys.financetracker.data.local.dao.TransactionFilter
+import com.rhys.financetracker.data.local.dao.TransactionSort
 import com.rhys.financetracker.data.local.entity.DashboardWidgetEntity
 import com.rhys.financetracker.data.local.entity.PersonEntity
 import com.rhys.financetracker.data.local.projection.AccountWithBalance
@@ -203,6 +205,76 @@ class DashboardViewModel @Inject constructor(
         )
     }
 
+    // --------------------------------------------------------- drill-down
+
+    private val selectedCategory = MutableStateFlow<CategorySelection?>(null)
+
+    /**
+     * The breakdown shown when a category slice is tapped: that category's
+     * entries for the month on screen, plus the same figure a month earlier so
+     * the two can be compared.
+     *
+     * It is a separate flow from [state] so that opening and closing the sheet
+     * does not recompute the whole dashboard.
+     */
+    val categoryDetail: StateFlow<CategoryDetail?> =
+        combine(selectedCategory, visibleMonth, scope) { selection, month, currentScope ->
+            Triple(selection, month, currentScope)
+        }.flatMapLatest { (selection, month, currentScope) ->
+            if (selection == null) {
+                flowOf(null)
+            } else {
+                val range = DateUtils.monthRange(month)
+                val previous = DateUtils.monthRange(month.minusMonths(1))
+                combine(
+                    transactionRepository.search(
+                        TransactionFilter(
+                            categoryIds = selection.categoryId?.let { setOf(it) } ?: emptySet(),
+                            onlyUncategorised = selection.categoryId == null,
+                            dateFrom = range.start,
+                            dateTo = range.endInclusive,
+                            types = setOf(TransactionType.EXPENSE),
+                            personIds = currentScope.personId?.let { setOf(it) } ?: emptySet(),
+                            sort = TransactionSort.AMOUNT_DESC,
+                        ),
+                    ),
+                    transactionRepository.observeCategoryTotals(
+                        type = TransactionType.EXPENSE,
+                        start = previous.start,
+                        end = previous.endInclusive,
+                        accountId = currentScope.accountId,
+                        personId = currentScope.personId,
+                    ),
+                ) { entries, lastMonth ->
+                    CategoryDetail(
+                        categoryId = selection.categoryId,
+                        name = selection.name,
+                        colorHex = selection.colorHex,
+                        month = month,
+                        transactions = entries,
+                        totalMinor = entries.sumOf { it.transaction.amountMinor },
+                        previousMonthTotalMinor = lastMonth
+                            .firstOrNull { it.categoryId == selection.categoryId }
+                            ?.totalMinor ?: 0L,
+                    )
+                }
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** Opens the breakdown for a tapped slice or legend row. */
+    fun showCategoryDetail(categoryId: Long?, name: String, colorHex: String?) {
+        selectedCategory.value = CategorySelection(categoryId, name, colorHex)
+    }
+
+    fun clearCategoryDetail() {
+        selectedCategory.value = null
+    }
+
+    /** Jumps to the month behind a tapped bar. */
+    fun showMonth(month: YearMonth) {
+        if (!month.isAfter(DateUtils.currentYearMonth())) visibleMonth.value = month
+    }
+
     fun setScope(newScope: DashboardScope) {
         scope.value = newScope
     }
@@ -288,4 +360,35 @@ data class DashboardState(
     val hasAnyData: Boolean get() = accounts.isNotEmpty() || recentTransactions.isNotEmpty()
     fun isVisible(widget: DashboardWidget): Boolean =
         widgets.firstOrNull { it.widget == widget }?.isVisible ?: widget.defaultVisible
+}
+
+/** What the user tapped, before the figures behind it have been loaded. */
+private data class CategorySelection(
+    val categoryId: Long?,
+    val name: String,
+    val colorHex: String?,
+)
+
+/** The breakdown behind one category slice, for the month on screen. */
+data class CategoryDetail(
+    val categoryId: Long?,
+    val name: String,
+    val colorHex: String?,
+    val month: YearMonth,
+    val transactions: List<TransactionWithDetails>,
+    val totalMinor: Long,
+    val previousMonthTotalMinor: Long,
+) {
+    /** Positive means more was spent than last month. */
+    val changeMinor: Long get() = totalMinor - previousMonthTotalMinor
+
+    val hasComparison: Boolean get() = previousMonthTotalMinor > 0L
+
+    /** Change as a percentage of last month, or null when there is nothing to compare with. */
+    val changePercent: Int?
+        get() = if (previousMonthTotalMinor <= 0L) {
+            null
+        } else {
+            ((changeMinor.toDouble() / previousMonthTotalMinor) * 100).toInt()
+        }
 }

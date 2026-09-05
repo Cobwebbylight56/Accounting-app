@@ -163,11 +163,55 @@ private fun ChooseFileStep(onChoose: () -> Unit) {
                     "• If a sheet has one column of figures per person, import it once for " +
                     "each person and set who it belongs to.\n" +
                     "• You can import the same file again later to top things up — matching " +
-                    "accounts and categories are reused, not duplicated.",
+                    "accounts and categories are reused, not duplicated.\n" +
+                    "• If your sheet has a column of figures for each person, the app will " +
+                    "spot that and offer to import the whole thing in one tap.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+/**
+ * The banner that turns a whole household sheet into one tap.
+ *
+ * It appears only when the layout was recognised, and it always says exactly
+ * what it found, so the user can tell whether the guess is right before
+ * committing to it.
+ */
+@Composable
+private fun DetectedLayoutCard(state: ImportState, viewModel: ImportViewModel) {
+    val layout = state.detectedLayout ?: return
+
+    SectionCard(
+        title = "This looks like a household budget",
+        subtitle = "Everything can be imported in one go",
+    ) {
+        Text(
+            text = layout.describe(),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = "Each person's column is read separately, and any \"both\" or " +
+                "\"total\" column is ignored so nothing is counted twice.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(14.dp))
+        Button(
+            onClick = viewModel::useDetectedLayout,
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+        ) {
+            Text("Import the whole sheet")
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = "You will see everything it plans to create before anything is saved.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -183,6 +227,16 @@ private fun MappingStep(state: ImportState, viewModel: ImportViewModel) {
         contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 96.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
+        if (state.canAutoImport) {
+            item { DetectedLayoutCard(state = state, viewModel = viewModel) }
+            item {
+                Text(
+                    text = "Or set the columns yourself",
+                    style = MaterialTheme.typography.titleSmall,
+                )
+            }
+        }
+
         if ((state.workbook?.sheets?.size ?: 0) > 1) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -398,6 +452,13 @@ private fun ReviewStep(state: ImportState, viewModel: ImportViewModel) {
                     text = "${state.selectedCount} of ${state.candidates.size} rows will be added",
                     style = MaterialTheme.typography.titleSmall,
                 )
+                if (state.usingDetectedLayout) {
+                    Text(
+                        text = "Read straight from your sheet's layout",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 if (state.problemCount > 0) {
                     Text(
                         text = "${state.problemCount} cannot be read and have been left out",
@@ -414,10 +475,10 @@ private fun ReviewStep(state: ImportState, viewModel: ImportViewModel) {
             modifier = Modifier.weight(1f),
             contentPadding = PaddingValues(horizontal = 16.dp),
         ) {
-            items(state.candidates, key = { it.sourceRow }) { candidate ->
+            items(state.candidates, key = { it.id }) { candidate ->
                 CandidateRow(
                     candidate = candidate,
-                    onToggle = { viewModel.toggleCandidate(candidate.sourceRow) },
+                    onToggle = { viewModel.toggleCandidate(candidate.id) },
                 )
             }
         }
@@ -427,9 +488,9 @@ private fun ReviewStep(state: ImportState, viewModel: ImportViewModel) {
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             OutlinedButton(
-                onClick = viewModel::goToMapping,
+                onClick = viewModel::mapByHand,
                 modifier = Modifier.weight(1f),
-            ) { Text("Back") }
+            ) { Text("Change") }
             Button(
                 onClick = viewModel::applyImport,
                 modifier = Modifier.weight(1f),

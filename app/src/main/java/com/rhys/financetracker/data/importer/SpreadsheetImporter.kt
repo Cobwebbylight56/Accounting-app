@@ -110,6 +110,31 @@ class SpreadsheetImporter @Inject constructor(
     }
 
     /**
+     * Looks for the household layout — a column of figures per person, in
+     * blocks — and returns everything needed to import the whole sheet at once.
+     * Returns null when the sheet is not that shape, in which case the user
+     * maps the columns by hand as before.
+     */
+    fun detectHouseholdLayout(sheet: SheetData): DetectedLayout? =
+        HouseholdLayoutDetector.detect(sheet)?.takeIf { it.isUsable }
+
+    /**
+     * Builds the candidates for every person and every block in one pass.
+     *
+     * Rows that fail to read are kept and flagged rather than dropped, so the
+     * preview shows the whole sheet and nothing disappears silently.
+     */
+    fun buildCandidatesForLayout(
+        sheet: SheetData,
+        layout: DetectedLayout,
+    ): List<ImportCandidate> =
+        HouseholdLayoutDetector.mappingsFor(layout)
+            .flatMap { mapping -> buildCandidates(sheet, mapping) }
+            // The same row appears once per person; keep them together so the
+            // review list reads down the sheet rather than by person.
+            .sortedWith(compareBy({ it.sourceRow }, { it.sourceColumn }))
+
+    /**
      * Interprets the mapped rows without saving them, so the user can review
      * exactly what would be created.
      */
@@ -133,10 +158,8 @@ class SpreadsheetImporter @Inject constructor(
 
         return range.mapNotNull { row ->
             val name = nameColumn?.let { sheet.cell(row, it) }?.trim().orEmpty()
-            val amountText = amountColumns
-                .map { sheet.cell(row, it) }
-                .firstOrNull { it.isNotBlank() }
-                .orEmpty()
+            val amountColumn = amountColumns.firstOrNull { sheet.cell(row, it).isNotBlank() }
+            val amountText = amountColumn?.let { sheet.cell(row, it) }.orEmpty()
             val amount = Money.parseOrNull(amountText)
 
             // A row with neither a name nor a figure is a spacer, not data.
@@ -153,6 +176,7 @@ class SpreadsheetImporter @Inject constructor(
 
             ImportCandidate(
                 sourceRow = row,
+                sourceColumn = amountColumn ?: -1,
                 name = name.ifBlank { "Row ${row + 1}" },
                 amountMinor = amount ?: 0L,
                 target = mapping.target,

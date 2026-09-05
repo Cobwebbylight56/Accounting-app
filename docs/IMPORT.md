@@ -22,7 +22,44 @@ Open the spreadsheet on a computer and check two things:
 
 ---
 
-## The layout problem, and how to work with it
+## The quick way: let the app read the layout
+
+When you pick the file, the app looks at its shape. If it sees a **column of
+figures for each person** — which is how the "Book r and h" sheet is built — it
+says so and offers to import the whole thing in one tap:
+
+> **This looks like a household budget**
+> Rhys and Hannah found, across 3 blocks: income (1 row), savings & (4 rows),
+> outgoings (7 rows).
+>
+> [ Import the whole sheet ]
+
+Press it and you go straight to the preview, with every row from every block
+listed and ready to check. Nothing is saved until you press Import.
+
+What it works out for itself:
+
+- **Who the people are** — from the row reading `Rhys | Hannah | both`.
+- **Which column belongs to whom**, reading each person's column separately.
+- **That the "both" column is a total**, and ignoring it. This matters: importing
+  it as well would count every amount twice.
+- **Where the blocks start and stop**, from the headings (`savings &`,
+  `OUTGOINGS`) and the blank rows between them.
+- **What each block is** — balances, income or bills.
+- **Which rows are totals** (`spent`, `left over`, `ALL SAVINGS`) and leaving
+  them out, so you do not end up with a bill called "spent" for £1,941.63.
+
+If the guess is wrong anywhere, **Change** on the preview screen takes you to
+the manual mapping below, and nothing has been written.
+
+---
+
+## The manual way
+
+Use this when your sheet is laid out differently, or when the detection gets
+something wrong.
+
+### The layout problem, by hand
 
 A spreadsheet like this one:
 
@@ -41,7 +78,7 @@ has **one column of figures per person** and one derived "both" column. Most
 importers assume one row per record with a person column — this one has a person
 per *column*.
 
-The way through it is to **import the sheet once per person**:
+The way through it by hand is to **import the sheet once per person**:
 
 1. Import it with the *Amount* column set to Rhys's column (F) and the person
    set to "Rhys".
@@ -50,8 +87,6 @@ The way through it is to **import the sheet once per person**:
 
 Leave the "both" column (J) alone — it is a total the app recalculates for you,
 and importing it would double-count everything.
-
----
 
 ## Step by step
 

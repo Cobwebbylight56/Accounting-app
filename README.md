@@ -23,9 +23,9 @@ bank holiday calendar, and that is off until you turn it on.
 | **Savings** | Multiple goals with targets, contributions, target dates, progress bars, and an honest answer to "will I actually get there in time?". |
 | **Categories** | Fully editable, colour-coded, nestable one level deep, with optional monthly budgets. |
 | **Reports** | Monthly and yearly spending, category breakdown, income vs expenses, account balances, net worth, cash flow, savings history, and a full printable summary. |
-| **Charts** | Donut, grouped bar and line charts, drawn in-app with no third-party library — and each one readable by a screen reader. |
+| **Charts** | Donut, grouped bar and line charts, drawn in-app with no third-party library — and each one readable by a screen reader. **Tap a pie slice** to see every entry behind it and how it compares with last month; **tap a bar** to jump to that month; **tap the balance line** to read a single day. |
 | **Search and filters** | Search names, notes, tags, categories, accounts and people. Filter by date, amount, type, category, person and account. |
-| **Import** | Read an existing `.xlsx` or `.csv` budget, map the columns (with a sensible first guess), preview exactly what will be created, then import. |
+| **Import** | Read an existing `.xlsx` or `.csv` budget. A sheet with a column of figures per person is recognised automatically and imported whole in one tap; anything else is mapped by hand with a sensible first guess. Either way you preview exactly what will be created before anything is written. |
 | **Export and print** | PDF, CSV and Excel, A4 portrait or landscape, printed through Android's own print system. |
 | **Backup** | Manual and automatic backups to anywhere the system file picker can reach — including Drive, OneDrive or Dropbox — plus restore. |
 | **Notifications** | Bills due, overdue payments, low balances and savings milestones, each switchable on its own. |
@@ -68,9 +68,15 @@ cd Accounting-app
 ./gradlew installDebug     # with a device or emulator attached
 ```
 
-Then open the app, go to **Settings → Load the example household**, and the
-original spreadsheet's figures appear as real accounts, bills and goals to
-explore.
+The app starts with no financial data — only a set of categories to get going
+with. There are two ways to fill it:
+
+- **Settings → Load the example household** puts the original spreadsheet's
+  figures in as real accounts, bills and goals, to explore before committing to
+  anything.
+- **More → Import a spreadsheet** reads your actual workbook. If it has a column
+  of figures per person, the app spots that and imports the whole sheet in one
+  tap.
 
 ## Running the tests
 

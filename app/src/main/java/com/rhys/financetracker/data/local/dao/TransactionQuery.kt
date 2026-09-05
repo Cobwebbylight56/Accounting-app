@@ -20,6 +20,8 @@ data class TransactionFilter(
     val types: Set<TransactionType> = emptySet(),
     val minAmountMinor: Long? = null,
     val maxAmountMinor: Long? = null,
+    /** Matches only entries with no category, which no id list can express. */
+    val onlyUncategorised: Boolean = false,
     val savingsGoalId: Long? = null,
     val recurringRuleId: Long? = null,
     val onlyUnconfirmed: Boolean = false,
@@ -33,6 +35,7 @@ data class TransactionFilter(
     val isEmpty: Boolean
         get() = text.isNullOrBlank() && dateFrom == null && dateTo == null &&
             accountIds.isEmpty() && categoryIds.isEmpty() && personIds.isEmpty() &&
+            !onlyUncategorised &&
             types.isEmpty() && minAmountMinor == null && maxAmountMinor == null &&
             savingsGoalId == null && recurringRuleId == null &&
             !onlyUnconfirmed && !onlyUncleared && !includeArchived
@@ -43,7 +46,7 @@ data class TransactionFilter(
             !text.isNullOrBlank(),
             dateFrom != null || dateTo != null,
             accountIds.isNotEmpty(),
-            categoryIds.isNotEmpty(),
+            categoryIds.isNotEmpty() || onlyUncategorised,
             personIds.isNotEmpty(),
             types.isNotEmpty(),
             minAmountMinor != null || maxAmountMinor != null,
@@ -110,7 +113,9 @@ object TransactionQuery {
             args += filter.accountIds
         }
 
-        if (filter.categoryIds.isNotEmpty()) {
+        if (filter.onlyUncategorised) {
+            conditions += "t.category_id IS NULL"
+        } else if (filter.categoryIds.isNotEmpty()) {
             conditions += "t.category_id IN (${filter.categoryIds.joinToString(", ") { "?" }})"
             args += filter.categoryIds
         }

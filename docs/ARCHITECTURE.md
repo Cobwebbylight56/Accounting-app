@@ -146,6 +146,22 @@ Drawn directly on a Compose `Canvas`. No charting library means no dependency to
 track, a smaller APK, and — the reason that actually matters — a real
 `contentDescription` on every chart, so a screen reader reads out the figures.
 
+They are interactive. The donut computes its slice sweeps once and both draws
+and hit-tests from that same list, so what you tap is always what you see; the
+hit test also checks the radius, since the ring is hollow and the total sits in
+the middle. The bar chart treats the whole column as the target rather than the
+bar, so a quiet month is as easy to hit as a busy one. Every chart's
+`contentDescription` says what tapping does.
+
+### `HouseholdLayoutDetector`
+
+Recognises the shape of a hand-built budget sheet — a column of figures per
+person, blocks separated by blank rows, a derived "both" column — and produces
+one `ImportMapping` per person per block. The normal import pipeline then turns
+those into candidates, so the one-tap path and the manual path share all of the
+same code below the mapping. It reads only; nothing is written until the user
+confirms the preview.
+
 ---
 
 ## Threading and background work
@@ -177,6 +193,7 @@ Unit tests cover the parts where a bug would be expensive and silent:
 | `CsvReaderTest` | Quoted fields, embedded newlines, delimiter detection |
 | `XlsxWriterTest` | The archive contains every part Excel needs; text is escaped |
 | `TransactionQueryTest` | Filters build correctly, and user input is bound rather than concatenated |
+| `HouseholdLayoutDetectorTest` | The example sheet's layout is read correctly: both people found, the "both" column ignored, total rows excluded |
 | `SampleDataTest` | The sample figures still agree with the original spreadsheet |
 | `DateUtilsTest`, `ValidatorsTest` | Date handling and input rules |
 
