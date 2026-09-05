@@ -1,0 +1,174 @@
+package com.rhys.financetracker.data
+
+import com.rhys.financetracker.data.importer.PdfStatementParser
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import java.time.LocalDate
+
+/**
+ * A PDF gives lines of text with nothing marking which figure is the amount,
+ * which is the balance, or which way the money went. The running balance is
+ * what settles it, and these cover both that working and its failing safely.
+ */
+class PdfStatementParserTest {
+
+    private val statement = listOf(
+        "Your statement",
+        "Account 12345678            Sort code 00-00-00",
+        "Date        Description              Paid out   Paid in    Balance",
+        "01 Mar 2026 Balance brought forward                        2,000.00",
+        "01 Mar 2026 TESCO STORES 3294           42.15              1,957.85",
+        "02 Mar 2026 SALARY ACME LTD                     1,862.23   3,820.08",
+        "03 Mar 2026 SHELL FILLING STN           61.40              3,758.68",
+    )
+
+    @Test
+    fun `reads the transaction lines and ignores the rest`() {
+        val rows = PdfStatementParser.parse(statement)
+        // Headings, the account line and the brought-forward line are not
+        // transactions; the three payments are.
+        assertEquals(3, rows.size)
+        assertEquals(LocalDate.of(2026, 3, 1), rows[0].date)
+        assertEquals("TESCO STORES 3294", rows[0].description)
+    }
+
+    @Test
+    fun `the brought forward line sets the opening balance without becoming an entry`() {
+        // Counted as a payment it would both invent an entry and leave the
+        // first real row with nothing to check itself against.
+        val rows = PdfStatementParser.parse(statement)
+        assertTrue(rows.none { it.description.contains("brought forward", ignoreCase = true) })
+        assertEquals(4215L, rows[0].moneyOutMinor)
+        assertNull(rows[0].problem)
+    }
+
+    @Test
+    fun `the balance decides which way the money went`() {
+        val rows = PdfStatementParser.parse(statement)
+
+        // Down 42.15, so money out — regardless of which column it sat in.
+        assertEquals(4215L, rows[0].moneyOutMinor)
+        assertNull(rows[0].moneyInMinor)
+
+        // Up 1,862.23, so money in.
+        assertEquals(186223L, rows[1].moneyInMinor)
+        assertNull(rows[1].moneyOutMinor)
+
+        // And down again.
+        assertEquals(6140L, rows[2].moneyOutMinor)
+    }
+
+    @Test
+    fun `the balance is kept alongside each row`() {
+        val rows = PdfStatementParser.parse(statement)
+        assertEquals(195785L, rows[0].balanceMinor)
+        assertEquals(382008L, rows[1].balanceMinor)
+        assertEquals(375868L, rows[2].balanceMinor)
+    }
+
+    @Test
+    fun `a line whose figures do not match the balance is flagged`() {
+        // 42.15 out should leave 1,957.85 but the statement says 1,900.00, so
+        // something on this line was misread. Better shown than assumed.
+        val rows = PdfStatementParser.parse(
+            listOf(
+                "01 Mar 2026 Balance brought forward      2,000.00",
+                "02 Mar 2026 TESCO STORES 3294   42.15    1,900.00",
+            ),
+        )
+        assertEquals(1, rows.size)
+        assertNotNull(rows[0].problem)
+        assertTrue(rows[0].problem!!.contains("balance"))
+    }
+
+    @Test
+    fun `a reference number in the description is not mistaken for money`() {
+        // "3294" has no pence, so it stays part of the payee.
+        val rows = PdfStatementParser.parse(
+            listOf(
+                "01 Mar 2026 Balance brought forward      2,000.00",
+                "02 Mar 2026 TESCO STORES 3294   42.15    1,957.85",
+            ),
+        )
+        assertEquals("TESCO STORES 3294", rows[0].description)
+        assertEquals(4215L, rows[0].moneyOutMinor)
+    }
+
+    @Test
+    fun `reads both the numeric and the written date`() {
+        assertEquals(
+            LocalDate.of(2026, 3, 1),
+            PdfStatementParser.leadingDate("01/03/2026 TESCO 42.15"),
+        )
+        assertEquals(
+            LocalDate.of(2026, 3, 1),
+            PdfStatementParser.leadingDate("01 Mar 2026 TESCO 42.15"),
+        )
+        assertEquals(
+            LocalDate.of(2026, 3, 1),
+            PdfStatementParser.leadingDate("1 March 2026 TESCO 42.15"),
+        )
+    }
+
+    @Test
+    fun `a line with no date at the front is not a transaction`() {
+        assertNull(PdfStatementParser.leadingDate("Balance brought forward 2,000.00"))
+        assertNull(PdfStatementParser.leadingDate("Page 1 of 3"))
+        // A date with no year would have to be guessed, and a wrong year files
+        // the transaction in the wrong month.
+        assertNull(PdfStatementParser.leadingDate("01 Mar TESCO 42.15"))
+    }
+
+    @Test
+    fun `only a trailing run of figures counts as money`() {
+        assertEquals(listOf(4215L, 195785L), PdfStatementParser.trailingAmounts(
+            "01 Mar 2026 TESCO STORES 3294 42.15 1,957.85",
+        ))
+        // Nothing at the end that looks like money.
+        assertEquals(emptyList<Long>(), PdfStatementParser.trailingAmounts("Page 1 of 3"))
+    }
+
+    @Test
+    fun `a bracketed or trailing minus is read as money out`() {
+        val rows = PdfStatementParser.parse(
+            listOf(
+                "01 Mar 2026 Balance brought forward  2,000.00",
+                "02 Mar 2026 TESCO   (42.15)          1,957.85",
+            ),
+        )
+        assertEquals(4215L, rows[0].moneyOutMinor)
+    }
+
+    @Test
+    fun `the first row says its direction was not checked`() {
+        val rows = PdfStatementParser.parse(
+            listOf("01 Mar 2026 TESCO STORES 42.15 1,957.85"),
+        )
+        assertEquals(1, rows.size)
+        assertNotNull(rows[0].problem)
+    }
+
+    @Test
+    fun `a document with no transactions is not offered as a statement`() {
+        assertNull(
+            PdfStatementParser.toSheet(
+                listOf("Dear Mr Evans", "Thank you for your recent enquiry.", "Yours faithfully"),
+                "letter",
+            ),
+        )
+    }
+
+    @Test
+    fun `the sheet it produces looks like a CSV export`() {
+        val sheet = PdfStatementParser.toSheet(statement, "statement")
+        assertNotNull(sheet)
+        assertEquals(PdfStatementParser.HEADINGS, sheet!!.rows.first())
+        // Header plus the three transactions; the brought-forward line is not one.
+        assertEquals(4, sheet.rows.size)
+        assertEquals("2026-03-01", sheet.rows[1][0])
+        assertEquals("TESCO STORES 3294", sheet.rows[1][1])
+    }
+}

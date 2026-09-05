@@ -27,9 +27,35 @@ Open the spreadsheet on a computer and check two things:
 This is the route that needs no bank connection at all, and it is how you build
 a spending history going back as far as your bank keeps records.
 
-Export a statement from online banking as **CSV** — every UK bank offers it,
-usually under "Download" or "Export" on the account page — and open it here.
-The app recognises the layout, so there is nothing to map.
+Export a statement from online banking — **PDF or CSV** — and open it here.
+The app recognises the layout, so there is nothing to map. PDF is what most
+banking apps offer; CSV, where available, reads more reliably.
+
+### PDF statements
+
+Most banking apps only offer PDF, so PDFs are read directly.
+
+A PDF has no columns — it is lines of text, and nothing in it marks which
+figure is the amount, which is the balance, or whether money came in or went
+out. The **running balance** settles it: between two rows the balance moves by
+exactly the amount of the transaction, and the direction of that move says
+which way the money went.
+
+That makes the reading self-checking. When no figure on a line matches the
+change in balance, something was misread — a wrapped description, a fee sharing
+a line — and the row is **flagged on the review screen** rather than guessed at.
+Look over anything marked before importing.
+
+Two things to know:
+
+* **A CSV export reads more reliably** where your bank offers one. It is
+  usually on the website rather than the app: look for "Download", "Export" or
+  "Statements" on the account page, and choose CSV or Excel over PDF.
+* **Scanned or photographed statements will not work.** There is no text in
+  the file to read, only a picture of one. The app says so rather than
+  importing nothing quietly.
+
+Password-protected PDFs need saving as an unprotected copy first.
 
 ### What it handles
 

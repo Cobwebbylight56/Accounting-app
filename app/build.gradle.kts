@@ -202,6 +202,7 @@ dependencies {
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.security.crypto)
     implementation(libs.androidx.documentfile)
+    implementation(libs.pdfbox.android)
 
     // Dependency injection
     implementation(libs.hilt.android)

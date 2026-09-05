@@ -8,6 +8,7 @@ import com.rhys.financetracker.data.repository.SeedRepository
 import com.rhys.financetracker.di.ApplicationScope
 import com.rhys.financetracker.domain.rollover.MonthlyRolloverEngine
 import com.rhys.financetracker.notify.NotificationChannels
+import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.rhys.financetracker.security.AppLockManager
 import com.rhys.financetracker.work.WorkScheduler
 import dagger.hilt.android.HiltAndroidApp
@@ -48,6 +49,11 @@ class FinanceApp : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+
+        // PDFBox ships its fonts and encoding tables as assets and needs a
+        // context to reach them. Cheap, and doing it here means the first
+        // statement import does not pay for it.
+        PDFBoxResourceLoader.init(applicationContext)
 
         NotificationChannels.createAll(this)
         ProcessLifecycleOwner.get().lifecycle.addObserver(appLockManager)

@@ -27,3 +27,18 @@
 # it falls back to the platform provider when it is not present.
 -dontwarn org.conscrypt.**
 -dontwarn javax.annotation.**
+
+# PDFBox, used to read PDF bank statements. It reaches for a handful of classes
+# that do not exist on Android — AWT imaging, Java Beans, the full Bouncy
+# Castle for encrypted files — and resolves them at runtime only when needed.
+# R8 treats the dangling references as fatal, so they are declared absent.
+-dontwarn com.tom_roush.harmony.awt.**
+-dontwarn com.tom_roush.pdfbox.**
+-dontwarn org.bouncycastle.**
+-dontwarn java.awt.**
+-dontwarn javax.imageio.**
+-dontwarn org.apache.commons.logging.**
+
+# Font boxes and encodings are looked up by name from PDFBox's own assets.
+-keep class com.tom_roush.fontbox.** { *; }
+-keep class com.tom_roush.pdfbox.pdmodel.font.** { *; }

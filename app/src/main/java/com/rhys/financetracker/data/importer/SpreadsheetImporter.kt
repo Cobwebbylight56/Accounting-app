@@ -74,13 +74,16 @@ class SpreadsheetImporter @Inject constructor(
                         name.endsWith(".tsv", ignoreCase = true) ->
                         CsvReader.read(input, name)
 
+                    name.endsWith(".pdf", ignoreCase = true) ->
+                        PdfStatementReader.read(input, name)
+
                     name.endsWith(".xls", ignoreCase = true) ->
                         error(
                             "That is an older .xls workbook. Open it in Excel or Google " +
                                 "Sheets and save it as .xlsx or .csv first.",
                         )
 
-                    else -> error("Choose an .xlsx or .csv file")
+                    else -> error("Choose a .pdf, .csv or .xlsx file")
                 }
             }.also { workbook ->
                 if (workbook.isEmpty) error("That file did not contain any data")

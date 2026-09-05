@@ -59,6 +59,7 @@
                 <data android:mimeType="text/x-csv" />
                 <data android:mimeType="application/vnd.ms-excel" />
                 <data android:mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+                <data android:mimeType="application/pdf" />
             </intent-filter>
 
             <intent-filter android:label="Import into Finance Tracker">
@@ -70,6 +71,7 @@
                 <data android:mimeType="text/x-csv" />
                 <data android:mimeType="application/vnd.ms-excel" />
                 <data android:mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+                <data android:mimeType="application/pdf" />
             </intent-filter>
         </activity>
 

@@ -139,6 +139,7 @@ fun ImportScreen(
                     onChoose = {
                         pickFile.launch(
                             arrayOf(
+                                "application/pdf",
                                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                 "text/csv",
                                 "text/comma-separated-values",
@@ -169,8 +170,8 @@ private fun ChooseFileStep(onChoose: () -> Unit) {
         EmptyState(
             icon = Icons.Outlined.UploadFile,
             title = "Bank statement or spreadsheet",
-            message = "Choose a .csv statement downloaded from your bank, or an .xlsx or " +
-                ".csv budget. Nothing is changed until you have seen exactly what will " +
+            message = "Choose a statement downloaded from your bank — PDF or CSV — or an " +
+                ".xlsx budget. Nothing is changed until you have seen exactly what will " +
                 "be created.",
             actionLabel = "Choose a file",
             onAction = onChoose,
@@ -182,8 +183,11 @@ private fun ChooseFileStep(onChoose: () -> Unit) {
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                text = "• Bank statements: download one as CSV from online banking. The " +
-                    "layout is recognised, so there is nothing to set up.\n" +
+                text = "• PDF statements work, and are usually the only kind a banking " +
+                    "app offers. A CSV export, if your bank has one, reads more " +
+                    "reliably — look on the website rather than the app.\n" +
+                    "• Figures read from a PDF are checked against the running balance, " +
+                    "and anything that does not add up is flagged for you to look at.\n" +
                     "• Import old statements too, in any order — that is how you build " +
                     "up a spending history.\n" +
                     "• Overlapping statements are safe. Rows already added are skipped, " +
