@@ -1,5 +1,7 @@
 package com.rhys.financetracker.data.importer
 
+import com.rhys.financetracker.domain.model.TransactionType
+
 /**
  * A spreadsheet as the importer sees it: a grid of trimmed strings, plus the
  * name of the sheet it came from.
@@ -47,6 +49,9 @@ enum class ColumnRole(val displayName: String, val hint: String) {
     ACCOUNT("Account", "Which account it comes from"),
     NOTES("Notes", "Any extra detail"),
     TYPE("Type", "Income or expense"),
+    MONEY_IN("Money in", "Paid in, credits, receipts"),
+    MONEY_OUT("Money out", "Paid out, debits, withdrawals"),
+    BALANCE("Balance", "The running balance — read but never imported"),
     FREQUENCY("Frequency", "Monthly, weekly, yearly…"),
     DAY_OF_MONTH("Day of month", "The day a bill is due"),
 }
@@ -79,6 +84,14 @@ data class ImportMapping(
     val defaultFrequency: String = "MONTHLY",
     /** Skip rows whose amount is zero — spreadsheets are full of empty placeholders. */
     val skipZeroAmounts: Boolean = true,
+    /**
+     * True when a minus sign means "money out" rather than a mistake.
+     *
+     * A bank statement with one signed Amount column needs this; a household
+     * sheet listing what each bill costs does not, and there a negative figure
+     * is worth querying rather than silently importing as income.
+     */
+    val amountSignIsDirection: Boolean = false,
 )
 
 /** What the mapped rows should become. */
@@ -120,6 +133,16 @@ data class ImportCandidate(
     val dayOfMonth: Int?,
     val dateIso: String?,
     val frequencyName: String,
+    /**
+     * Which way the money went, when the sheet says so — a statement's paid-in
+     * and paid-out columns, or a signed amount. Null leaves it to the target.
+     */
+    val transactionType: TransactionType? = null,
+    /**
+     * True when this row is already in the ledger. Shown but not selected, so
+     * re-importing an overlapping statement adds only what is new.
+     */
+    val isAlreadyPresent: Boolean = false,
     /** Set when the row cannot be imported; it is shown but not selected. */
     val problem: String? = null,
     val isSelected: Boolean = true,
@@ -138,6 +161,8 @@ data class ImportOutcome(
     val recurringCreated: Int = 0,
     val transactionsCreated: Int = 0,
     val skipped: Int = 0,
+    /** Rows that were already in the ledger — the cost of overlapping statements. */
+    val duplicatesSkipped: Int = 0,
     val problems: List<String> = emptyList(),
 ) {
     val totalCreated: Int
@@ -148,6 +173,9 @@ data class ImportOutcome(
         append("$totalCreated ")
         append(if (totalCreated == 1) "record" else "records")
         append(" added")
+        if (duplicatesSkipped > 0) {
+            append(", $duplicatesSkipped already had")
+        }
         if (skipped > 0) append(", $skipped skipped")
     }
 }

@@ -8,6 +8,7 @@ import com.rhys.financetracker.data.local.dao.TransactionFilter
 import com.rhys.financetracker.data.local.dao.TransactionSort
 import com.rhys.financetracker.data.local.entity.DashboardWidgetEntity
 import com.rhys.financetracker.data.local.entity.PersonEntity
+import com.rhys.financetracker.data.local.projection.AccountActivity
 import com.rhys.financetracker.data.local.projection.AccountWithBalance
 import com.rhys.financetracker.data.local.projection.CategoryTotal
 import com.rhys.financetracker.data.local.projection.IncomeExpenseTotals
@@ -102,6 +103,12 @@ class DashboardViewModel @Inject constructor(
         )
     }
 
+    /** Money in and out of each account for the month on screen. */
+    private val accountActivity = monthFlow.flatMapLatest { (month, _) ->
+        val range = DateUtils.monthRange(month)
+        transactionRepository.observeAccountActivity(range.start, range.endInclusive)
+    }
+
     private val monthlyTrend = monthFlow.flatMapLatest { (month, currentScope) ->
         val months = DateUtils.recentMonths(MONTHS_ON_CHART, month)
         transactionRepository.observeMonthlyTotals(
@@ -176,6 +183,7 @@ class DashboardViewModel @Inject constructor(
             scope,
             committed,
             insightReport,
+            accountActivity,
         ),
     ) { values -> buildState(values) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DashboardState())
@@ -199,6 +207,7 @@ class DashboardViewModel @Inject constructor(
         val currentScope = values[12] as DashboardScope
         val committed = values[13] as Long
         val insights = values[14] as InsightReport
+        val activity = values[15] as List<AccountActivity>
 
         val inScope = accountList.filter { currentScope.matches(it) }
         val savingsTotal = inScope.filter { it.isSavings }.sumOf { it.balanceMinor }
@@ -230,14 +239,34 @@ class DashboardViewModel @Inject constructor(
             externalData = external,
             topInsight = insights.topPriority,
             insightCount = insights.insights.size,
-            widgets = widgets
-                .mapNotNull { entity ->
-                    DashboardWidget.fromKey(entity.widgetKey)?.let { widget ->
-                        VisibleWidget(widget, entity.position, entity.isVisible)
-                    }
-                }
-                .sortedBy { it.position },
+            accountActivity = activity,
+            widgets = mergeWidgets(widgets),
         )
+    }
+
+    /**
+     * The stored layout, plus any card this version added.
+     *
+     * Only cards the user has a row for are stored, and an upgrade brings new
+     * ones. Without this they would be invisible on every install that existed
+     * before them — present in the code, absent from the screen — and only a
+     * fresh install would show them.
+     */
+    private fun mergeWidgets(stored: List<DashboardWidgetEntity>): List<VisibleWidget> {
+        val known = stored.mapNotNull { entity ->
+            DashboardWidget.fromKey(entity.widgetKey)?.let { widget ->
+                VisibleWidget(widget, entity.position, entity.isVisible)
+            }
+        }
+        val seen = known.map { it.widget }.toSet()
+        val added = DashboardWidget.entries
+            .filterNot { it in seen }
+            .map { widget ->
+                // Positioned by where it sits in the enum, which is where its
+                // author meant it to appear.
+                VisibleWidget(widget, DashboardWidget.entries.indexOf(widget), widget.defaultVisible)
+            }
+        return (known + added).sortedBy { it.position }
     }
 
     // --------------------------------------------------------- drill-down
@@ -383,6 +412,7 @@ data class DashboardState(
     val people: List<com.rhys.financetracker.data.local.entity.PersonEntity> = emptyList(),
     val summary: FinancialSummary = FinancialSummary.EMPTY,
     val spendingByCategory: List<CategoryTotal> = emptyList(),
+    val accountActivity: List<AccountActivity> = emptyList(),
     val monthlyTrend: List<MonthPoint> = emptyList(),
     val upcomingBills: List<RecurringRuleWithDetails> = emptyList(),
     val overdueBills: List<RecurringRuleWithDetails> = emptyList(),

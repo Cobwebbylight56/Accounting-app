@@ -116,3 +116,27 @@ data class IncomeExpenseTotals(
         val EMPTY = IncomeExpenseTotals(0L, 0L)
     }
 }
+
+/**
+ * How many stored transactions carry one import fingerprint.
+ *
+ * A count rather than a flag, because the same purchase can honestly happen
+ * twice in a day and both should be kept.
+ */
+data class FingerprintCount(
+    @ColumnInfo(name = "import_hash") val hash: String,
+    @ColumnInfo(name = "occurrences") val occurrences: Int,
+)
+
+/** A payee and the category it was filed under, used to learn from past choices. */
+data class DescriptionCategory(
+    @ColumnInfo(name = "description") val description: String,
+    @ColumnInfo(name = "category_name") val categoryName: String,
+)
+
+/** Money in and out of one account over a period. */
+data class AccountActivity(
+    @ColumnInfo(name = "account_id") val accountId: Long,
+    @ColumnInfo(name = "income_minor") val incomeMinor: Long,
+    @ColumnInfo(name = "expense_minor") val expenseMinor: Long,
+)

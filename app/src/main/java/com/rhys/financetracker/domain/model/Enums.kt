@@ -93,6 +93,10 @@ enum class ScopeType(val displayName: String) {
 
 /** Dashboard cards the user can show, hide and re-order. */
 enum class DashboardWidget(val key: String, val title: String, val defaultVisible: Boolean) {
+    // Declaration order is the default order on screen, so the plain
+    // at-a-glance cards come before the charts.
+    ACCOUNT_ACTIVITY("account_activity", "Accounts this month", true),
+    CATEGORY_TILES("category_tiles", "Where it went", true),
     BALANCE_SUMMARY("balance_summary", "Balances", true),
     MONTH_SUMMARY("month_summary", "This month", true),
     DISPOSABLE_INCOME("disposable_income", "Left to spend", true),

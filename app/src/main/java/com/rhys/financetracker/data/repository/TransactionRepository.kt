@@ -7,6 +7,7 @@ import com.rhys.financetracker.data.local.dao.TransactionDao
 import com.rhys.financetracker.data.local.dao.TransactionFilter
 import com.rhys.financetracker.data.local.dao.TransactionQuery
 import com.rhys.financetracker.data.local.entity.TransactionEntity
+import com.rhys.financetracker.data.local.projection.AccountActivity
 import com.rhys.financetracker.data.local.projection.CategoryTotal
 import com.rhys.financetracker.data.local.projection.IncomeExpenseTotals
 import com.rhys.financetracker.data.local.projection.MonthTotals
@@ -62,6 +63,10 @@ class TransactionRepository @Inject constructor(
         personId: Long? = null,
     ): Flow<List<CategoryTotal>> =
         transactionDao.observeCategoryTotals(type.name, start, end, accountId, personId)
+
+    /** Money in and out of every account over a period, one row per account. */
+    fun observeAccountActivity(start: LocalDate, end: LocalDate): Flow<List<AccountActivity>> =
+        transactionDao.observeAccountActivity(start, end)
 
     fun observeMonthlyTotals(
         start: LocalDate,

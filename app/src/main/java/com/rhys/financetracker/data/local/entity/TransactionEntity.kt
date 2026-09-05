@@ -55,6 +55,8 @@ import java.time.LocalDate
         Index("date"),
         Index("recurring_rule_id"),
         Index("savings_goal_id"),
+        // Looked up once per row on every import, so it needs to be indexed.
+        Index("import_hash"),
         // The dashboard and reports always filter by date and type together.
         Index(value = ["date", "type"]),
     ],
@@ -82,6 +84,12 @@ data class TransactionEntity(
     @ColumnInfo(name = "is_cleared") val isCleared: Boolean = true,
     /** Free-text tags, comma separated, searchable. */
     val tags: String? = null,
+    /**
+     * Identifies this entry for duplicate checking on re-import; see
+     * [com.rhys.financetracker.data.importer.TransactionFingerprint].
+     * Null for anything typed in by hand, which is never a re-import.
+     */
+    @ColumnInfo(name = "import_hash") val importHash: String? = null,
     @ColumnInfo(name = "is_archived") val isArchived: Boolean = false,
     @ColumnInfo(name = "created_at") val createdAt: Long = Instant.now().toEpochMilli(),
     @ColumnInfo(name = "updated_at") val updatedAt: Long = Instant.now().toEpochMilli(),

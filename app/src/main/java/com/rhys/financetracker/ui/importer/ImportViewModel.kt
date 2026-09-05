@@ -13,11 +13,15 @@ import com.rhys.financetracker.data.importer.ImportTarget
 import com.rhys.financetracker.data.importer.SheetData
 import com.rhys.financetracker.data.importer.SpreadsheetImporter
 import com.rhys.financetracker.data.importer.WorkbookData
+import com.rhys.financetracker.data.local.entity.AccountEntity
+import com.rhys.financetracker.data.repository.AccountRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
@@ -29,10 +33,15 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class ImportViewModel @Inject constructor(
     private val importer: SpreadsheetImporter,
+    accountRepository: AccountRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ImportState())
     val state: StateFlow<ImportState> = _state.asStateFlow()
+
+    /** Offered when filing a statement, so the rows land on the right account. */
+    val accounts: StateFlow<List<AccountEntity>> = accountRepository.observeActive()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /**
      * Step 1: read the file the user picked.
@@ -50,11 +59,13 @@ class ImportViewModel @Inject constructor(
                     val workbook = result.data
                     val firstSheet = workbook.sheets.firstOrNull()
                     val detected = firstSheet?.let(importer::detectHouseholdLayout)
+                    val statement = firstSheet?.let { importer.detectStatement(it) }
                     _state.value = ImportState(
                         step = if (firstSheet == null) ImportStep.CHOOSE_FILE else ImportStep.MAP,
                         workbook = workbook,
                         selectedSheetIndex = 0,
                         detectedLayout = detected,
+                        detectedStatement = statement,
                         mapping = firstSheet?.let {
                             importer.suggestMapping(it, ImportTarget.RECURRING_EXPENSE)
                         },
@@ -83,6 +94,35 @@ class ImportViewModel @Inject constructor(
         )
     }
 
+    /**
+     * Reads a bank statement with the detected mapping and goes to review.
+     *
+     * [accountName] files the rows against an account, which matters because
+     * duplicate checking is per account: the same £40 at the same shop on the
+     * same day can legitimately appear on two different cards.
+     */
+    fun useDetectedStatement(accountName: String? = null) {
+        val current = _state.value
+        val sheet = current.sheet ?: return
+        val detected = current.detectedStatement ?: return
+        val mapping = if (accountName.isNullOrBlank()) {
+            detected
+        } else {
+            detected.copy(defaultAccountName = accountName)
+        }
+        viewModelScope.launch {
+            _state.value = current.copy(isBusy = true)
+            val candidates = importer.buildCandidatesWithDuplicates(sheet, mapping)
+            _state.value = _state.value.copy(
+                mapping = mapping,
+                candidates = candidates,
+                usingDetectedLayout = false,
+                step = ImportStep.REVIEW,
+                isBusy = false,
+            )
+        }
+    }
+
     /** Falls back to mapping the columns by hand. */
     fun mapByHand() {
         _state.value = _state.value.copy(usingDetectedLayout = false, step = ImportStep.MAP)
@@ -95,6 +135,7 @@ class ImportViewModel @Inject constructor(
         val newState = _state.value.copy(
             selectedSheetIndex = index,
             detectedLayout = importer.detectHouseholdLayout(sheet),
+            detectedStatement = importer.detectStatement(sheet),
             usingDetectedLayout = false,
             mapping = importer.suggestMapping(sheet, target),
         )
@@ -243,6 +284,8 @@ data class ImportState(
     val mapping: ImportMapping? = null,
     /** Set when the sheet looks like a household budget the app can read whole. */
     val detectedLayout: DetectedLayout? = null,
+    /** Set when the sheet looks like a downloaded bank statement. */
+    val detectedStatement: ImportMapping? = null,
     val usingDetectedLayout: Boolean = false,
     val candidates: List<ImportCandidate> = emptyList(),
     val outcome: ImportOutcome? = null,
@@ -257,4 +300,10 @@ data class ImportState(
 
     /** True when the sheet can be imported whole without any manual mapping. */
     val canAutoImport: Boolean get() = detectedLayout?.isUsable == true
+
+    /** True when the sheet is a bank statement and can be read as it stands. */
+    val canImportStatement: Boolean get() = detectedStatement != null
+
+    /** How many rows the import would skip because they are already recorded. */
+    val alreadyPresentCount: Int get() = candidates.count { it.isAlreadyPresent }
 }

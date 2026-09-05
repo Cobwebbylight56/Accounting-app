@@ -13,6 +13,9 @@ import com.rhys.financetracker.data.local.entity.CategoryEntity
 import com.rhys.financetracker.data.local.entity.PersonEntity
 import com.rhys.financetracker.data.local.entity.TransactionEntity
 import com.rhys.financetracker.data.local.projection.CategoryTotal
+import com.rhys.financetracker.data.local.projection.AccountActivity
+import com.rhys.financetracker.data.local.projection.DescriptionCategory
+import com.rhys.financetracker.data.local.projection.FingerprintCount
 import com.rhys.financetracker.data.local.projection.IncomeExpenseTotals
 import com.rhys.financetracker.data.local.projection.MonthTotals
 import com.rhys.financetracker.data.local.projection.PersonTotals
@@ -92,6 +95,43 @@ interface TransactionDao {
 
     @Query("SELECT * FROM transactions ORDER BY date ASC, id ASC")
     suspend fun getAll(): List<TransactionEntity>
+
+    /**
+     * How many stored transactions carry each of [hashes].
+     *
+     * Counted rather than tested for existence so the importer can add the
+     * surplus when a day genuinely holds two identical purchases.
+     */
+    @Query(
+        """
+        SELECT import_hash, COUNT(*) AS occurrences
+        FROM transactions
+        WHERE import_hash IN (:hashes)
+        GROUP BY import_hash
+        """,
+    )
+    suspend fun countByFingerprint(hashes: List<String>): List<FingerprintCount>
+
+    /**
+     * Payees that have already been filed, commonest first.
+     *
+     * This is what lets the importer follow decisions rather than repeat
+     * guesses: correct one Sainsbury's fuel stop to Fuel and every later
+     * import of it follows. Capped because it is read into memory, and the
+     * long tail of one-off payees adds nothing.
+     */
+    @Query(
+        """
+        SELECT t.description AS description, c.name AS category_name
+        FROM transactions t
+        JOIN categories c ON c.id = t.category_id
+        WHERE t.is_archived = 0 AND t.category_id IS NOT NULL AND t.description != ''
+        GROUP BY t.description, c.name
+        ORDER BY COUNT(*) DESC
+        LIMIT :limit
+        """,
+    )
+    suspend fun getCategorisedDescriptions(limit: Int): List<DescriptionCategory>
 
     @Query("SELECT COUNT(*) FROM transactions")
     suspend fun count(): Int
@@ -278,6 +318,24 @@ interface TransactionDao {
         """,
     )
     fun observePersonTotals(start: LocalDate, end: LocalDate): Flow<List<PersonTotals>>
+
+    /**
+     * Money in and out of every account over a period, in one pass.
+     *
+     * The home screen shows a row per account, so asking per account would be
+     * one query per row.
+     */
+    @Query(
+        """
+        SELECT account_id,
+               IFNULL(SUM(CASE WHEN type = 'INCOME' THEN amount_minor ELSE 0 END), 0) AS income_minor,
+               IFNULL(SUM(CASE WHEN type = 'EXPENSE' THEN amount_minor ELSE 0 END), 0) AS expense_minor
+        FROM transactions
+        WHERE is_archived = 0 AND date BETWEEN :start AND :end
+        GROUP BY account_id
+        """,
+    )
+    fun observeAccountActivity(start: LocalDate, end: LocalDate): Flow<List<AccountActivity>>
 
     /** Per-account totals for the month, used by the monthly rollover. */
     @Query(

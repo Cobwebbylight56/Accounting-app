@@ -30,6 +30,22 @@ object ColumnDetector {
     private val NOTES_WORDS = setOf("note", "notes", "comment", "comments", "memo", "info")
     private val FREQUENCY_WORDS = setOf("frequency", "how often", "repeat", "recurrence", "every")
 
+    // Bank statement headings. UK banks all word these slightly differently:
+    // "Paid out"/"Paid in" (Lloyds, Halifax), "Money out"/"Money in" (Nationwide,
+    // Santander), "Debit"/"Credit" (Barclays, HSBC), "Withdrawn"/"Deposited".
+    private val MONEY_OUT_WORDS = setOf(
+        "paid out", "money out", "withdrawn", "withdrawal", "withdrawals",
+        "debit", "debits", "out (", "spent", "payments out",
+    )
+    private val MONEY_IN_WORDS = setOf(
+        "paid in", "money in", "deposited", "deposit", "credit", "credits",
+        "in (", "received", "payments in",
+    )
+    // Read so it can be excluded: a running balance is a column of perfectly
+    // good-looking amounts, and importing it would add the account's whole
+    // history over again as transactions.
+    private val BALANCE_WORDS = setOf("balance", "running total", "cleared bal")
+
     /**
      * @param headerRow the row believed to hold headings, or null when there is none.
      * @param sampleRows data rows used to sniff the content of each column.
@@ -74,6 +90,11 @@ object ColumnDetector {
         return when {
             matches(FREQUENCY_WORDS) -> ColumnRole.FREQUENCY
             matches(DATE_WORDS) -> ColumnRole.DATE
+            // Before AMOUNT, all three of them: "Balance", "Paid out" and
+            // "Debit" would otherwise be swallowed by the amount words.
+            matches(BALANCE_WORDS) -> ColumnRole.BALANCE
+            matches(MONEY_OUT_WORDS) -> ColumnRole.MONEY_OUT
+            matches(MONEY_IN_WORDS) -> ColumnRole.MONEY_IN
             matches(AMOUNT_WORDS) -> ColumnRole.AMOUNT
             matches(PERSON_WORDS) -> ColumnRole.PERSON
             matches(ACCOUNT_WORDS) -> ColumnRole.ACCOUNT

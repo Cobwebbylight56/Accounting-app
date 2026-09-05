@@ -103,6 +103,7 @@ object DefaultData {
         SeedCategory("School", CategoryKind.EXPENSE, "#FBC02D", "School", parent = "Children"),
 
         // ------------------------------------------------------------ misc
+        SeedCategory("Shopping", CategoryKind.EXPENSE, "#00695C", "ShoppingBag"),
         SeedCategory("Pets", CategoryKind.EXPENSE, "#8D6E63", "Pets"),
         SeedCategory("Health", CategoryKind.EXPENSE, "#D81B60", "MedicalServices"),
         SeedCategory("Education", CategoryKind.EXPENSE, "#3949AB", "School"),

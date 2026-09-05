@@ -254,6 +254,8 @@ private fun DashboardCard(
     onMonthClick: (java.time.YearMonth) -> Unit,
 ) {
     when (widget) {
+        DashboardWidget.ACCOUNT_ACTIVITY -> AccountActivityCard(state, onOpenAccounts)
+        DashboardWidget.CATEGORY_TILES -> CategoryTilesCard(state, onCategoryClick)
         DashboardWidget.BALANCE_SUMMARY -> BalanceSummaryCard(state, onOpenAccounts)
         DashboardWidget.MONTH_SUMMARY -> MonthSummaryCard(state)
         DashboardWidget.DISPOSABLE_INCOME -> DisposableIncomeCard(state)

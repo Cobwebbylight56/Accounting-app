@@ -22,6 +22,69 @@ Open the spreadsheet on a computer and check two things:
 
 ---
 
+## Bank statements — building up a spending history
+
+This is the route that needs no bank connection at all, and it is how you build
+a spending history going back as far as your bank keeps records.
+
+Export a statement from online banking as **CSV** — every UK bank offers it,
+usually under "Download" or "Export" on the account page — and open it here.
+The app recognises the layout, so there is nothing to map.
+
+### What it handles
+
+Bank exports are all slightly different, and the awkward parts are dealt with:
+
+| What banks do | What happens |
+|---|---|
+| Put the account name and sort code above the headings | The headings are searched for, not assumed to be on the first line |
+| Use "Paid out" and "Paid in" (Lloyds, Nationwide) | Read as two columns; the side with a figure decides the direction |
+| Use one signed "Amount" (Monzo, Starling) | A minus means money out |
+| Include a running **Balance** column | Recognised and deliberately ignored |
+| Word things differently — Debit, Credit, Withdrawn, Money out | All recognised |
+
+The balance column matters more than it looks. It is a column of entirely
+plausible amounts sitting next to the real one, and importing it would add the
+account's whole history a second time.
+
+### Importing old statements
+
+Import them in any order, oldest or newest first. Each row carries its own
+date, so the ledger sorts itself out. Downloading a year at a time and
+importing each file is the quickest way to fill in the past.
+
+### Nothing is ever counted twice
+
+Statements overlap. Downloading "the last three months" every month means two
+thirds of each file has been seen before.
+
+Every imported row is fingerprinted from its account, date, amount, direction
+and description. On the next import, rows already held are shown but not
+selected, and the summary says how many were skipped — seeing *58 already had*
+is how you know it worked.
+
+It counts rather than merely matching, so two identical coffees on the same day
+both survive: if the file holds three of a row and two are stored, the third is
+imported.
+
+Because the fingerprint includes the account, choose the right one when you
+import. The same £40 at the same shop on the same day can honestly appear on
+two different cards.
+
+### Spending is sorted for you
+
+Descriptions like `TESCO STORES 3294` are matched against the shops and
+services a UK household meets, so rows arrive already filed under Groceries,
+Fuel, Energy, Subscriptions and so on.
+
+Two things make it better over time:
+
+* **Your corrections win.** Re-file one `SAINSBURYS SPRUCE HILL` from Groceries
+  to Fuel and every later import of that payee follows, even though the
+  built-in rule says otherwise.
+* **Unknown payees are left blank** rather than guessed at. An empty category
+  is obvious and quick to fix; a wrong one is neither.
+
 ## The quick way: let the app read the layout
 
 When you pick the file, the app looks at its shape. If it sees a **column of

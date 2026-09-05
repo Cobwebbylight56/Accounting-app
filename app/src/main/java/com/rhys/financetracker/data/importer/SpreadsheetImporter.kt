@@ -119,6 +119,13 @@ class SpreadsheetImporter @Inject constructor(
         HouseholdLayoutDetector.detect(sheet)?.takeIf { it.isUsable }
 
     /**
+     * The mapping for a downloaded bank statement, or null when the sheet is
+     * not one. [accountName] is the account the rows will be filed against.
+     */
+    fun detectStatement(sheet: SheetData, accountName: String? = null): ImportMapping? =
+        StatementDetector.detect(sheet, accountName)
+
+    /**
      * Builds the candidates for every person and every block in one pass.
      *
      * Rows that fail to read are kept and flagged rather than dropped, so the
@@ -153,17 +160,39 @@ class SpreadsheetImporter @Inject constructor(
         val notesColumn = columnFor(ColumnRole.NOTES)
         val frequencyColumn = columnFor(ColumnRole.FREQUENCY)
         val dayColumn = columnFor(ColumnRole.DAY_OF_MONTH)
+        val moneyInColumn = columnFor(ColumnRole.MONEY_IN)
+        val moneyOutColumn = columnFor(ColumnRole.MONEY_OUT)
 
         val range = mapping.firstDataRow..mapping.lastDataRow.coerceAtMost(sheet.rowCount - 1)
 
         return range.mapNotNull { row ->
             val name = nameColumn?.let { sheet.cell(row, it) }?.trim().orEmpty()
-            val amountColumn = amountColumns.firstOrNull { sheet.cell(row, it).isNotBlank() }
-            val amountText = amountColumn?.let { sheet.cell(row, it) }.orEmpty()
-            val amount = Money.parseOrNull(amountText)
+
+            // A statement puts the direction in which column the figure is in;
+            // everything else carries it in the sign, or not at all.
+            val statementAmount = readStatementAmount(sheet, row, moneyInColumn, moneyOutColumn)
+            val amountColumn = statementAmount?.column
+                ?: amountColumns.firstOrNull { sheet.cell(row, it).isNotBlank() }
+            val amountText = statementAmount?.text
+                ?: amountColumn?.let { sheet.cell(row, it) }.orEmpty()
+            val signedAmount = statementAmount?.minor ?: Money.parseOrNull(amountText)
 
             // A row with neither a name nor a figure is a spacer, not data.
-            if (name.isBlank() && amount == null) return@mapNotNull null
+            if (name.isBlank() && signedAmount == null) return@mapNotNull null
+
+            // Amounts are stored positive with the direction held separately,
+            // so a signed figure is split into the two here.
+            val directionFromSign = when {
+                statementAmount != null -> statementAmount.type
+                mapping.amountSignIsDirection && signedAmount != null ->
+                    if (signedAmount < 0L) TransactionType.EXPENSE else TransactionType.INCOME
+                else -> null
+            }
+            val amount = when {
+                statementAmount != null -> statementAmount.minor
+                mapping.amountSignIsDirection -> signedAmount?.let { kotlin.math.abs(it) }
+                else -> signedAmount
+            }
 
             val problem = when {
                 name.isBlank() -> "No name in this row"
@@ -191,9 +220,105 @@ class SpreadsheetImporter @Inject constructor(
                 dateIso = dateColumn?.let { parseDate(sheet.cell(row, it)) }?.toString(),
                 frequencyName = frequencyColumn?.let { normaliseFrequency(sheet.cell(row, it)) }
                     ?: mapping.defaultFrequency,
+                transactionType = directionFromSign,
                 problem = problem,
                 isSelected = problem == null,
             )
+        }
+    }
+
+    /**
+     * Candidates with the ones already in the ledger marked and deselected.
+     *
+     * Statements overlap, so this is what makes importing "the last three
+     * months" every month safe. Rows already held are still shown — seeing
+     * that 58 of 71 rows were already there is how you know the import
+     * worked, whereas silently dropping them looks like a failure.
+     */
+    suspend fun buildCandidatesWithDuplicates(
+        sheet: SheetData,
+        mapping: ImportMapping,
+    ): List<ImportCandidate> = withContext(ioDispatcher) {
+        val candidates = categorise(buildCandidates(sheet, mapping))
+        markDuplicates(candidates, mapping.defaultAccountName)
+    }
+
+    /**
+     * Fills in a category for rows that arrived without one.
+     *
+     * A category the sheet stated is never overwritten — it was explicit, and
+     * a guess should not argue with it.
+     */
+    internal suspend fun categorise(candidates: List<ImportCandidate>): List<ImportCandidate> {
+        if (candidates.none { it.categoryName.isNullOrBlank() }) return candidates
+
+        val learned = transactionDao.getCategorisedDescriptions(LEARNED_PAYEE_LIMIT)
+            .associate { TransactionFingerprint.normaliseDescription(it.description) to it.categoryName }
+
+        return candidates.map { candidate ->
+            if (!candidate.categoryName.isNullOrBlank()) return@map candidate
+            val category = MerchantCategoriser.categoryFor(
+                description = candidate.name,
+                type = candidate.transactionType ?: TransactionType.EXPENSE,
+                learned = learned,
+            )
+            if (category == null) candidate else candidate.copy(categoryName = category)
+        }
+    }
+
+    /**
+     * Marks candidates that the ledger already holds.
+     *
+     * Occurrences are counted on both sides rather than matched one at a time:
+     * if the file holds three identical rows and two are stored, the third is
+     * genuinely new and stays selected.
+     */
+    internal suspend fun markDuplicates(
+        candidates: List<ImportCandidate>,
+        accountName: String?,
+    ): List<ImportCandidate> {
+        // Without a known account there is nothing to compare against: an
+        // account about to be created cannot already hold anything.
+        val accountId = accountName?.takeIf { it.isNotBlank() }
+            ?.let { accountDao.getByName(it) }?.id
+            ?: return candidates
+
+        val fingerprints = candidates.map { candidate ->
+            if (!candidate.isImportable || candidate.target != ImportTarget.TRANSACTION) {
+                null
+            } else {
+                TransactionFingerprint.of(
+                    accountId = accountId,
+                    date = candidate.dateIso?.let { DateUtils.parseIsoOrNull(it) }
+                        ?: return@map null,
+                    amountMinor = candidate.amountMinor,
+                    type = candidate.transactionType ?: TransactionType.EXPENSE,
+                    description = candidate.name,
+                )
+            }
+        }
+
+        val distinct = fingerprints.filterNotNull().distinct()
+        if (distinct.isEmpty()) return candidates
+
+        // IN () has a limit, so ask in batches.
+        val stored = mutableMapOf<String, Int>()
+        distinct.chunked(FINGERPRINT_BATCH).forEach { batch ->
+            transactionDao.countByFingerprint(batch).forEach { row ->
+                stored[row.hash] = row.occurrences
+            }
+        }
+
+        val remaining = stored.toMutableMap()
+        return candidates.mapIndexed { index, candidate ->
+            val fingerprint = fingerprints[index] ?: return@mapIndexed candidate
+            val left = remaining[fingerprint] ?: 0
+            if (left <= 0) {
+                candidate
+            } else {
+                remaining[fingerprint] = left - 1
+                candidate.copy(isAlreadyPresent = true, isSelected = false)
+            }
         }
     }
 
@@ -213,6 +338,10 @@ class SpreadsheetImporter @Inject constructor(
             val problems = mutableListOf<String>()
 
             for (candidate in candidates) {
+                if (candidate.isAlreadyPresent) {
+                    outcome = outcome.copy(duplicatesSkipped = outcome.duplicatesSkipped + 1)
+                    continue
+                }
                 if (!candidate.isSelected || !candidate.isImportable) {
                     outcome = outcome.copy(skipped = outcome.skipped + 1)
                     continue
@@ -307,20 +436,33 @@ class SpreadsheetImporter @Inject constructor(
         running = afterPerson
         val (accountId, afterAccount) = resolveAccount(candidate.accountName, personId, running)
         running = afterAccount
-        val (categoryId, afterCategory) =
-            resolveCategory(candidate.categoryName, TransactionType.EXPENSE, running)
+        // A statement says which way the money went; a list of bills does not,
+        // and there everything is money going out.
+        val type = candidate.transactionType ?: TransactionType.EXPENSE
+        val (categoryId, afterCategory) = resolveCategory(candidate.categoryName, type, running)
         running = afterCategory
+
+        val date = candidate.dateIso?.let { DateUtils.parseIsoOrNull(it) } ?: DateUtils.today()
 
         transactionDao.insert(
             TransactionEntity(
                 amountMinor = candidate.amountMinor,
-                type = TransactionType.EXPENSE,
-                date = candidate.dateIso?.let { DateUtils.parseIsoOrNull(it) } ?: DateUtils.today(),
+                type = type,
+                date = date,
                 description = candidate.name,
                 accountId = accountId,
                 categoryId = categoryId,
                 personId = personId,
                 notes = candidate.notes,
+                // Stamped now so the next statement covering this period
+                // recognises the row instead of adding it again.
+                importHash = TransactionFingerprint.of(
+                    accountId = accountId,
+                    date = date,
+                    amountMinor = candidate.amountMinor,
+                    type = type,
+                    description = candidate.name,
+                ),
             ),
         )
         return running.copy(transactionsCreated = running.transactionsCreated + 1)
@@ -395,6 +537,47 @@ class SpreadsheetImporter @Inject constructor(
 
     // -------------------------------------------------------------- helpers
 
+    /** A figure read from a statement, with the direction its column implies. */
+    private data class StatementAmount(
+        val column: Int,
+        val text: String,
+        val minor: Long,
+        val type: TransactionType,
+    )
+
+    /**
+     * Reads a row's "paid out" / "paid in" pair.
+     *
+     * Statements leave the unused side blank, so whichever column holds a
+     * figure decides the direction. Banks also write the paid-out column as a
+     * negative on occasion, so the magnitude is taken either way. Returns null
+     * when this is not a two-column statement or the row is blank in both.
+     */
+    private fun readStatementAmount(
+        sheet: SheetData,
+        row: Int,
+        moneyInColumn: Int?,
+        moneyOutColumn: Int?,
+    ): StatementAmount? {
+        if (moneyInColumn == null && moneyOutColumn == null) return null
+
+        moneyOutColumn?.let { column ->
+            val text = sheet.cell(row, column).trim()
+            val minor = Money.parseOrNull(text)
+            if (minor != null && minor != 0L) {
+                return StatementAmount(column, text, kotlin.math.abs(minor), TransactionType.EXPENSE)
+            }
+        }
+        moneyInColumn?.let { column ->
+            val text = sheet.cell(row, column).trim()
+            val minor = Money.parseOrNull(text)
+            if (minor != null && minor != 0L) {
+                return StatementAmount(column, text, kotlin.math.abs(minor), TransactionType.INCOME)
+            }
+        }
+        return null
+    }
+
     /** Reads the date formats a UK spreadsheet is likely to contain. */
     internal fun parseDate(raw: String): LocalDate? {
         val text = raw.trim()
@@ -450,5 +633,20 @@ class SpreadsheetImporter @Inject constructor(
             text.contains("saver") || text.contains("saving") -> AccountType.SAVINGS
             else -> AccountType.CURRENT
         }
+    }
+
+    private companion object {
+        /**
+         * How many fingerprints to ask about at once. SQLite caps the
+         * number of bound parameters in an IN clause, and a statement can
+         * easily carry more rows than that.
+         */
+        const val FINGERPRINT_BATCH = 400
+
+        /**
+         * How many previously filed payees to learn from. Beyond this the tail
+         * is one-off payments that will never be seen again.
+         */
+        const val LEARNED_PAYEE_LIMIT = 2_000
     }
 }

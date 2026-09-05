@@ -56,6 +56,7 @@ import com.rhys.financetracker.ui.components.EmptyState
 import com.rhys.financetracker.ui.components.ErrorBanner
 import com.rhys.financetracker.ui.components.LabelledTextField
 import com.rhys.financetracker.ui.components.SectionCard
+import com.rhys.financetracker.ui.components.colorFromHex
 import com.rhys.financetracker.ui.theme.FinanceTheme
 import kotlinx.coroutines.launch
 
@@ -180,6 +181,56 @@ private fun ChooseFileStep(onChoose: () -> Unit) {
  * what it found, so the user can tell whether the guess is right before
  * committing to it.
  */
+/**
+ * Offered when the file is a downloaded bank statement.
+ *
+ * The account has to be chosen rather than guessed: a statement file rarely
+ * names the account in a form the app would recognise, and filing rows against
+ * the wrong account would put the duplicate check on the wrong history.
+ */
+@Composable
+private fun DetectedStatementCard(state: ImportState, viewModel: ImportViewModel) {
+    if (!state.canImportStatement) return
+    val accounts by viewModel.accounts.collectAsStateWithLifecycle()
+    var chosen by remember(accounts) { mutableStateOf(accounts.firstOrNull()) }
+
+    SectionCard(
+        title = "This looks like a bank statement",
+        subtitle = "Import it as transactions",
+    ) {
+        Text(
+            text = "Dates, descriptions and amounts were found. Rows already in " +
+                "the app are skipped, so importing overlapping statements is safe.",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Spacer(Modifier.height(12.dp))
+        DropdownField(
+            label = "Add these to",
+            options = accounts,
+            selected = chosen,
+            onSelect = { chosen = it },
+            optionLabel = { it.name },
+            optionColor = { colorFromHex(it.colorHex) },
+            placeholder = if (accounts.isEmpty()) "No accounts yet" else "Choose an account",
+        )
+        Spacer(Modifier.height(14.dp))
+        Button(
+            onClick = { viewModel.useDetectedStatement(chosen?.name) },
+            enabled = chosen != null && !state.isBusy,
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+        ) {
+            Text("Read the statement")
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = "Spending is sorted into categories automatically, and you can " +
+                "correct anything before it is saved.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
 @Composable
 private fun DetectedLayoutCard(state: ImportState, viewModel: ImportViewModel) {
     val layout = state.detectedLayout ?: return
@@ -227,8 +278,13 @@ private fun MappingStep(state: ImportState, viewModel: ImportViewModel) {
         contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 96.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
+        if (state.canImportStatement) {
+            item { DetectedStatementCard(state = state, viewModel = viewModel) }
+        }
         if (state.canAutoImport) {
             item { DetectedLayoutCard(state = state, viewModel = viewModel) }
+        }
+        if (state.canAutoImport || state.canImportStatement) {
             item {
                 Text(
                     text = "Or set the columns yourself",

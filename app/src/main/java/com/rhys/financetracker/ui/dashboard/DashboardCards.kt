@@ -45,6 +45,155 @@ import com.rhys.financetracker.ui.theme.FinanceTheme
  * card can be reordered, hidden or previewed on its own.
  */
 
+/**
+ * Every account with what went in and what went out this month.
+ *
+ * The balance alone does not answer "how are we doing?" — £400 could be a good
+ * month or a bad one depending on what passed through to get there. In, out
+ * and the balance together do answer it, which is why all three are on one row.
+ */
+@Composable
+internal fun AccountActivityCard(state: DashboardState, onOpenAccounts: () -> Unit) {
+    val byAccount = state.accountActivity.associateBy { it.accountId }
+    val accounts = state.accounts.filter { state.scope.matches(it) }
+
+    SectionCard(
+        title = "Accounts this month",
+        subtitle = DateUtils.formatMonth(state.month),
+        action = { TextButton(onClick = onOpenAccounts) { Text("All") } },
+    ) {
+        if (accounts.isEmpty()) {
+            Text(
+                "No accounts yet.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            return@SectionCard
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            accounts.forEach { account ->
+                val activity = byAccount[account.account.id]
+                AccountActivityRow(
+                    name = account.account.name,
+                    colorHex = account.account.colorHex,
+                    inMinor = activity?.incomeMinor ?: 0L,
+                    outMinor = activity?.expenseMinor ?: 0L,
+                    balanceMinor = account.balanceMinor,
+                    onClick = onOpenAccounts,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AccountActivityRow(
+    name: String,
+    colorHex: String?,
+    inMinor: Long,
+    outMinor: Long,
+    balanceMinor: Long,
+    onClick: () -> Unit,
+) {
+    val colors = FinanceTheme.colors
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            ColorDot(colorFromHex(colorHex))
+            Spacer(Modifier.width(8.dp))
+            Text(
+                name,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                Money.format(balanceMinor),
+                style = MaterialTheme.typography.titleSmall,
+                color = if (balanceMinor < 0L) colors.negative else MaterialTheme.colorScheme.onSurface,
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text(
+                "In ${Money.format(inMinor)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.positive,
+            )
+            Text(
+                "Out ${Money.format(outMinor)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.negative,
+            )
+        }
+    }
+}
+
+/**
+ * Where the money went, as a plain list of the biggest categories.
+ *
+ * The donut chart below shows the same figures in proportion; this shows them
+ * in pounds. Reading "Groceries £412" off a card takes no interpretation at
+ * all, which is what makes it the right thing to see first.
+ */
+@Composable
+internal fun CategoryTilesCard(
+    state: DashboardState,
+    onCategoryClick: (Long?, String, String?) -> Unit,
+) {
+    val top = state.spendingByCategory
+        .filter { it.totalMinor > 0L }
+        .take(CATEGORY_TILE_COUNT)
+
+    SectionCard(
+        title = "Where it went",
+        subtitle = DateUtils.formatMonth(state.month),
+    ) {
+        if (top.isEmpty()) {
+            Text(
+                "Nothing spent yet this month.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            return@SectionCard
+        }
+        // Two to a row: wide enough for "Household bills" and a figure without
+        // either being cut short.
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            top.chunked(2).forEach { pair ->
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    pair.forEachIndexed { offset, entry ->
+                        StatTile(
+                            label = entry.categoryName ?: "Uncategorised",
+                            value = Money.format(entry.totalMinor),
+                            caption = "${entry.transactionCount} " +
+                                if (entry.transactionCount == 1) "entry" else "entries",
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                onCategoryClick(
+                                    entry.categoryId,
+                                    entry.categoryName ?: "Uncategorised",
+                                    entry.categoryColor,
+                                )
+                            },
+                        )
+                        // Keeps a lone tile on the last row half-width rather
+                        // than letting it stretch across.
+                        if (pair.size == 1 && offset == 0) Spacer(Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Enough to cover a household's regular spending without becoming a wall. */
+private const val CATEGORY_TILE_COUNT = 6
+
 @Composable
 internal fun MonthSummaryCard(state: DashboardState) {
     val summary = state.summary

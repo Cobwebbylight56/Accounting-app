@@ -5,20 +5,29 @@ import androidx.room.migration.Migration
 /**
  * Schema migrations, oldest first.
  *
- * Version 1 is the initial schema, so there is nothing to migrate yet.  When
- * the schema changes, add a migration here — for example:
- *
- * ```kotlin
- * val MIGRATION_1_2 = Migration(1, 2) { db ->
- *     db.execSQL("ALTER TABLE accounts ADD COLUMN sort_code TEXT")
- * }
- * ```
- *
- * and add it to [ALL].  Every migration must be additive or must copy data
- * across to a new table: a migration that drops a column loses history.
+ * Every migration must be additive or must copy data across to a new table: a
+ * migration that drops a column loses history, and not losing history is the
+ * point of the application.
  */
 object Migrations {
 
+    /**
+     * Adds the import fingerprint used to recognise a re-imported statement.
+     *
+     * Existing rows are left null. They were typed in or came from the
+     * spreadsheet import, so there is nothing to match them against, and a
+     * null simply never matches — the worst case is that a statement covering
+     * a period already entered by hand offers those rows as new, which is
+     * visible on the review screen before anything is saved.
+     */
+    val MIGRATION_1_2 = Migration(1, 2) { db ->
+        db.execSQL("ALTER TABLE transactions ADD COLUMN import_hash TEXT")
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS index_transactions_import_hash " +
+                "ON transactions (import_hash)",
+        )
+    }
+
     /** Registered with Room in `di/DatabaseModule.kt`. */
-    val ALL: Array<Migration> = emptyArray()
+    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2)
 }
