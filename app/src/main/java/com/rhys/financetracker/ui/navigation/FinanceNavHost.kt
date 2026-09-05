@@ -1,5 +1,6 @@
 package com.rhys.financetracker.ui.navigation
 
+import android.net.Uri
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -9,6 +10,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavGraphBuilder
@@ -54,8 +56,15 @@ import com.rhys.financetracker.ui.transactions.TransactionListScreen
 @Composable
 fun FinanceNavHost(
     onShareFile: (ExportedFile) -> Unit,
+    importFile: Uri? = null,
+    onImportFileHandled: () -> Unit = {},
     navController: NavHostController = rememberNavController(),
 ) {
+    // A statement opened from outside the app goes straight to the importer,
+    // wherever the user happened to be.
+    LaunchedEffect(importFile) {
+        if (importFile != null) navController.navigate(Routes.importForAccount())
+    }
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val isTopLevel = TopLevelDestination.fromRoute(currentRoute) != null
@@ -119,7 +128,7 @@ private fun NavGraphBuilder.topLevelDestinations(
         TransactionListScreen(
             onOpenTransaction = { navController.navigate(Routes.transactionEdit(it)) },
             onAddTransaction = { navController.navigate(Routes.transactionEdit()) },
-            onOpenImport = { navController.navigate(Routes.IMPORT) },
+            onOpenImport = { navController.navigate(Routes.importForAccount()) },
             onShareFile = onShareFile,
         )
     }
@@ -142,7 +151,7 @@ private fun NavGraphBuilder.topLevelDestinations(
             onOpenPeople = { navController.navigate(Routes.PEOPLE) },
             onOpenRecurring = { navController.navigate(Routes.RECURRING) },
             onOpenCategories = { navController.navigate(Routes.CATEGORIES) },
-            onOpenImport = { navController.navigate(Routes.IMPORT) },
+            onOpenImport = { navController.navigate(Routes.importForAccount()) },
             onOpenSettings = { navController.navigate(Routes.SETTINGS) },
         )
     }
@@ -163,6 +172,7 @@ private fun NavGraphBuilder.editorDestinations(navController: NavHostController)
             onEditAccount = { navController.navigate(Routes.accountEdit(it)) },
             onAddAccount = { navController.navigate(Routes.accountEdit()) },
             onOpenPeople = { navController.navigate(Routes.PEOPLE) },
+            onImportStatement = { navController.navigate(Routes.importForAccount(it)) },
         )
     }
 
@@ -236,10 +246,22 @@ private fun NavGraphBuilder.editorDestinations(navController: NavHostController)
         )
     }
 
-    composable(Routes.IMPORT) {
+    composable(
+        route = Routes.IMPORT_PATTERN,
+        arguments = listOf(
+            navArgument(Routes.ARG_ACCOUNT_ID) {
+                type = NavType.LongType
+                defaultValue = Routes.NEW_ID
+            },
+        ),
+    ) { entry ->
+        val accountId = entry.arguments?.getLong(Routes.ARG_ACCOUNT_ID) ?: Routes.NEW_ID
         ImportScreen(
             onBack = { navController.popBackStack() },
             onFinished = { navController.navigateToTab(Routes.DASHBOARD) },
+            preselectedAccountId = accountId.takeIf { it != Routes.NEW_ID },
+            incomingFile = importFile,
+            onIncomingFileHandled = onImportFileHandled,
         )
     }
 }
@@ -256,7 +278,7 @@ private fun NavGraphBuilder.settingsDestinations(navController: NavHostControlle
             onOpenExternalData = { navController.navigate(Routes.SETTINGS_EXTERNAL_DATA) },
             onOpenDashboardLayout = { navController.navigate(Routes.SETTINGS_DASHBOARD) },
             onOpenCategories = { navController.navigate(Routes.CATEGORIES) },
-            onOpenImport = { navController.navigate(Routes.IMPORT) },
+            onOpenImport = { navController.navigate(Routes.importForAccount()) },
         )
     }
     composable(Routes.SETTINGS_APPEARANCE) {

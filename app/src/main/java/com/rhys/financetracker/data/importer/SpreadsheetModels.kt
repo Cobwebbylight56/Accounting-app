@@ -79,6 +79,14 @@ data class ImportMapping(
      */
     val defaultPersonName: String? = null,
     val defaultAccountName: String? = null,
+    /**
+     * The exact account to file against, when one has been chosen.
+     *
+     * Takes precedence over [defaultAccountName], and has to: account names
+     * are unique per person, so "Main account" no longer identifies one
+     * account on its own.
+     */
+    val defaultAccountId: Long? = null,
     val defaultCategoryName: String? = null,
     /** Applied to every row when there is no frequency column. */
     val defaultFrequency: String = "MONTHLY",
@@ -138,6 +146,8 @@ data class ImportCandidate(
      * and paid-out columns, or a signed amount. Null leaves it to the target.
      */
     val transactionType: TransactionType? = null,
+    /** Set when the account was chosen rather than named, so no lookup is needed. */
+    val accountId: Long? = null,
     /**
      * True when this row is already in the ledger. Shown but not selected, so
      * re-importing an overlapping statement adds only what is new.

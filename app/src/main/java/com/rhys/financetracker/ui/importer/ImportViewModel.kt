@@ -13,7 +13,7 @@ import com.rhys.financetracker.data.importer.ImportTarget
 import com.rhys.financetracker.data.importer.SheetData
 import com.rhys.financetracker.data.importer.SpreadsheetImporter
 import com.rhys.financetracker.data.importer.WorkbookData
-import com.rhys.financetracker.data.local.entity.AccountEntity
+import com.rhys.financetracker.data.local.projection.AccountOption
 import com.rhys.financetracker.data.repository.AccountRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -40,7 +40,7 @@ class ImportViewModel @Inject constructor(
     val state: StateFlow<ImportState> = _state.asStateFlow()
 
     /** Offered when filing a statement, so the rows land on the right account. */
-    val accounts: StateFlow<List<AccountEntity>> = accountRepository.observeActive()
+    val accounts: StateFlow<List<AccountOption>> = accountRepository.observeActiveOptions()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /**
@@ -97,18 +97,19 @@ class ImportViewModel @Inject constructor(
     /**
      * Reads a bank statement with the detected mapping and goes to review.
      *
-     * [accountName] files the rows against an account, which matters because
+     * [account] files the rows against an account, which matters because
      * duplicate checking is per account: the same £40 at the same shop on the
-     * same day can legitimately appear on two different cards.
+     * same day can legitimately appear on two different cards. It is passed by
+     * id rather than name, since names are only unique per person.
      */
-    fun useDetectedStatement(accountName: String? = null) {
+    fun useDetectedStatement(account: AccountOption? = null) {
         val current = _state.value
         val sheet = current.sheet ?: return
         val detected = current.detectedStatement ?: return
-        val mapping = if (accountName.isNullOrBlank()) {
+        val mapping = if (account == null) {
             detected
         } else {
-            detected.copy(defaultAccountName = accountName)
+            detected.copy(defaultAccountName = account.name, defaultAccountId = account.id)
         }
         viewModelScope.launch {
             _state.value = current.copy(isBusy = true)
@@ -121,6 +122,18 @@ class ImportViewModel @Inject constructor(
                 isBusy = false,
             )
         }
+    }
+
+    /**
+     * Remembers the account the importer was opened from.
+     *
+     * Kept in state rather than passed straight through, because the file has
+     * not been chosen yet — the answer has to survive until the statement card
+     * appears.
+     */
+    fun preselectAccount(accountId: Long?) {
+        if (_state.value.preselectedAccountId == accountId) return
+        _state.value = _state.value.copy(preselectedAccountId = accountId)
     }
 
     /** Falls back to mapping the columns by hand. */
@@ -286,6 +299,8 @@ data class ImportState(
     val detectedLayout: DetectedLayout? = null,
     /** Set when the sheet looks like a downloaded bank statement. */
     val detectedStatement: ImportMapping? = null,
+    /** The account this import was started from, when it began on one. */
+    val preselectedAccountId: Long? = null,
     val usingDetectedLayout: Boolean = false,
     val candidates: List<ImportCandidate> = emptyList(),
     val outcome: ImportOutcome? = null,

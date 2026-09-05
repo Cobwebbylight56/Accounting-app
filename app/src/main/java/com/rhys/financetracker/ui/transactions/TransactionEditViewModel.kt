@@ -7,11 +7,11 @@ import com.rhys.financetracker.core.money.Money
 import com.rhys.financetracker.core.result.AppResult
 import com.rhys.financetracker.core.time.DateUtils
 import com.rhys.financetracker.core.validation.Validators
-import com.rhys.financetracker.data.local.entity.AccountEntity
 import com.rhys.financetracker.data.local.entity.CategoryEntity
 import com.rhys.financetracker.data.local.entity.PersonEntity
 import com.rhys.financetracker.data.local.entity.SavingsGoalEntity
 import com.rhys.financetracker.data.local.entity.TransactionEntity
+import com.rhys.financetracker.data.local.projection.AccountOption
 import com.rhys.financetracker.data.repository.AccountRepository
 import com.rhys.financetracker.data.repository.CategoryRepository
 import com.rhys.financetracker.data.repository.PeopleRepository
@@ -56,7 +56,7 @@ class TransactionEditViewModel @Inject constructor(
 
     val state: StateFlow<TransactionEditState> = combine(
         form,
-        accountRepository.observeActive(),
+        accountRepository.observeActiveOptions(),
         categoryRepository.observeAll(),
         peopleRepository.observeActive(),
         combine(savingsRepository.observeAll(), saved, message) { goals, isSaved, text ->
@@ -90,7 +90,7 @@ class TransactionEditViewModel @Inject constructor(
     }
 
     private suspend fun load() {
-        val defaults = accountRepository.observeActive().first()
+        val defaults = accountRepository.observeActiveOptions().first()
         if (transactionId == Routes.NEW_ID) {
             form.value = TransactionForm(
                 date = DateUtils.today(),
@@ -235,7 +235,7 @@ data class TransactionForm(
 data class TransactionEditState(
     val isNew: Boolean = true,
     val form: TransactionForm = TransactionForm(),
-    val accounts: List<AccountEntity> = emptyList(),
+    val accounts: List<AccountOption> = emptyList(),
     val categories: List<CategoryEntity> = emptyList(),
     val people: List<PersonEntity> = emptyList(),
     val savingsGoals: List<SavingsGoalEntity> = emptyList(),

@@ -6,9 +6,9 @@ import androidx.lifecycle.viewModelScope
 import com.rhys.financetracker.core.money.Money
 import com.rhys.financetracker.core.result.AppResult
 import com.rhys.financetracker.core.time.DateUtils
-import com.rhys.financetracker.data.local.entity.AccountEntity
 import com.rhys.financetracker.data.local.entity.PersonEntity
 import com.rhys.financetracker.data.local.entity.SavingsGoalEntity
+import com.rhys.financetracker.data.local.projection.AccountOption
 import com.rhys.financetracker.data.local.projection.SavingsGoalWithProgress
 import com.rhys.financetracker.data.local.seed.DefaultData
 import com.rhys.financetracker.data.repository.AccountRepository
@@ -129,7 +129,7 @@ class SavingsEditViewModel @Inject constructor(
 
     val state: StateFlow<SavingsEditState> = combine(
         form,
-        accountRepository.observeActive(),
+        accountRepository.observeActiveOptions(),
         peopleRepository.observeActive(),
     ) { currentForm, accounts, people ->
         SavingsEditState(
@@ -214,6 +214,6 @@ data class SavingsForm(
 data class SavingsEditState(
     val isNew: Boolean = true,
     val form: SavingsForm = SavingsForm(),
-    val accounts: List<AccountEntity> = emptyList(),
+    val accounts: List<AccountOption> = emptyList(),
     val people: List<PersonEntity> = emptyList(),
 )

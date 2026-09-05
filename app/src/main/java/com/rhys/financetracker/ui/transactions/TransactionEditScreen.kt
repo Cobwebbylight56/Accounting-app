@@ -34,6 +34,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rhys.financetracker.data.local.projection.labelFor
 import com.rhys.financetracker.domain.model.TransactionType
 import com.rhys.financetracker.ui.components.AmountField
 import com.rhys.financetracker.ui.components.ConfirmDialog
@@ -137,7 +138,7 @@ fun TransactionEditScreen(
                 options = state.accounts,
                 selected = state.accounts.firstOrNull { it.id == state.form.accountId },
                 onSelect = { account -> viewModel.update { it.copy(accountId = account.id) } },
-                optionLabel = { it.name },
+                optionLabel = { state.accounts.labelFor(it) },
                 optionColor = { colorFromHex(it.colorHex) },
             )
 
@@ -149,7 +150,7 @@ fun TransactionEditScreen(
                     onSelect = { account ->
                         viewModel.update { it.copy(transferAccountId = account.id) }
                     },
-                    optionLabel = { it.name },
+                    optionLabel = { state.accounts.labelFor(it) },
                     optionColor = { colorFromHex(it.colorHex) },
                 )
             }

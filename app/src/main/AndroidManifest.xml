@@ -36,6 +36,41 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!--
+                Offered in "Open with" after a statement is downloaded, and in
+                the share sheet from a banking app or file manager.
+
+                The types are listed explicitly rather than using a wildcard:
+                claiming application/* would put this app in the chooser for
+                every unknown download, which is worse than not being there.
+                A bank that serves its CSV as application/octet-stream will
+                still not offer us, and the in-app picker covers that.
+            -->
+            <intent-filter android:label="Import into Finance Tracker">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:mimeType="text/csv" />
+                <data android:mimeType="text/comma-separated-values" />
+                <data android:mimeType="application/csv" />
+                <data android:mimeType="text/x-csv" />
+                <data android:mimeType="application/vnd.ms-excel" />
+                <data android:mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+            </intent-filter>
+
+            <intent-filter android:label="Import into Finance Tracker">
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/csv" />
+                <data android:mimeType="text/comma-separated-values" />
+                <data android:mimeType="application/csv" />
+                <data android:mimeType="text/x-csv" />
+                <data android:mimeType="application/vnd.ms-excel" />
+                <data android:mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+            </intent-filter>
         </activity>
 
         <!--

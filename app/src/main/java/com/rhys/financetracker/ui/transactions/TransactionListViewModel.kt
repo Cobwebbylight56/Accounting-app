@@ -9,9 +9,9 @@ import com.rhys.financetracker.data.export.ExportManager
 import com.rhys.financetracker.data.export.ExportedFile
 import com.rhys.financetracker.data.local.dao.TransactionFilter
 import com.rhys.financetracker.data.local.dao.TransactionSort
-import com.rhys.financetracker.data.local.entity.AccountEntity
 import com.rhys.financetracker.data.local.entity.CategoryEntity
 import com.rhys.financetracker.data.local.entity.PersonEntity
+import com.rhys.financetracker.data.local.projection.AccountOption
 import com.rhys.financetracker.data.local.projection.TransactionWithDetails
 import com.rhys.financetracker.data.repository.AccountRepository
 import com.rhys.financetracker.data.repository.CategoryRepository
@@ -69,7 +69,7 @@ class TransactionListViewModel @Inject constructor(
         effectiveFilter,
         searchText,
         combine(
-            accountRepository.observeActive(),
+            accountRepository.observeActiveOptions(),
             categoryRepository.observeActive(),
             peopleRepository.observeActive(),
         ) { accounts, categories, people -> Triple(accounts, categories, people) },
@@ -215,7 +215,7 @@ data class TransactionListState(
     val transactions: List<TransactionWithDetails> = emptyList(),
     val filter: TransactionFilter = TransactionFilter(),
     val searchText: String = "",
-    val accounts: List<AccountEntity> = emptyList(),
+    val accounts: List<AccountOption> = emptyList(),
     val categories: List<CategoryEntity> = emptyList(),
     val people: List<PersonEntity> = emptyList(),
     val totalIncomeMinor: Long = 0L,

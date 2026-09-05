@@ -1,5 +1,6 @@
 package com.rhys.financetracker.ui.importer
 
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.horizontalScroll
@@ -36,6 +37,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,6 +53,7 @@ import com.rhys.financetracker.core.money.Money
 import com.rhys.financetracker.data.importer.ColumnRole
 import com.rhys.financetracker.data.importer.ImportCandidate
 import com.rhys.financetracker.data.importer.ImportTarget
+import com.rhys.financetracker.data.local.projection.labelFor
 import com.rhys.financetracker.ui.components.DropdownField
 import com.rhys.financetracker.ui.components.EmptyState
 import com.rhys.financetracker.ui.components.ErrorBanner
@@ -74,9 +77,27 @@ import kotlinx.coroutines.launch
 fun ImportScreen(
     onBack: () -> Unit,
     onFinished: () -> Unit,
+    preselectedAccountId: Long? = null,
+    incomingFile: Uri? = null,
+    onIncomingFileHandled: () -> Unit = {},
     viewModel: ImportViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+
+    // Arrived from an account, so that account is the answer and the picker
+    // has nothing left to ask.
+    LaunchedEffect(preselectedAccountId) {
+        viewModel.preselectAccount(preselectedAccountId)
+    }
+
+    // Opened from a download or the share sheet: read it without making the
+    // user find the same file again through the picker.
+    LaunchedEffect(incomingFile) {
+        incomingFile?.let {
+            viewModel.openFile(it)
+            onIncomingFileHandled()
+        }
+    }
 
     val pickFile = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
@@ -195,7 +216,10 @@ private fun ChooseFileStep(onChoose: () -> Unit) {
 private fun DetectedStatementCard(state: ImportState, viewModel: ImportViewModel) {
     if (!state.canImportStatement) return
     val accounts by viewModel.accounts.collectAsStateWithLifecycle()
-    var chosen by remember(accounts) { mutableStateOf(accounts.firstOrNull()) }
+    val preselected = accounts.firstOrNull { it.id == state.preselectedAccountId }
+    var chosen by remember(accounts, preselected) {
+        mutableStateOf(preselected ?: accounts.firstOrNull())
+    }
 
     SectionCard(
         title = "This looks like a bank statement",
@@ -208,17 +232,17 @@ private fun DetectedStatementCard(state: ImportState, viewModel: ImportViewModel
         )
         Spacer(Modifier.height(12.dp))
         DropdownField(
-            label = "Add these to",
+            label = if (preselected != null) "Adding to" else "Add these to",
             options = accounts,
             selected = chosen,
             onSelect = { chosen = it },
-            optionLabel = { it.name },
+            optionLabel = { accounts.labelFor(it) },
             optionColor = { colorFromHex(it.colorHex) },
             placeholder = if (accounts.isEmpty()) "No accounts yet" else "Choose an account",
         )
         Spacer(Modifier.height(14.dp))
         Button(
-            onClick = { viewModel.useDetectedStatement(chosen?.name) },
+            onClick = { viewModel.useDetectedStatement(chosen) },
             enabled = chosen != null && !state.isBusy,
             modifier = Modifier.fillMaxWidth().height(52.dp),
         ) {

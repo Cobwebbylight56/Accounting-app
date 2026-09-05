@@ -6,10 +6,10 @@ import androidx.lifecycle.viewModelScope
 import com.rhys.financetracker.core.money.Money
 import com.rhys.financetracker.core.result.AppResult
 import com.rhys.financetracker.core.time.DateUtils
-import com.rhys.financetracker.data.local.entity.AccountEntity
 import com.rhys.financetracker.data.local.entity.CategoryEntity
 import com.rhys.financetracker.data.local.entity.PersonEntity
 import com.rhys.financetracker.data.local.entity.RecurringRuleEntity
+import com.rhys.financetracker.data.local.projection.AccountOption
 import com.rhys.financetracker.data.local.projection.RecurringRuleWithDetails
 import com.rhys.financetracker.data.repository.AccountRepository
 import com.rhys.financetracker.data.repository.CategoryRepository
@@ -157,7 +157,7 @@ class RecurringEditViewModel @Inject constructor(
 
     val state: StateFlow<RecurringEditState> = combine(
         form,
-        accountRepository.observeActive(),
+        accountRepository.observeActiveOptions(),
         categoryRepository.observeAll(),
         peopleRepository.observeActive(),
     ) { currentForm, accounts, categories, people ->
@@ -320,7 +320,7 @@ data class RecurringForm(
 data class RecurringEditState(
     val isNew: Boolean = true,
     val form: RecurringForm = RecurringForm(),
-    val accounts: List<AccountEntity> = emptyList(),
+    val accounts: List<AccountOption> = emptyList(),
     val categories: List<CategoryEntity> = emptyList(),
     val people: List<PersonEntity> = emptyList(),
     val upcomingDates: List<LocalDate> = emptyList(),

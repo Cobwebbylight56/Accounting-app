@@ -7,6 +7,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import com.rhys.financetracker.data.local.entity.AccountEntity
+import com.rhys.financetracker.data.local.projection.AccountOption
 import com.rhys.financetracker.data.local.projection.AccountWithBalance
 import java.time.LocalDate
 import kotlinx.coroutines.flow.Flow
@@ -101,8 +102,38 @@ interface AccountDao {
     @Query("SELECT * FROM accounts WHERE id = :id")
     suspend fun getById(id: Long): AccountEntity?
 
+    /** Active accounts with their owner's name, for pickers. */
+    @Query(
+        """
+        SELECT a.id AS id, a.name AS name, a.color_hex AS color_hex, p.name AS person_name
+        FROM accounts a
+        LEFT JOIN people p ON p.id = a.person_id
+        WHERE a.is_archived = 0
+        ORDER BY a.sort_order ASC, a.name ASC
+        """,
+    )
+    fun observeActiveOptions(): Flow<List<AccountOption>>
+
     @Query("SELECT * FROM accounts WHERE name = :name COLLATE NOCASE LIMIT 1")
     suspend fun getByName(name: String): AccountEntity?
+
+    /**
+     * The account with this name belonging to this person.
+     *
+     * Names are unique per owner rather than across the whole app, so Rhys and
+     * Hannah can each have a "Main account" — which is what they are both
+     * called in real life. `personId IS NULL` matches shared accounts, which
+     * form their own group for the same reason.
+     */
+    @Query(
+        """
+        SELECT * FROM accounts
+        WHERE name = :name COLLATE NOCASE
+          AND ((:personId IS NULL AND person_id IS NULL) OR person_id = :personId)
+        LIMIT 1
+        """,
+    )
+    suspend fun getByNameForPerson(name: String, personId: Long?): AccountEntity?
 
     @Query("SELECT * FROM accounts ORDER BY sort_order ASC, name ASC")
     suspend fun getAll(): List<AccountEntity>

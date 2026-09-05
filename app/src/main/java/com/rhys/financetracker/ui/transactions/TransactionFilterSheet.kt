@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.rhys.financetracker.core.money.Money
 import com.rhys.financetracker.data.local.dao.TransactionSort
+import com.rhys.financetracker.data.local.projection.labelFor
 import com.rhys.financetracker.domain.model.TransactionType
 import com.rhys.financetracker.ui.components.AmountField
 import com.rhys.financetracker.ui.components.DateField
@@ -137,7 +138,7 @@ fun TransactionFilterSheet(
                     options = state.accounts,
                     selected = state.accounts.filter { it.id in state.filter.accountIds }.toSet(),
                     onToggle = { viewModel.toggleAccount(it.id) },
-                    optionLabel = { it.name },
+                    optionLabel = { state.accounts.labelFor(it) },
                 )
             }
         }

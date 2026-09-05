@@ -7,8 +7,8 @@ import com.rhys.financetracker.core.time.DateUtils
 import com.rhys.financetracker.data.export.ExportManager
 import com.rhys.financetracker.data.export.ExportedFile
 import com.rhys.financetracker.data.export.ReportPrinter
-import com.rhys.financetracker.data.local.entity.AccountEntity
 import com.rhys.financetracker.data.local.entity.PersonEntity
+import com.rhys.financetracker.data.local.projection.AccountOption
 import com.rhys.financetracker.data.repository.AccountRepository
 import com.rhys.financetracker.data.repository.PeopleRepository
 import com.rhys.financetracker.domain.model.ExportFormat
@@ -61,7 +61,7 @@ class ReportsViewModel @Inject constructor(
         combine(report, isBuilding, message) { current, building, text ->
             Triple(current, building, text)
         },
-        accountRepository.observeActive(),
+        accountRepository.observeActiveOptions(),
         peopleRepository.observeActive(),
         combine(exported, orientation) { file, page -> file to page },
     ) { selection, output, accounts, people, extras ->
@@ -183,7 +183,7 @@ data class ReportsState(
     val scope: ReportScope = ReportScope.HOUSEHOLD,
     val report: Report? = null,
     val isBuilding: Boolean = false,
-    val accounts: List<AccountEntity> = emptyList(),
+    val accounts: List<AccountOption> = emptyList(),
     val people: List<PersonEntity> = emptyList(),
     val message: String? = null,
     val exportedFile: ExportedFile? = null,

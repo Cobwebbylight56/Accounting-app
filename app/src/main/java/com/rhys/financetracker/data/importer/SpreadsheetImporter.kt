@@ -434,8 +434,16 @@ class SpreadsheetImporter @Inject constructor(
         var running = outcome
         val (personId, afterPerson) = resolvePerson(candidate.personName, running)
         running = afterPerson
-        val (accountId, afterAccount) = resolveAccount(candidate.accountName, personId, running)
-        running = afterAccount
+        // A statement is filed against the account the user picked. Names
+        // are unique per person now, so a name alone would be ambiguous.
+        val accountId: Long
+        if (candidate.accountId != null) {
+            accountId = candidate.accountId
+        } else {
+            val (resolved, afterAccount) = resolveAccount(candidate.accountName, personId, running)
+            accountId = resolved
+            running = afterAccount
+        }
         // A statement says which way the money went; a list of bills does not,
         // and there everything is money going out.
         val type = candidate.transactionType ?: TransactionType.EXPENSE
@@ -494,7 +502,14 @@ class SpreadsheetImporter @Inject constructor(
         outcome: ImportOutcome,
     ): Pair<Long, ImportOutcome> {
         if (!name.isNullOrBlank()) {
-            accountDao.getByName(name)?.let { return it.id to outcome }
+            // The owner's account first, since names are unique per person and
+            // "Main account" may well exist for more than one of them. Falling
+            // back to the name alone keeps sheets that never say who owns what
+            // working as they did.
+            accountDao.getByNameForPerson(name, personId)?.let { return it.id to outcome }
+            if (personId == null) {
+                accountDao.getByName(name)?.let { return it.id to outcome }
+            }
             val id = accountDao.insert(
                 AccountEntity(
                     name = name.trim(),

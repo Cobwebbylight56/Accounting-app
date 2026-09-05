@@ -78,6 +78,7 @@ fun AccountsScreen(
     onEditAccount: (Long) -> Unit,
     onAddAccount: () -> Unit,
     onOpenPeople: () -> Unit,
+    onImportStatement: (Long) -> Unit,
     viewModel: AccountsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -176,6 +177,9 @@ fun AccountsScreen(
                                 AccountRow(
                                     account = account,
                                     onClick = { onEditAccount(account.account.id) },
+                                    onImportStatement = {
+                                        onImportStatement(account.account.id)
+                                    },
                                     onDuplicate = { viewModel.duplicate(account.account.id) },
                                     onArchive = {
                                         viewModel.archive(
@@ -229,6 +233,7 @@ fun AccountsScreen(
 private fun AccountRow(
     account: AccountWithBalance,
     onClick: () -> Unit,
+    onImportStatement: () -> Unit,
     onDuplicate: () -> Unit,
     onArchive: () -> Unit,
     onDelete: () -> Unit,
@@ -278,6 +283,12 @@ private fun AccountRow(
             DropdownMenuItem(
                 text = { Text("Edit") },
                 onClick = { onClick(); showMenu = false },
+            )
+            // Reached from the account itself, so there is nothing to choose:
+            // the statement is filed here.
+            DropdownMenuItem(
+                text = { Text("Import a statement") },
+                onClick = { onImportStatement(); showMenu = false },
             )
             DropdownMenuItem(
                 text = { Text("Duplicate") },

@@ -140,3 +140,32 @@ data class AccountActivity(
     @ColumnInfo(name = "income_minor") val incomeMinor: Long,
     @ColumnInfo(name = "expense_minor") val expenseMinor: Long,
 )
+
+/**
+ * An account as a picker shows it: enough to name it, colour it and choose it.
+ *
+ * Carries the owner because account names are unique per person rather than
+ * across the app, so "Main account" can legitimately appear more than once.
+ */
+data class AccountOption(
+    @ColumnInfo(name = "id") val id: Long,
+    @ColumnInfo(name = "name") val name: String,
+    @ColumnInfo(name = "color_hex") val colorHex: String?,
+    @ColumnInfo(name = "person_name") val personName: String?,
+)
+
+/**
+ * The label for [option] within this list: the plain name, or the name with its
+ * owner when another account shares it.
+ *
+ * Qualifying only when it is needed keeps the common case short — most
+ * households have one "Car insurance" and do not need to be told whose.
+ */
+fun List<AccountOption>.labelFor(option: AccountOption): String {
+    val shared = count { it.name.equals(option.name, ignoreCase = true) } > 1
+    return if (shared && option.personName != null) {
+        "${option.personName} · ${option.name}"
+    } else {
+        option.name
+    }
+}

@@ -4,6 +4,7 @@ import com.rhys.financetracker.core.result.AppResult
 import com.rhys.financetracker.core.result.runCatchingApp
 import com.rhys.financetracker.core.validation.Validators
 import com.rhys.financetracker.data.local.dao.AccountDao
+import com.rhys.financetracker.data.local.dao.PersonDao
 import com.rhys.financetracker.data.local.entity.AccountEntity
 import com.rhys.financetracker.data.local.projection.AccountWithBalance
 import java.time.Instant
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.map
 @Singleton
 class AccountRepository @Inject constructor(
     private val accountDao: AccountDao,
+    private val personDao: PersonDao,
 ) {
 
     fun observeWithBalances(): Flow<List<AccountWithBalance>> =
@@ -25,6 +27,9 @@ class AccountRepository @Inject constructor(
         accountDao.observeAllWithBalances()
 
     fun observeActive(): Flow<List<AccountEntity>> = accountDao.observeActive()
+
+    /** Active accounts with their owner, for anywhere one has to be chosen. */
+    fun observeActiveOptions(): Flow<List<AccountOption>> = accountDao.observeActiveOptions()
 
     fun observe(id: Long): Flow<AccountEntity?> = accountDao.observeById(id)
 
@@ -51,9 +56,18 @@ class AccountRepository @Inject constructor(
         runCatchingApp("Could not save this account") {
             Validators.validateName(account.name, "Account name").errorOrNull?.let { error(it) }
             Validators.validateNotes(account.notes).errorOrNull?.let { error(it) }
-            val existing = accountDao.getByName(account.name)
+            // Scoped to the owner: two people can each have a "Main account",
+            // and refusing that was stopping a second person being set up at all.
+            val existing = accountDao.getByNameForPerson(account.name, account.personId)
             if (existing != null && existing.id != account.id) {
-                error("There is already an account called \"${account.name}\"")
+                val owner = account.personId?.let { personDao.getById(it)?.name }
+                error(
+                    if (owner == null) {
+                        "There is already a shared account called \"${account.name}\""
+                    } else {
+                        "$owner already has an account called \"${account.name}\""
+                    },
+                )
             }
             if (account.id == 0L) {
                 accountDao.insert(account)
@@ -73,7 +87,7 @@ class AccountRepository @Inject constructor(
             accountDao.insert(
                 original.copy(
                     id = 0L,
-                    name = uniqueName(original.name),
+                    name = uniqueName(original.name, original.personId),
                     openingBalanceMinor = 0L,
                     openingBalanceDate = LocalDate.now(),
                     createdAt = Instant.now().toEpochMilli(),
@@ -97,10 +111,10 @@ class AccountRepository @Inject constructor(
             accountDao.delete(account)
         }
 
-    private suspend fun uniqueName(base: String): String {
+    private suspend fun uniqueName(base: String, personId: Long?): String {
         var candidate = "$base (copy)"
         var counter = 2
-        while (accountDao.getByName(candidate) != null) {
+        while (accountDao.getByNameForPerson(candidate, personId) != null) {
             candidate = "$base (copy $counter)"
             counter++
         }

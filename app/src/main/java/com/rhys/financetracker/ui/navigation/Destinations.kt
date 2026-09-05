@@ -57,6 +57,14 @@ object Routes {
     fun savingsEdit(id: Long = NEW_ID): String = "$SAVINGS_EDIT/$id"
     fun reportDetail(type: String): String = "$REPORT_DETAIL/$type"
 
+    /**
+     * The importer, already filed against one account.
+     *
+     * [NEW_ID] means "ask which account", which is what the general Import
+     * entries use.
+     */
+    fun importForAccount(accountId: Long = NEW_ID): String = "$IMPORT?$ARG_ACCOUNT_ID=$accountId"
+
     /** Route patterns, with the argument placeholder Navigation expects. */
     const val TRANSACTION_EDIT_PATTERN = "$TRANSACTION_EDIT/{$ARG_ID}"
     const val ACCOUNT_EDIT_PATTERN = "$ACCOUNT_EDIT/{$ARG_ID}"
@@ -65,6 +73,10 @@ object Routes {
     const val RECURRING_EDIT_PATTERN = "$RECURRING_EDIT/{$ARG_ID}"
     const val SAVINGS_EDIT_PATTERN = "$SAVINGS_EDIT/{$ARG_ID}"
     const val REPORT_DETAIL_PATTERN = "$REPORT_DETAIL/{type}"
+
+    /** Optional so the plain `import` route still matches. */
+    const val ARG_ACCOUNT_ID = "accountId"
+    const val IMPORT_PATTERN = "$IMPORT?$ARG_ACCOUNT_ID={$ARG_ACCOUNT_ID}"
 }
 
 /** The five tabs along the bottom. */
