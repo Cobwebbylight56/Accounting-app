@@ -96,15 +96,28 @@ object Money {
         }
         if (text.isEmpty()) return null
 
-        // Decide which separator is the decimal point.  Whichever appears last
-        // and is followed by one or two digits wins; the other is a grouping mark.
+        // Decide which separator is the decimal point.
+        //
+        // With both marks present the last one is the decimal point and the
+        // other is grouping, which reads "1,234.56" and "1.234,56" correctly.
+        //
+        // A single mark followed by exactly three digits is the ambiguous case:
+        // "1,234" is a thousand and a bit, but "12.345" is twelve pounds and a
+        // third of a penny.  British convention settles it — the comma groups,
+        // the dot divides — and anything else is a decimal point.  Deciding by
+        // position alone would read every three-decimal figure as a thousand
+        // times its value, which is how an imported "12.345" became £12,345.
         val lastDot = text.lastIndexOf('.')
         val lastComma = text.lastIndexOf(',')
-        val decimalIndex = maxOf(lastDot, lastComma)
-        val normalised = if (decimalIndex >= 0 && text.length - decimalIndex - 1 in 1..2) {
+        val decimalIndex = when {
+            lastDot >= 0 && lastComma >= 0 -> maxOf(lastDot, lastComma)
+            lastComma >= 0 -> if (text.length - lastComma - 1 == 3) -1 else lastComma
+            else -> lastDot
+        }
+        val normalised = if (decimalIndex >= 0) {
             val whole = text.substring(0, decimalIndex).filter { it.isDigit() }
             val fraction = text.substring(decimalIndex + 1).filter { it.isDigit() }
-            "${whole.ifEmpty { "0" }}.$fraction"
+            "${whole.ifEmpty { "0" }}.${fraction.ifEmpty { "0" }}"
         } else {
             text.filter { it.isDigit() }.ifEmpty { return null }
         }
