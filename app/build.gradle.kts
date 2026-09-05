@@ -1,3 +1,7 @@
+import java.io.File
+import java.time.LocalDate
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -17,7 +21,7 @@ plugins {
 // The figures live in version.properties at the project root; bump them with
 // ./gradlew bumpPatch (or bumpMinor / bumpMajor).
 // ---------------------------------------------------------------------------
-val versionProperties = java.util.Properties().apply {
+val versionProperties = Properties().apply {
     val file = rootProject.file("version.properties")
     require(file.exists()) { "version.properties is missing from the project root" }
     file.inputStream().use { load(it) }
@@ -56,7 +60,7 @@ android {
 
         // Shown in Settings -> About, so what is on the phone can be checked
         // against what was built without guessing.
-        buildConfigField("String", "BUILD_TIME", "\"${java.time.LocalDate.now()}\"")
+        buildConfigField("String", "BUILD_TIME", "\"${LocalDate.now()}\"")
         buildConfigField("int", "VERSION_CODE_VALUE", "$appVersionCode")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -87,7 +91,7 @@ android {
         // The real key, supplied by keystore.properties or by the build
         // server's secrets.  See docs/RELEASING.md.
         create("release") {
-            val keystoreProperties = java.util.Properties().apply {
+            val keystoreProperties = Properties().apply {
                 val file = rootProject.file("keystore.properties")
                 if (file.exists()) file.inputStream().use { load(it) }
             }

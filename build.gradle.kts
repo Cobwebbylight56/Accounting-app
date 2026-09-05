@@ -1,3 +1,6 @@
+import java.io.File
+import java.util.Properties
+
 // Root build script.  Plugins are declared (but not applied) here so that the
 // versions resolved from gradle/libs.versions.toml are shared by all modules.
 plugins {
@@ -25,7 +28,7 @@ plugins {
 
 fun versionFile(): File = rootProject.file("version.properties")
 
-fun readVersion(): java.util.Properties = java.util.Properties().apply {
+fun readVersion(): Properties = Properties().apply {
     versionFile().inputStream().use { load(it) }
 }
 

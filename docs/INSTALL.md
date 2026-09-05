@@ -68,32 +68,9 @@ everyday use.
    keyPassword=…
    ```
 
-3. Add the signing configuration to `app/build.gradle.kts`, above the
-   `buildTypes` block:
-
-   ```kotlin
-   val keystoreProperties = java.util.Properties().apply {
-       val file = rootProject.file("keystore.properties")
-       if (file.exists()) file.inputStream().use { load(it) }
-   }
-
-   signingConfigs {
-       create("release") {
-           if (keystoreProperties.isNotEmpty()) {
-               storeFile = file(keystoreProperties.getProperty("storeFile"))
-               storePassword = keystoreProperties.getProperty("storePassword")
-               keyAlias = keystoreProperties.getProperty("keyAlias")
-               keyPassword = keystoreProperties.getProperty("keyPassword")
-           }
-       }
-   }
-   ```
-
-   and inside `buildTypes { release { … } }` add:
-
-   ```kotlin
-   signingConfig = signingConfigs.getByName("release")
-   ```
+3. That is all the project needs — `app/build.gradle.kts` already reads
+   `keystore.properties` and uses it when it is present, falling back to the
+   committed debug key when it is not. See [RELEASING.md](RELEASING.md).
 
 4. Build it:
 
