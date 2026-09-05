@@ -119,6 +119,7 @@ private fun NavGraphBuilder.topLevelDestinations(
         TransactionListScreen(
             onOpenTransaction = { navController.navigate(Routes.transactionEdit(it)) },
             onAddTransaction = { navController.navigate(Routes.transactionEdit()) },
+            onOpenImport = { navController.navigate(Routes.IMPORT) },
             onShareFile = onShareFile,
         )
     }

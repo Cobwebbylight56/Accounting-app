@@ -27,6 +27,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -75,6 +76,7 @@ import com.rhys.financetracker.ui.theme.FinanceTheme
 fun TransactionListScreen(
     onOpenTransaction: (Long) -> Unit,
     onAddTransaction: () -> Unit,
+    onOpenImport: () -> Unit,
     onShareFile: (com.rhys.financetracker.data.export.ExportedFile) -> Unit,
     viewModel: TransactionListViewModel = hiltViewModel(),
 ) {
@@ -122,6 +124,17 @@ fun TransactionListScreen(
                             expanded = showMenu,
                             onDismissRequest = { showMenu = false },
                         ) {
+                            // Sits with the exports because this is the screen
+                            // you are on when you think about transactions
+                            // arriving, not Settings.
+                            DropdownMenuItem(
+                                text = { Text("Import a bank statement") },
+                                onClick = {
+                                    onOpenImport()
+                                    showMenu = false
+                                },
+                            )
+                            HorizontalDivider()
                             DropdownMenuItem(
                                 text = { Text("Export as CSV") },
                                 onClick = {

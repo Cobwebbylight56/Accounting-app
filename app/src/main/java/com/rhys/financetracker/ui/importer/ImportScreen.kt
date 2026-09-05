@@ -85,7 +85,7 @@ fun ImportScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Import a spreadsheet") },
+                title = { Text("Import") },
                 navigationIcon = {
                     IconButton(
                         onClick = {
@@ -147,9 +147,10 @@ private fun ChooseFileStep(onChoose: () -> Unit) {
     Column {
         EmptyState(
             icon = Icons.Outlined.UploadFile,
-            title = "Bring in your spreadsheet",
-            message = "Choose an .xlsx or .csv file. Nothing is changed until you have seen " +
-                "exactly what will be created.",
+            title = "Bank statement or spreadsheet",
+            message = "Choose a .csv statement downloaded from your bank, or an .xlsx or " +
+                ".csv budget. Nothing is changed until you have seen exactly what will " +
+                "be created.",
             actionLabel = "Choose a file",
             onAction = onChoose,
         )
@@ -160,13 +161,15 @@ private fun ChooseFileStep(onChoose: () -> Unit) {
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                text = "• Older .xls files need saving as .xlsx or .csv first.\n" +
-                    "• If a sheet has one column of figures per person, import it once for " +
-                    "each person and set who it belongs to.\n" +
-                    "• You can import the same file again later to top things up — matching " +
-                    "accounts and categories are reused, not duplicated.\n" +
-                    "• If your sheet has a column of figures for each person, the app will " +
-                    "spot that and offer to import the whole thing in one tap.",
+                text = "• Bank statements: download one as CSV from online banking. The " +
+                    "layout is recognised, so there is nothing to set up.\n" +
+                    "• Import old statements too, in any order — that is how you build " +
+                    "up a spending history.\n" +
+                    "• Overlapping statements are safe. Rows already added are skipped, " +
+                    "and the summary says how many.\n" +
+                    "• Older .xls files need saving as .xlsx or .csv first.\n" +
+                    "• If a budget sheet has a column of figures for each person, the app " +
+                    "will spot that and offer to import the whole thing in one tap.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

@@ -83,8 +83,8 @@ fun MoreScreen(
                 onClick = onOpenInsights,
             )
             SettingsItem(
-                title = "Import a spreadsheet",
-                subtitle = "Bring in an existing Excel or CSV budget",
+                title = "Import statements & spreadsheets",
+                subtitle = "Add a bank statement, or an Excel or CSV budget",
                 icon = Icons.Outlined.UploadFile,
                 onClick = onOpenImport,
             )
