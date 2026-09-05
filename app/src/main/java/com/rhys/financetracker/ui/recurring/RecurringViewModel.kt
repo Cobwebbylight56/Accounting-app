@@ -23,13 +23,14 @@ import com.rhys.financetracker.domain.recurrence.RecurrenceCalculator
 import com.rhys.financetracker.domain.recurrence.RecurringTransactionGenerator
 import com.rhys.financetracker.ui.navigation.Routes
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.LocalDate
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.time.LocalDate
-import javax.inject.Inject
 
 /**
  * The regular income and bills that the app posts by itself.

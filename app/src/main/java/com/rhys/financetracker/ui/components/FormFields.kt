@@ -207,7 +207,8 @@ fun <T> DropdownField(
     modifier: Modifier = Modifier,
     placeholder: String = "Choose…",
     error: String? = null,
-    optionColor: ((T) -> Color?)? = null,
+    /** Composable so callers can pass a theme-aware colour, e.g. `colorFromHex`. */
+    optionColor: (@Composable (T) -> Color?)? = null,
 ) {
     var expanded by remember { mutableStateOf(false) }
 

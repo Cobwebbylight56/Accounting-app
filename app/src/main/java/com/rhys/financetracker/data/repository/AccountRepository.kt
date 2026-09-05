@@ -6,11 +6,12 @@ import com.rhys.financetracker.core.validation.Validators
 import com.rhys.financetracker.data.local.dao.AccountDao
 import com.rhys.financetracker.data.local.entity.AccountEntity
 import com.rhys.financetracker.data.local.projection.AccountWithBalance
-import kotlinx.coroutines.flow.Flow
 import java.time.Instant
 import java.time.LocalDate
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 @Singleton
 class AccountRepository @Inject constructor(

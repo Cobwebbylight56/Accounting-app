@@ -12,12 +12,13 @@ import com.rhys.financetracker.data.repository.CategoryRepository
 import com.rhys.financetracker.domain.model.CategoryKind
 import com.rhys.financetracker.ui.navigation.Routes
 import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 /** Manage the categories money is grouped into. */
 @HiltViewModel

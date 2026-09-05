@@ -22,10 +22,10 @@ import com.rhys.financetracker.data.repository.PeopleRepository
 import com.rhys.financetracker.data.repository.RecurringRepository
 import com.rhys.financetracker.data.repository.SavingsRepository
 import com.rhys.financetracker.data.repository.TransactionRepository
-import com.rhys.financetracker.domain.model.DashboardWidget
-import com.rhys.financetracker.domain.model.TransactionType
 import com.rhys.financetracker.domain.insight.Insight
 import com.rhys.financetracker.domain.insight.InsightReport
+import com.rhys.financetracker.domain.model.DashboardWidget
+import com.rhys.financetracker.domain.model.TransactionType
 import com.rhys.financetracker.domain.report.FinancialSummary
 import com.rhys.financetracker.domain.report.MonthPoint
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -38,6 +38,11 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**

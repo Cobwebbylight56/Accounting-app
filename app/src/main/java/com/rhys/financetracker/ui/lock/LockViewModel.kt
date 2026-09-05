@@ -7,12 +7,13 @@ import com.rhys.financetracker.security.AppLockManager
 import com.rhys.financetracker.security.PinCheck
 import com.rhys.financetracker.security.PinStore
 import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
+import kotlin.math.ceil
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import javax.inject.Inject
-import kotlin.math.ceil
+import kotlinx.coroutines.flow.stateIn
 
 /**
  * Checks the PIN and reports why an attempt failed.

@@ -9,6 +9,7 @@ import android.print.PrintAttributes
 import android.print.PrintDocumentAdapter
 import android.print.PrintDocumentInfo
 import android.print.PrintManager
+import androidx.core.content.getSystemService
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream

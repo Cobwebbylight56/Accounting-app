@@ -17,13 +17,15 @@ import com.rhys.financetracker.data.repository.SavingsProjection
 import com.rhys.financetracker.data.repository.SavingsRepository
 import com.rhys.financetracker.ui.navigation.Routes
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.LocalDate
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.time.LocalDate
-import javax.inject.Inject
 
 /** Savings goals and the savings accounts behind them. */
 @HiltViewModel

@@ -10,12 +10,13 @@ import com.rhys.financetracker.data.repository.AccountRepository
 import com.rhys.financetracker.data.repository.PeopleRepository
 import com.rhys.financetracker.ui.navigation.Routes
 import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 @HiltViewModel
 class PeopleViewModel @Inject constructor(

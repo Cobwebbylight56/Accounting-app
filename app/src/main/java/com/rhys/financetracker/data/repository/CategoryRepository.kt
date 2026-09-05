@@ -6,10 +6,11 @@ import com.rhys.financetracker.core.validation.Validators
 import com.rhys.financetracker.data.local.dao.CategoryDao
 import com.rhys.financetracker.data.local.entity.CategoryEntity
 import com.rhys.financetracker.domain.model.CategoryKind
-import kotlinx.coroutines.flow.Flow
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 @Singleton
 class CategoryRepository @Inject constructor(

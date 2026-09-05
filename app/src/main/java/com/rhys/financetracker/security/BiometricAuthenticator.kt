@@ -2,6 +2,7 @@ package com.rhys.financetracker.security
 
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
+import androidx.biometric.BiometricPrompt.AuthenticationResult
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 

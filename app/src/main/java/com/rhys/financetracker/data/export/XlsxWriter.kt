@@ -37,7 +37,7 @@ class XlsxWriter @Inject constructor() {
         rows += listOf(Cell.Text("Period"), Cell.Text(report.period.label))
         rows += listOf(Cell.Text("Scope"), Cell.Text(report.scope.label))
         rows += listOf(Cell.Text("Produced"), Cell.Text(DateUtils.format(report.generatedOn)))
-        rows += emptyList()
+        rows += emptyList<Cell>()
 
         report.sections.forEach { section ->
             rows += listOf(Cell.Text(section.title))
@@ -50,7 +50,7 @@ class XlsxWriter @Inject constructor() {
                 )
             }
             section.note?.let { rows += listOf(Cell.Text(it)) }
-            rows += emptyList()
+            rows += emptyList<Cell>()
         }
 
         write(output, listOf(Sheet(sanitiseSheetName(report.title), rows)))

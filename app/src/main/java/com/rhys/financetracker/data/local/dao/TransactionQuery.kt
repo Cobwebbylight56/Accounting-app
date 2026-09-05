@@ -109,26 +109,26 @@ object TransactionQuery {
         if (filter.accountIds.isNotEmpty()) {
             val placeholders = filter.accountIds.joinToString(", ") { "?" }
             conditions += "(t.account_id IN ($placeholders) OR t.transfer_account_id IN ($placeholders))"
-            args += filter.accountIds
-            args += filter.accountIds
+            args.addAll(filter.accountIds)
+            args.addAll(filter.accountIds)
         }
 
         if (filter.onlyUncategorised) {
             conditions += "t.category_id IS NULL"
         } else if (filter.categoryIds.isNotEmpty()) {
             conditions += "t.category_id IN (${filter.categoryIds.joinToString(", ") { "?" }})"
-            args += filter.categoryIds
+            args.addAll(filter.categoryIds)
         }
 
         if (filter.personIds.isNotEmpty()) {
             conditions += "COALESCE(t.person_id, a.person_id) IN " +
                 "(${filter.personIds.joinToString(", ") { "?" }})"
-            args += filter.personIds
+            args.addAll(filter.personIds)
         }
 
         if (filter.types.isNotEmpty()) {
             conditions += "t.type IN (${filter.types.joinToString(", ") { "?" }})"
-            args += filter.types.map { it.name }
+            args.addAll(filter.types.map { it.name })
         }
 
         filter.minAmountMinor?.let {

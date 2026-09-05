@@ -9,6 +9,7 @@ import com.rhys.financetracker.data.local.projection.AccountWithBalance
 import com.rhys.financetracker.domain.model.TransactionType
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.first
 
 /**
