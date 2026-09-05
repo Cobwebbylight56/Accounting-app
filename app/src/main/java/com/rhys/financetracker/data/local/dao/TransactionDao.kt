@@ -270,7 +270,10 @@ interface TransactionDao {
         LEFT JOIN accounts a ON a.id = t.account_id
         LEFT JOIN people p ON p.id = COALESCE(t.person_id, a.person_id)
         WHERE t.is_archived = 0 AND t.date BETWEEN :start AND :end
-        GROUP BY person_id
+        -- Grouped on the whole expression, not the output alias: both
+        -- `transactions` and `accounts` carry a `person_id`, so a bare
+        -- `GROUP BY person_id` is ambiguous to SQLite.
+        GROUP BY COALESCE(t.person_id, a.person_id)
         ORDER BY income_minor DESC
         """,
     )
