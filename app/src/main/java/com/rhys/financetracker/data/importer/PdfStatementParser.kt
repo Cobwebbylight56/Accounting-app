@@ -85,123 +85,255 @@ object PdfStatementParser {
 
     /** Every transaction line found in [lines], in the order they appear. */
     fun parse(lines: List<String>): List<Row> {
+        val documentYear = inferYear(lines)
+        val read = readLines(lines, documentYear)
+        if (read.isEmpty()) return emptyList()
+
+        // Where the money columns sit. Right-aligned, so grouping the end
+        // positions across the whole statement recovers the columns even
+        // though the text has been flattened.
+        val columns = columnsIn(read)
+        val balanceColumn = balanceColumnIn(read, columns)
+        val outColumn = directionColumn(read, columns, balanceColumn)
+
         val result = mutableListOf<Row>()
         var previousBalance: Long? = null
 
-        // Many statements print the year once, in the period heading, and then
-        // date each row "01 Mar". Without a year those rows cannot be placed,
-        // so one is taken from the document itself rather than assumed.
-        val documentYear = inferYear(lines)
-
-        // Others print the date only when it changes, leaving later rows for
-        // the same day blank. Those rows are still transactions.
-        var lastDate: LocalDate? = null
-
-        for (raw in lines) {
-            val line = raw.trim()
-            if (line.isEmpty()) continue
-
-            val amounts = trailingAmounts(line)
-            if (amounts.isEmpty()) continue
-
-            val date = leadingDate(line, documentYear)
-                // Only carried forward for a row that looks like a full
-                // transaction — an amount and a balance. A single figure with
-                // no date is more likely a total than a payment.
-                ?: lastDate?.takeIf { amounts.size >= 2 }
-                ?: continue
-            lastDate = date
-
-            val description = describe(line)
-            if (description.isBlank()) continue
-
-            // A brought-forward line states the opening balance and is not a
-            // transaction. It has to be recognised, because it is what every
-            // following row is reconciled against — treating it as a payment
-            // both invents an entry and leaves the next row unchecked.
-            if (amounts.size == 1 && BALANCE_LINE.containsMatchIn(description)) {
-                previousBalance = amounts.single()
+        for (line in read) {
+            // Wording settles a brought-forward line before anything else. A
+            // statement whose columns are not padded out gives no useful
+            // position, and reading this as a payment invents an entry the
+            // size of the entire balance.
+            if (line.figures.size == 1 && BALANCE_LINE.containsMatchIn(line.description)) {
+                previousBalance = line.figures.single().minor
                 continue
             }
 
-            val row = reconcile(date, description, amounts, previousBalance)
+            // On a full row the last figure is the balance — that much is
+            // true of every statement that prints one. Columns are only
+            // needed for rows carrying a single figure, which is where a
+            // balance printed once a day leaves nothing to reconcile against.
+            val single = line.figures.singleOrNull()
+            val balance = when {
+                line.figures.size >= 2 -> line.figures.last().minor
+                single != null && balanceColumn != null && near(single.endsAt, balanceColumn) ->
+                    single.minor
+                else -> null
+            }
+            val others = when {
+                line.figures.size >= 2 -> line.figures.dropLast(1)
+                balance != null -> emptyList()
+                else -> line.figures
+            }
+
+            if (others.isEmpty()) {
+                // A balance on its own updates the running total and is not
+                // an entry in its own right.
+                if (balance != null) previousBalance = balance
+                continue
+            }
+
+            val row = read(line, others, balance, previousBalance, outColumn)
             result += row
-            row.balanceMinor?.let { previousBalance = it }
+            (balance ?: row.balanceMinor)?.let { previousBalance = it }
         }
         return result
     }
 
     /**
-     * Works out which figure is the amount and which way it went.
+     * Reads one row, using whatever evidence the line offers.
      *
-     * With a previous balance to compare against this is arithmetic rather than
-     * guesswork. Without one — the first row on the statement — the layout has
-     * to be assumed, and that assumption is recorded so the row can be checked.
+     * The balance is the strongest: it settles both the amount and the
+     * direction by arithmetic. When it is absent — plenty of statements print
+     * a balance only once a day — the column the figure sits in says the
+     * direction instead, and the row is still read rather than abandoned.
+     *
+     * An amount is always produced when there is a figure to produce one from.
+     * Returning nothing leaves the row with no value at all, which the importer
+     * can only treat as unreadable, and that silently drops real transactions.
      */
-    private fun reconcile(
-        date: LocalDate,
-        description: String,
-        amounts: List<Long>,
+    private fun read(
+        line: ReadLine,
+        others: List<Figure>,
+        balance: Long?,
         previousBalance: Long?,
+        outColumn: Int?,
     ): Row {
-        // One figure and no balance column: the sign is all there is to go on.
-        if (amounts.size == 1) {
-            val only = amounts.single()
-            return Row(
-                date = date,
-                description = description,
-                moneyOutMinor = if (only < 0) -only else null,
-                moneyInMinor = if (only >= 0) only else null,
-                balanceMinor = null,
-                problem = if (only < 0) {
-                    null
-                } else {
-                    "Only one figure on this line, and nothing says which way it went"
-                },
+        val figure = others.firstOrNull { it.minor != 0L }
+            ?: others.firstOrNull()
+            ?: return Row(
+                line.date, line.description, null, null, balance,
+                problem = "No amount was found on this line",
             )
+        val size = kotlin.math.abs(figure.minor)
+
+        // 1. The balance proves it.
+        if (balance != null && previousBalance != null) {
+            val change = balance - previousBalance
+            if (change != 0L && kotlin.math.abs(change) == size) {
+                return Row(
+                    date = line.date,
+                    description = line.description,
+                    moneyOutMinor = if (change < 0) size else null,
+                    moneyInMinor = if (change > 0) size else null,
+                    balanceMinor = balance,
+                )
+            }
         }
 
-        val balance = amounts.last()
-        val candidates = amounts.dropLast(1)
-
-        if (previousBalance == null) {
-            // The opening row. Take the larger-than-zero figure nearest the
-            // balance as the amount and say plainly that it is unverified.
-            val amount = candidates.lastOrNull { it != 0L } ?: return Row(
-                date, description, null, null, balance,
-                problem = "No amount found on this line",
-            )
-            return Row(
-                date = date,
-                description = description,
-                moneyOutMinor = if (amount > 0) amount else null,
-                moneyInMinor = if (amount < 0) -amount else null,
-                balanceMinor = balance,
-                problem = "First row, so the direction could not be checked against a balance",
-            )
+        // 2. Otherwise the column it sits in, which is why the columns were
+        //    calibrated against the rows the balance did prove.
+        val fromColumn = outColumn?.let { near(figure.endsAt, it) }
+        val outward = when {
+            figure.minor < 0L -> true
+            fromColumn != null -> fromColumn
+            else -> null
         }
 
-        val change = balance - previousBalance
-        val size = kotlin.math.abs(change)
-        val matched = candidates.firstOrNull { kotlin.math.abs(it) == size }
-
-        if (matched == null) {
-            return Row(
-                date, description, null, null, balance,
-                problem = "The figures on this line do not match the change in balance",
-            )
-        }
-        // The balance went down, so money left the account. No interpretation
-        // of column order needed.
         return Row(
-            date = date,
-            description = description,
-            moneyOutMinor = if (change < 0) size else null,
-            moneyInMinor = if (change > 0) size else null,
+            date = line.date,
+            description = line.description,
+            moneyOutMinor = if (outward != false) size else null,
+            moneyInMinor = if (outward == false) size else null,
             balanceMinor = balance,
-            problem = if (change == 0L) "This line does not change the balance" else null,
+            problem = when {
+                outward == null ->
+                    "Read as money out — nothing on this line said which way it went"
+                balance != null && previousBalance != null ->
+                    "The balance on this line does not match the amount; check it"
+                else -> null
+            },
         )
     }
+
+    /** One line of the statement, once its date and figures have been read. */
+    private data class ReadLine(
+        val date: LocalDate,
+        val description: String,
+        val figures: List<Figure>,
+    )
+
+    /** The lines that look like statement rows, in order. */
+    private fun readLines(lines: List<String>, documentYear: Int?): List<ReadLine> {
+        val read = mutableListOf<ReadLine>()
+        var lastDate: LocalDate? = null
+        for (raw in lines) {
+            val line = raw.trimEnd()
+            if (line.isBlank()) continue
+            val figures = trailingFigures(line)
+            if (figures.isEmpty()) continue
+            val date = leadingDate(line.trim(), documentYear)
+                ?: lastDate?.takeIf { figures.size >= 2 }
+                ?: continue
+            lastDate = date
+            val description = describe(line)
+            if (description.isBlank()) continue
+            read += ReadLine(date, description, figures)
+        }
+        return read
+    }
+
+    /**
+     * The money columns, as end positions, left to right.
+     *
+     * Positions within [COLUMN_TOLERANCE] of each other are the same column:
+     * a figure's width varies with its size, and right alignment is never
+     * pixel-exact once a PDF has been flattened to text.
+     */
+    private fun columnsIn(lines: List<ReadLine>): List<Int> {
+        val positions = lines.flatMap { line -> line.figures.map { it.endsAt } }.sorted()
+        if (positions.isEmpty()) return emptyList()
+
+        val columns = mutableListOf<Int>()
+        var group = mutableListOf(positions.first())
+        for (position in positions.drop(1)) {
+            if (position - group.last() <= COLUMN_TOLERANCE) {
+                group += position
+            } else {
+                columns += group[group.size / 2]
+                group = mutableListOf(position)
+            }
+        }
+        columns += group[group.size / 2]
+        return columns
+    }
+
+    /**
+     * The column holding the running balance, if the statement has one.
+     *
+     * The rightmost money column is the usual place for it, but not every
+     * statement prints one — and on those, the rightmost column is paid-in,
+     * which must not be mistaken for a balance or every credit loses its
+     * amount entirely.
+     *
+     * A balance appears against most rows; paid-in appears only against the
+     * occasional one. So the rightmost column counts as the balance only when
+     * it is used at least as often as any other money column.
+     */
+    private fun balanceColumnIn(lines: List<ReadLine>, columns: List<Int>): Int? {
+        if (columns.size < 2) return null
+        val uses = columns.associateWith { column ->
+            lines.count { line -> line.figures.any { near(it.endsAt, column) } }
+        }
+        val rightmost = columns.last()
+        val busiestOther = columns.dropLast(1).maxOfOrNull { uses[it] ?: 0 } ?: 0
+        return rightmost.takeIf { (uses[it] ?: 0) >= busiestOther }
+    }
+
+    /**
+     * Which column means money out, learned from the rows that prove it.
+     *
+     * Rather than assuming an order — banks disagree about whether paid-out or
+     * paid-in comes first — the rows where a balance is present and moves are
+     * used as worked examples, and the majority verdict is applied to the rows
+     * where there is nothing to check against. Null when nothing proved it.
+     */
+    private fun directionColumn(
+        lines: List<ReadLine>,
+        columns: List<Int>,
+        balanceColumn: Int?,
+    ): Int? {
+        if (columns.size < 2) return null
+        if (balanceColumn == null) {
+            // No balance to learn from; position is all there is.
+            return columns.firstOrNull()
+        }
+
+        val votes = mutableMapOf<Int, Int>()
+        var previousBalance: Long? = null
+        for (line in lines) {
+            val balance = line.figures.firstOrNull { near(it.endsAt, balanceColumn) }?.minor
+            val others = line.figures.filterNot { near(it.endsAt, balanceColumn) }
+            val figure = others.firstOrNull { it.minor != 0L }
+
+            if (balance != null && previousBalance != null && figure != null) {
+                val change = balance - previousBalance
+                if (change != 0L && kotlin.math.abs(change) == kotlin.math.abs(figure.minor)) {
+                    val column = columns.minByOrNull { kotlin.math.abs(it - figure.endsAt) }
+                    if (column != null) {
+                        votes[column] = (votes[column] ?: 0) + if (change < 0) 1 else -1
+                    }
+                }
+            }
+            if (balance != null) previousBalance = balance
+        }
+
+        // A column with more "money left the account" verdicts than the other
+        // way is the paid-out column.
+        votes.entries.filter { it.value > 0 }.maxByOrNull { it.value }?.let { return it.key }
+
+        // Nothing proved it. Fall back to where paid-out sits on a UK
+        // statement — first, before paid-in — which only means anything when
+        // there are two money columns to tell apart.
+        val moneyColumns = columns.filterNot { balanceColumn != null && it == balanceColumn }
+        return moneyColumns.firstOrNull().takeIf { moneyColumns.size >= 2 }
+    }
+
+    private fun near(position: Int, column: Int): Boolean =
+        kotlin.math.abs(position - column) <= COLUMN_TOLERANCE
+
+    /** How far apart two figures can end and still be the same column. */
+    private const val COLUMN_TOLERANCE = 3
 
     /**
      * The date a statement line starts with.
@@ -255,6 +387,47 @@ object PdfStatementParser {
      * `TESCO STORES 3294`, `CARD 1234` — and those are part of the payee, not
      * money. Requiring pence, brackets or a sign keeps them out.
      */
+    /**
+     * A figure and where it ended on the line.
+     *
+     * Money columns are right-aligned, so the end position is what stays put
+     * from row to row. That position is what says which column a figure is in
+     * — the one piece of evidence that survives when a row has no balance to
+     * reconcile against.
+     */
+    internal data class Figure(val endsAt: Int, val minor: Long)
+
+    /** [trailingAmounts], but keeping each figure's column position. */
+    internal fun trailingFigures(line: String): List<Figure> {
+        val text = line.trimEnd()
+        val figures = mutableListOf<Figure>()
+        var end = text.length
+        while (end > 0) {
+            val start = text.lastIndexOf(' ', end - 1) + 1
+            val token = text.substring(start, end)
+            if (token.isEmpty()) {
+                end = start - 1
+                continue
+            }
+            if (token.uppercase() in DIRECTION_MARKERS) {
+                end = start - 1
+                continue
+            }
+            if (!looksLikeMoney(token)) break
+            val minor = Money.parseOrNull(token) ?: break
+            val signed = if (token.startsWith("-") || token.endsWith("-") ||
+                (token.startsWith("(") && token.endsWith(")"))
+            ) {
+                -kotlin.math.abs(minor)
+            } else {
+                minor
+            }
+            figures += Figure(endsAt = end, minor = signed)
+            end = start - 1
+        }
+        return figures.asReversed()
+    }
+
     internal fun trailingAmounts(line: String): List<Long> {
         val amounts = mutableListOf<Long>()
         for (token in line.trim().split(WHITESPACE).asReversed()) {

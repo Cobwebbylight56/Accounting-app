@@ -82,6 +82,10 @@ class PdfStatementParserTest {
         assertEquals(1, rows.size)
         assertNotNull(rows[0].problem)
         assertTrue(rows[0].problem!!.contains("balance"))
+        // Still read. Returning no amount left the row with no value at all,
+        // which the importer could only treat as unreadable — silently
+        // dropping a real transaction rather than showing a doubtful one.
+        assertEquals(4215L, rows[0].moneyOutMinor)
     }
 
     @Test
@@ -143,12 +147,64 @@ class PdfStatementParserTest {
     }
 
     @Test
-    fun `the first row says its direction was not checked`() {
+    fun `a balance printed only once a day still reads every row`() {
+        // The likeliest reason half a real statement came back unimportable:
+        // rows between the daily balances had nothing to reconcile against, so
+        // they were returned with no amount at all.
         val rows = PdfStatementParser.parse(
-            listOf("01 Mar 2026 TESCO STORES 42.15 1,957.85"),
+            listOf(
+                "Statement 1 March 2026 to 31 March 2026",
+                "Date   Description                Paid out   Paid in    Balance",
+                "01 Mar Balance brought forward                          2,000.00",
+                "02 Mar TESCO STORES 3294             42.15",
+                "02 Mar GREGGS PLC 1042                3.60              1,954.25",
+                "03 Mar SALARY ACME LTD                        1,862.23",
+                "03 Mar SHELL FILLING STN             61.40              3,755.08",
+            ),
         )
-        assertEquals(1, rows.size)
-        assertNotNull(rows[0].problem)
+        assertEquals(4, rows.size)
+        assertTrue(rows.all { (it.moneyOutMinor ?: it.moneyInMinor) != null })
+        assertEquals(4215L, rows[0].moneyOutMinor)
+        assertEquals(360L, rows[1].moneyOutMinor)
+        // Read from its column: the balance said nothing about this row.
+        assertEquals(186223L, rows[2].moneyInMinor)
+        assertEquals(6140L, rows[3].moneyOutMinor)
+    }
+
+    @Test
+    fun `a statement with no balance column still reads both directions`() {
+        // With no balance anywhere, the column a figure sits in is the only
+        // evidence — and without it every credit was read as a payment.
+        val rows = PdfStatementParser.parse(
+            listOf(
+                "Date        Description              Paid out   Paid in",
+                "01 Mar 2026 TESCO STORES 3294           42.15",
+                "02 Mar 2026 SALARY ACME LTD                     1,862.23",
+                "03 Mar 2026 SHELL FILLING STN           61.40",
+            ),
+        )
+        assertEquals(3, rows.size)
+        assertEquals(4215L, rows[0].moneyOutMinor)
+        assertEquals(186223L, rows[1].moneyInMinor)
+        assertEquals(6140L, rows[2].moneyOutMinor)
+    }
+
+    @Test
+    fun `an opening balance is never imported as a payment`() {
+        // On a statement whose columns are not padded out there is no useful
+        // position to go on, so the wording has to settle it. Read as a
+        // payment it invents an entry the size of the whole balance.
+        val rows = PdfStatementParser.parse(
+            listOf(
+                "Date Reference Amount Balance",
+                "01 Mar 2026 OPENING BALANCE 2,000.00",
+                "02 Mar 2026 TESCO STORES 3294 -42.15 1,957.85",
+                "03 Mar 2026 SALARY ACME LTD 1,862.23 3,820.08",
+            ),
+        )
+        assertEquals(2, rows.size)
+        assertEquals(4215L, rows[0].moneyOutMinor)
+        assertEquals(186223L, rows[1].moneyInMinor)
     }
 
     @Test
