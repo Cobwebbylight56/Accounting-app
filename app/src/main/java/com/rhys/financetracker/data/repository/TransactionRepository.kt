@@ -12,7 +12,9 @@ import com.rhys.financetracker.data.local.projection.CategoryTotal
 import com.rhys.financetracker.data.local.projection.IncomeExpenseTotals
 import com.rhys.financetracker.data.local.projection.MonthTotals
 import com.rhys.financetracker.data.local.projection.PersonTotals
+import com.rhys.financetracker.data.local.projection.PotFlow
 import com.rhys.financetracker.data.local.projection.TransactionWithDetails
+import com.rhys.financetracker.domain.model.CategoryKind
 import com.rhys.financetracker.domain.model.TransactionType
 import java.time.Instant
 import java.time.LocalDate
@@ -64,13 +66,19 @@ class TransactionRepository @Inject constructor(
     ): Flow<List<CategoryTotal>> =
         transactionDao.observeCategoryTotals(type.name, start, end, accountId, personId)
 
-    /** Money paid into savings over a period, from the categories on it. */
-    fun observeSavingsPaidIn(
+    /**
+     * Money moved into and out of savings or cash over a period, read from the
+     * categories on the payments rather than from any account balance.
+     */
+    fun observePotFlow(
+        kind: CategoryKind,
         start: LocalDate,
         end: LocalDate,
         accountId: Long? = null,
         personId: Long? = null,
-    ): Flow<Long> = transactionDao.observeSavingsPaidIn(start, end, accountId, personId)
+    ): Flow<PotFlow> =
+        transactionDao.observePotFlow(kind.name, start, end, accountId, personId)
+            .map { it ?: PotFlow.EMPTY }
 
     /** Money in and out of every account over a period, one row per account. */
     fun observeAccountActivity(start: LocalDate, end: LocalDate): Flow<List<AccountActivity>> =

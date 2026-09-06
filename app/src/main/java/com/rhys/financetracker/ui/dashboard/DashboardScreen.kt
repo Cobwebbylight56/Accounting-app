@@ -307,6 +307,7 @@ private fun DashboardCard(
         DashboardWidget.OVERDUE_BILLS -> OverdueBillsCard(state, onOpenRecurring)
         DashboardWidget.RECENT_TRANSACTIONS ->
             RecentTransactionsCard(state, onOpenTransaction, onAddTransaction, onMonthClick)
+        DashboardWidget.SAVINGS_AND_CASH -> SavingsAndCashCard(state, onOpenAccounts)
         DashboardWidget.SAVINGS_PROGRESS -> SavingsProgressCard(state, onOpenSavings)
         DashboardWidget.SPENDING_BY_CATEGORY ->
             SpendingByCategoryCard(state, onCategoryClick)
@@ -349,12 +350,18 @@ private fun BalanceSummaryCard(state: DashboardState, onOpenAccounts: () -> Unit
             StatTile(
                 label = "Saved",
                 caption = when {
-                    summary.savingsPaidInMinor > 0L ->
-                        "${Money.format(summary.savingsPaidInMinor)} in this month"
+                    summary.savingsNetMinor > 0L ->
+                        "${Money.format(summary.savingsNetMinor)} in this month"
+                    summary.savingsNetMinor < 0L ->
+                        "${Money.format(-summary.savingsNetMinor)} out this month"
                     else -> "Set aside"
                 },
-                value = if (summary.totalSavingsMinor == 0L && summary.savingsPaidInMinor > 0L) {
-                    Money.format(summary.savingsPaidInMinor)
+                // A savings account, where there is one, is the real answer.
+                // Where there is not, what the app has watched move in and out
+                // is the best it can say — and better than the £0.00 it used
+                // to show a household that saves every month.
+                value = if (summary.totalSavingsMinor == 0L && summary.savingsEverMovedMinor != 0L) {
+                    Money.format(summary.savingsEverMovedMinor)
                 } else {
                     Money.format(summary.totalSavingsMinor)
                 },

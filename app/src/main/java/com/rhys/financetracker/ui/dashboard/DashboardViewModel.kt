@@ -12,6 +12,7 @@ import com.rhys.financetracker.data.local.projection.AccountActivity
 import com.rhys.financetracker.data.local.projection.AccountWithBalance
 import com.rhys.financetracker.data.local.projection.CategoryTotal
 import com.rhys.financetracker.data.local.projection.IncomeExpenseTotals
+import com.rhys.financetracker.data.local.projection.PotFlow
 import com.rhys.financetracker.data.local.projection.RecurringRuleWithDetails
 import com.rhys.financetracker.data.local.projection.SavingsGoalWithProgress
 import com.rhys.financetracker.data.local.projection.TransactionWithDetails
@@ -25,6 +26,7 @@ import com.rhys.financetracker.data.repository.SavingsRepository
 import com.rhys.financetracker.data.repository.TransactionRepository
 import com.rhys.financetracker.domain.insight.Insight
 import com.rhys.financetracker.domain.insight.InsightReport
+import com.rhys.financetracker.domain.model.CategoryKind
 import com.rhys.financetracker.domain.model.DashboardWidget
 import com.rhys.financetracker.domain.model.TransactionType
 import com.rhys.financetracker.domain.report.FinancialSummary
@@ -118,12 +120,35 @@ class DashboardViewModel @Inject constructor(
     }
 
     /**
-     * What was paid into savings this month, whether or not a savings account
-     * exists in the app to hold it.
+     * Money into and out of savings this month, whether or not a savings
+     * account exists in the app to hold it.
      */
-    private val savingsPaidIn = monthFlow.flatMapLatest { (month, currentScope) ->
+    private val savingsThisMonth = potFlow(CategoryKind.SAVING)
+
+    /** The same for cash: out of a machine, and back in at a counter. */
+    private val cashThisMonth = potFlow(CategoryKind.CASH)
+
+    /**
+     * Everything the app has ever seen move into savings, less what came back.
+     *
+     * This is the closest thing to a balance for a saver held at another bank,
+     * which the app has no account for. It only knows about the movements it
+     * has been shown, so it is never called a balance.
+     */
+    private val savingsEverMoved = scope.flatMapLatest { currentScope ->
+        transactionRepository.observePotFlow(
+            kind = CategoryKind.SAVING,
+            start = FIRST_POSSIBLE_DATE,
+            end = DateUtils.today(),
+            accountId = currentScope.accountId,
+            personId = currentScope.personId,
+        )
+    }
+
+    private fun potFlow(kind: CategoryKind) = monthFlow.flatMapLatest { (month, currentScope) ->
         val range = DateUtils.monthRange(month)
-        transactionRepository.observeSavingsPaidIn(
+        transactionRepository.observePotFlow(
+            kind = kind,
             start = range.start,
             end = range.endInclusive,
             accountId = currentScope.accountId,
@@ -218,7 +243,9 @@ class DashboardViewModel @Inject constructor(
             committed,
             insightReport,
             accountActivity,
-            savingsPaidIn,
+            savingsThisMonth,
+            cashThisMonth,
+            savingsEverMoved,
             // Only for saying where the money is when the month on screen is
             // empty. Opening on today's month and finding nothing looks like a
             // broken app when the entries are simply in an earlier month.
@@ -247,8 +274,10 @@ class DashboardViewModel @Inject constructor(
         val committed = values[13] as Long
         val insights = values[14] as InsightReport
         val activity = values[15] as List<AccountActivity>
-        val paidIntoSavings = values[16] as Long
-        val latest = (values[17] as List<TransactionWithDetails>)
+        val savings = values[16] as PotFlow
+        val cash = values[17] as PotFlow
+        val savingsEver = values[18] as PotFlow
+        val latest = (values[19] as List<TransactionWithDetails>)
             .firstOrNull()?.transaction?.date
 
         val inScope = accountList.filter { currentScope.matches(it) }
@@ -272,7 +301,11 @@ class DashboardViewModel @Inject constructor(
                 monthIncomeMinor = monthTotals.incomeMinor,
                 monthExpenseMinor = monthTotals.expenseMinor,
                 committedRecurringMinor = committed,
-                savingsPaidInMinor = paidIntoSavings,
+                savingsInMinor = savings.intoPotMinor,
+                savingsOutMinor = savings.outOfPotMinor,
+                savingsEverMovedMinor = savingsEver.netMinor,
+                cashOutMinor = cash.intoPotMinor,
+                cashInMinor = cash.outOfPotMinor,
             ),
             spendingByCategory = categories,
             monthlyTrend = trend,
@@ -424,6 +457,8 @@ class DashboardViewModel @Inject constructor(
     }
 
     private companion object {
+        /** Early enough to be "everything", without pretending to be a date. */
+        val FIRST_POSSIBLE_DATE: LocalDate = LocalDate.of(1900, 1, 1)
         const val MONTHS_ON_CHART = 6
         const val UPCOMING_DAYS = 30L
     }

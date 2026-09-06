@@ -68,8 +68,32 @@ enum class RecordSource(val displayName: String) {
 enum class CategoryKind(val displayName: String) {
     INCOME("Income"),
     EXPENSE("Expense"),
+
+    /**
+     * Money moved somewhere it is being kept, rather than spent.
+     *
+     * Its own kind because the two directions have to be told apart from
+     * ordinary income and spending: £200 to a saver is not £200 gone, and
+     * £200 back out of one is not £200 earned.
+     */
     SAVING("Saving"),
+
+    /**
+     * Money that became notes and coins, or notes and coins paid back in.
+     *
+     * Taking £50 out of a machine spends nothing — the £50 is in a pocket
+     * instead of an account. Counted as spending it inflates the month twice
+     * over: once at the machine, and again when the cash is actually spent.
+     */
+    CASH("Cash"),
     TRANSFER("Transfer"),
+    ;
+
+    /**
+     * True for the kinds that describe money being moved rather than earned
+     * or spent, and which therefore belong on every direction's list.
+     */
+    val isAPot: Boolean get() = this == SAVING || this == CASH
 }
 
 /** How often a recurring income or bill repeats. */
@@ -130,6 +154,7 @@ enum class DashboardWidget(val key: String, val title: String, val defaultVisibl
     UPCOMING_BILLS("upcoming_bills", "Upcoming bills", true),
     OVERDUE_BILLS("overdue_bills", "Overdue", true),
     RECENT_TRANSACTIONS("recent_transactions", "This month's transactions", true),
+    SAVINGS_AND_CASH("savings_and_cash", "Savings and cash", true),
     SAVINGS_PROGRESS("savings_progress", "Savings goals", true),
     SPENDING_BY_CATEGORY("spending_by_category", "Spending by category", true),
     INSIGHTS("insights", "Advice", true),

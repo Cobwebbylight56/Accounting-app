@@ -135,11 +135,24 @@ data class FinancialSummary(
     val monthExpenseMinor: Long,
     val committedRecurringMinor: Long,
     /**
-     * Paid into savings this month, read from the categories on the payments
-     * rather than from any account balance — so a saver held at another bank,
-     * which this app has no account for, still shows up as saving.
+     * Money into and out of savings this month, read from the categories on
+     * the payments rather than from any account balance — so a saver held at
+     * another bank, which this app has no account for, still shows up.
      */
-    val savingsPaidInMinor: Long = 0L,
+    val savingsInMinor: Long = 0L,
+    val savingsOutMinor: Long = 0L,
+
+    /**
+     * Everything ever paid into savings less everything taken back out.
+     *
+     * The nearest thing to a balance for a saver the app holds no account for.
+     * Never called one: it knows only the movements it has been shown.
+     */
+    val savingsEverMovedMinor: Long = 0L,
+
+    /** Cash out of a machine this month, and cash paid back in at a counter. */
+    val cashOutMinor: Long = 0L,
+    val cashInMinor: Long = 0L,
 ) {
     val monthNetMinor: Long get() = monthIncomeMinor - monthExpenseMinor
 
@@ -148,6 +161,17 @@ data class FinancialSummary(
      * gone out, less the bills still to be paid before the month ends.
      */
     val disposableMinor: Long get() = monthNetMinor - committedRecurringMinor
+
+    /** What this month actually added to savings; negative when it drew them down. */
+    val savingsNetMinor: Long get() = savingsInMinor - savingsOutMinor
+
+    /** Cash taken out and not paid back in this month. */
+    val cashNetMinor: Long get() = cashOutMinor - cashInMinor
+
+    /** True when there is anything at all to say about savings or cash. */
+    val hasPotActivity: Boolean
+        get() = savingsInMinor != 0L || savingsOutMinor != 0L ||
+            cashOutMinor != 0L || cashInMinor != 0L
 
     companion object {
         val EMPTY = FinancialSummary(0, 0, 0, 0, 0, 0, 0)

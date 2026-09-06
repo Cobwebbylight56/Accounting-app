@@ -69,13 +69,19 @@ class TransactionEditViewModel @Inject constructor(
             form = currentForm,
             accounts = accounts,
             // Only offer categories that make sense for the chosen direction.
+                // Savings and cash are offered on every direction. Paying
+                // into a saver is an expense on the account it leaves, taking
+                // money back out is income to it, and neither could be picked
+                // at all before — so a payment the importer had filed under
+                // Savings could not be corrected to it by hand.
             categories = categories.filter { category ->
                 !category.isArchived && when (currentForm.type) {
-                    TransactionType.INCOME -> category.kind == CategoryKind.INCOME
-                    TransactionType.EXPENSE -> category.kind == CategoryKind.EXPENSE
+                    TransactionType.INCOME ->
+                        category.kind == CategoryKind.INCOME || category.kind.isAPot
+                    TransactionType.EXPENSE ->
+                        category.kind == CategoryKind.EXPENSE || category.kind.isAPot
                     TransactionType.TRANSFER ->
-                        category.kind == CategoryKind.TRANSFER ||
-                            category.kind == CategoryKind.SAVING
+                        category.kind == CategoryKind.TRANSFER || category.kind.isAPot
                 }
             },
             people = people,

@@ -54,6 +54,27 @@ data class CategoryTotal(
     @ColumnInfo(name = "transaction_count") val transactionCount: Int,
 )
 
+/**
+ * Money moved into and out of a pot — savings, or cash — over a period.
+ *
+ * Both directions in one row because either alone is misleading. A month that
+ * put £200 into a saver and took £500 back out has not saved £200, and showing
+ * only what went in says it has.
+ */
+data class PotFlow(
+    /** Money that left an account for the pot. */
+    @ColumnInfo(name = "into_pot_minor") val intoPotMinor: Long,
+    /** Money that came back out of it. */
+    @ColumnInfo(name = "out_of_pot_minor") val outOfPotMinor: Long,
+) {
+    /** What the period actually added to the pot; negative when it drew it down. */
+    val netMinor: Long get() = intoPotMinor - outOfPotMinor
+
+    companion object {
+        val EMPTY = PotFlow(intoPotMinor = 0L, outOfPotMinor = 0L)
+    }
+}
+
 /** Income/expense totals for one calendar month. */
 data class MonthTotals(
     @ColumnInfo(name = "year_month") val yearMonth: String,

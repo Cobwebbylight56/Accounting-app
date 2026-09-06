@@ -108,7 +108,7 @@ Groupings for income and spending, nestable one level deep.
 |---|---|---|
 | `id` | INTEGER PK | |
 | `name` | TEXT | Unique together with `kind` |
-| `kind` | TEXT | `INCOME`, `EXPENSE`, `SAVING` or `TRANSFER` |
+| `kind` | TEXT | `INCOME`, `EXPENSE`, `SAVING`, `CASH` or `TRANSFER`. `SAVING` and `CASH` are money moved rather than earned or spent, and are read in both directions: an expense on one is money into the pot, an income is money back out. No migration — new categories are topped up on launch by name, the same way dashboard cards are. |
 | `color_hex` | TEXT | |
 | `icon_key` | TEXT? | Material icon name |
 | `parent_id` | INTEGER? | FK → `categories`, `SET NULL` |

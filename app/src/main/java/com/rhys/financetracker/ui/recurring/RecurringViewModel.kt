@@ -165,13 +165,17 @@ class RecurringEditViewModel @Inject constructor(
             isNew = ruleId == Routes.NEW_ID,
             form = currentForm,
             accounts = accounts,
+            // A standing order into a saver is the commonest regular payment
+            // there is, so savings and cash are offered whichever direction
+            // the rule runs in.
             categories = categories.filterNot { it.isArchived }.filter { category ->
                 when (currentForm.type) {
-                    TransactionType.INCOME -> category.kind == CategoryKind.INCOME
-                    TransactionType.EXPENSE -> category.kind == CategoryKind.EXPENSE
+                    TransactionType.INCOME ->
+                        category.kind == CategoryKind.INCOME || category.kind.isAPot
+                    TransactionType.EXPENSE ->
+                        category.kind == CategoryKind.EXPENSE || category.kind.isAPot
                     TransactionType.TRANSFER ->
-                        category.kind == CategoryKind.SAVING ||
-                            category.kind == CategoryKind.TRANSFER
+                        category.kind == CategoryKind.TRANSFER || category.kind.isAPot
                 }
             },
             people = people,

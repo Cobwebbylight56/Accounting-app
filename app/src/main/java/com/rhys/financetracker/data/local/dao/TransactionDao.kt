@@ -12,15 +12,16 @@ import com.rhys.financetracker.data.local.entity.AccountEntity
 import com.rhys.financetracker.data.local.entity.CategoryEntity
 import com.rhys.financetracker.data.local.entity.PersonEntity
 import com.rhys.financetracker.data.local.entity.TransactionEntity
-import com.rhys.financetracker.data.local.projection.CategoryTotal
 import com.rhys.financetracker.data.local.projection.AccountActivity
-import com.rhys.financetracker.data.local.projection.DescriptionCategory
 import com.rhys.financetracker.data.local.projection.AccountPayee
+import com.rhys.financetracker.data.local.projection.CategoryTotal
+import com.rhys.financetracker.data.local.projection.DescriptionCategory
 import com.rhys.financetracker.data.local.projection.ExistingEntry
 import com.rhys.financetracker.data.local.projection.FingerprintCount
 import com.rhys.financetracker.data.local.projection.IncomeExpenseTotals
 import com.rhys.financetracker.data.local.projection.MonthTotals
 import com.rhys.financetracker.data.local.projection.PersonTotals
+import com.rhys.financetracker.data.local.projection.PotFlow
 import com.rhys.financetracker.data.local.projection.TransactionWithDetails
 import java.time.LocalDate
 import kotlinx.coroutines.flow.Flow
@@ -306,37 +307,44 @@ interface TransactionDao {
     ): Flow<List<CategoryTotal>>
 
     /**
-     * Money paid into savings over a period.
+     * Money moved into and out of a pot — savings, or cash — over a period.
      *
      * Savings are not only an account balance. Somebody whose saver is with
      * another bank has nothing in this app to hold that balance, and every
      * standing order into it looked like ordinary spending — so the app showed
      * nothing saved by a household that was saving every month.
      *
-     * What it can see is the payment leaving, and the category on it says
-     * where it went. Anything filed under a saving category counts here,
-     * whether or not an account exists for the other end of it.
+     * What it can see is the payment moving, and the category on it says where
+     * it went. Both directions are counted: money out of the account is money
+     * into the pot, money back in is money out of it. Counting only the first
+     * would report a month that emptied its saver as a month that saved.
+     *
+     * Cash works the same way and is the same query — taking £50 out of a
+     * machine is not spending £50, it is £50 in a pocket.
      */
     @Query(
         """
-        SELECT IFNULL(SUM(t.amount_minor), 0)
+        SELECT IFNULL(SUM(CASE WHEN t.type = 'EXPENSE' THEN t.amount_minor ELSE 0 END), 0)
+                   AS into_pot_minor,
+               IFNULL(SUM(CASE WHEN t.type = 'INCOME' THEN t.amount_minor ELSE 0 END), 0)
+                   AS out_of_pot_minor
         FROM transactions t
         JOIN categories c ON c.id = t.category_id
         LEFT JOIN accounts a ON a.id = t.account_id
         WHERE t.is_archived = 0
-          AND t.type = 'EXPENSE'
-          AND c.kind = 'SAVING'
+          AND c.kind = :kind
           AND t.date BETWEEN :start AND :end
           AND (:accountId IS NULL OR t.account_id = :accountId)
           AND (:personId IS NULL OR COALESCE(t.person_id, a.person_id) = :personId)
         """,
     )
-    fun observeSavingsPaidIn(
+    fun observePotFlow(
+        kind: String,
         start: LocalDate,
         end: LocalDate,
         accountId: Long?,
         personId: Long?,
-    ): Flow<Long>
+    ): Flow<PotFlow?>
 
     @Query(
         """

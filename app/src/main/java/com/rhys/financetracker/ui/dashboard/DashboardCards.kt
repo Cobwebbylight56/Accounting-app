@@ -7,8 +7,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -412,6 +414,116 @@ internal fun RecentTransactionsCard(
 
 /** How many of the month's transactions the card shows before it is opened. */
 private const val TRANSACTIONS_SHOWN = 8
+
+/**
+ * Money moved rather than spent: into and out of savings, and into and out of
+ * cash.
+ *
+ * Both directions, because either alone lies. A month that put £200 into a
+ * saver and took £500 back out has not saved £200, and the app used to say it
+ * had. The same for cash: £50 from a machine is not £50 spent, it is £50 in a
+ * pocket — what it then went on is something no statement can say.
+ */
+@Composable
+internal fun SavingsAndCashCard(state: DashboardState, onOpenAccounts: () -> Unit) {
+    val summary = state.summary
+    SectionCard(
+        title = "Savings and cash",
+        subtitle = DateUtils.formatMonth(state.month),
+    ) {
+        if (!summary.hasPotActivity) {
+            Text(
+                text = "Nothing moved into savings or taken out as cash this month. " +
+                    "Payments to a saver and withdrawals from a machine are recognised " +
+                    "on import, and either can be set by hand on any entry.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            return@SectionCard
+        }
+
+        PotRow("Into savings", summary.savingsInMinor, isGood = true)
+        PotRow("Out of savings", summary.savingsOutMinor, isGood = false)
+        PotRow(
+            label = if (summary.savingsNetMinor < 0L) "Savings went down by" else "Saved this month",
+            amountMinor = kotlin.math.abs(summary.savingsNetMinor),
+            isGood = summary.savingsNetMinor >= 0L,
+            isTotal = true,
+        )
+
+        Spacer(Modifier.height(12.dp))
+        HorizontalDivider()
+        Spacer(Modifier.height(12.dp))
+
+        PotRow("Cash taken out", summary.cashOutMinor, isGood = false)
+        PotRow("Cash paid back in", summary.cashInMinor, isGood = true)
+
+        Spacer(Modifier.height(10.dp))
+        Text(
+            text = "Cash out of a machine is not spending — it is the same money in a " +
+                "pocket. What it was spent on is only in the app if you enter it.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        if (summary.totalSavingsMinor == 0L && summary.savingsEverMovedMinor != 0L) {
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = "You have no savings account in the app, so \"Saved\" on Home shows " +
+                    "${Money.format(summary.savingsEverMovedMinor)} — everything it has " +
+                    "watched move into savings, less what came back out. Add the saver as " +
+                    "an account and its real balance is shown instead.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            TextButton(onClick = onOpenAccounts) { Text("Add the saver") }
+        }
+    }
+}
+
+/** One line of the savings and cash card. */
+@Composable
+private fun PotRow(
+    label: String,
+    amountMinor: Long,
+    isGood: Boolean,
+    isTotal: Boolean = false,
+) {
+    val colors = FinanceTheme.colors
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = if (isTotal) {
+                MaterialTheme.typography.bodyLarge
+            } else {
+                MaterialTheme.typography.bodyMedium
+            },
+            color = if (isTotal) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = Money.format(amountMinor),
+            style = if (isTotal) {
+                MaterialTheme.typography.titleMedium
+            } else {
+                MaterialTheme.typography.bodyLarge
+            },
+            color = when {
+                amountMinor == 0L -> MaterialTheme.colorScheme.onSurfaceVariant
+                isGood -> colors.positive
+                else -> colors.negative
+            },
+        )
+    }
+}
 
 @Composable
 private fun TransactionRowCompact(item: TransactionWithDetails, onClick: () -> Unit) {

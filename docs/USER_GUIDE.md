@@ -225,6 +225,55 @@ Home opens on the current month. If you have imported older statements that
 month may be empty, and the card says which month your latest entries are in
 with a button to jump straight there.
 
+### Savings and cash
+
+Two kinds of payment are not spending, and counting them as spending makes a
+household that saves £200 a month look like one that spends it:
+
+* **Savings** — money moved to where it is being kept.
+* **Cash** — money that became notes and coins. Taking £50 out of a machine
+  spends nothing; the £50 is in a pocket. What it then went on is only in the
+  app if you enter it.
+
+Both are recognised on import from the wording on the statement, **in both
+directions**. The same words mean the payment either way and the statement
+already says which way the money went, so "Transfer to START TO SAVE" is money
+into savings and "Transfer from START TO SAVE" is money back out of it.
+
+The **Savings and cash** card on Home shows all four figures for the month:
+into savings, out of savings, what that nets to, and cash out and back in.
+
+If your saver is at another bank there is no account here to hold its balance,
+so **Saved** on Home shows everything the app has watched move into savings
+less what came back out. Add the saver as an account under your name and its
+real balance is shown instead.
+
+You can also set either by hand on any entry: open it and pick **Savings** or
+**Cash** as the category. That works on income and expenses alike, and the app
+remembers the payee — correct one and every future import of it follows.
+
+#### The wordings that are recognised
+
+Savings (88 of them):
+
+```
+aj bell, bonus saver, cash isa, child saver, chip financial, chip invest, christmas saver, digital saver, dodl, double access, e saver, easy access, easy saver, emergency fund, esaver, first saver, fixed bond, fixed rate bond, flex saver, flexi saver, freetrade, from savings, future saver, goal saver, guaranteed growth, guaranteed income, hargreaves, help to buy isa, help to save, holiday saver, income bonds, instant saver, interactive investor, into savings, investec, investing, investment, isa, jisa, junior isa, junior saver, lifetime isa, limited access, loyalty saver, matured, maturity, member saver, money box, moneybox, moneyfarm, monthly saver, monzo pot, national savings, nest egg, ns and i, nsandi, nutmeg, online saver, pension contribution, plum, premium bonds, put away, rainy day, regular saver, round up, roundup, save into, saver, savings, savings account, savings bond, savings goal, savings pot, savings transfer, set aside, sinking fund, sipp, smart saver, starling space, start to save, stocks and shares, to save, to savings, trading 212, triple access, vanguard, wealthify, young saver
+```
+
+Cash (24):
+
+```
+atm, atm withdrawal, branch deposit, branch withdrawal, cardtronics, cash advance, cash at, cash deposit, cash in at, cash machine, cash paid in, cash point, cash withdrawal, cashpoint, counter deposit, counter withdrawal, link atm, link cash, note machine, notemachine, paying in, post office cash, withdrawal, withdrawn
+```
+
+A word matches at the start of a word in the description, so "saver" finds
+"SAVER 12345678". Some are written with a trailing space in the app so they
+match a whole word only — otherwise "isa" reaches ISABELLAS and "saver"
+reaches SAVERS, the high-street shop.
+
+If a payment of yours is not on this list, tell me what the bank calls it and
+it can be added.
+
 ### The monthly rollover
 
 At the start of each month, the app:

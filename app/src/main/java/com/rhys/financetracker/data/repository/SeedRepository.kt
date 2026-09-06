@@ -51,9 +51,41 @@ class SeedRepository @Inject constructor(
             // the table was not empty, so nothing was ever inserted. The
             // charts were added after the first release, which is exactly the
             // case that went missing.
+            // The same top-up as the widgets, and for the same reason: a
+            // category added in a later version was never inserted for anybody
+            // who had already run the app, because the table was not empty.
+            // "Cash" arrived that way, and without this the one install that
+            // needed it would never have seen it.
+            if (seedMissingCategories()) didSeed = true
             if (seedMissingWidgets()) didSeed = true
             didSeed
         }
+
+    /**
+     * Adds any default category the database does not already hold by name.
+     *
+     * Matched on the name alone: somebody who made their own "Cash" category
+     * should keep theirs rather than be given a second one beside it.
+     *
+     * @return true when anything was added.
+     */
+    private suspend fun seedMissingCategories(): Boolean {
+        val existing = database.categoryDao().getAll()
+        if (existing.isEmpty()) return false
+        val byName = existing.associateBy { it.name }.toMutableMap()
+        val missing = DefaultData.defaultCategories().filter { it.name !in byName }
+        if (missing.isEmpty()) return false
+
+        var order = (existing.maxOfOrNull { it.sortOrder } ?: 0) + 1
+        // Parents first, so a child added at the same time has an id to point
+        // at rather than being orphaned.
+        for (seed in missing.filter { it.parent == null } + missing.filter { it.parent != null }) {
+            val parentId = seed.parent?.let { byName[it]?.id }
+            val id = database.categoryDao().insert(seed.toEntity(order++, parentId))
+            byName[seed.name] = seed.toEntity(order, parentId).copy(id = id)
+        }
+        return true
+    }
 
     /**
      * Adds a row for any dashboard card that has none, keeping the positions
