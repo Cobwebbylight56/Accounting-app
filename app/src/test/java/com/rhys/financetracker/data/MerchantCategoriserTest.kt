@@ -38,6 +38,10 @@ class MerchantCategoriserTest {
         assertEquals("Savings", categoryFor("MONEYBOX"))
         assertEquals("Savings", categoryFor("NS AND I PREMIUM BONDS"))
         assertEquals("Savings", categoryFor("STANDING ORDER TO SAVINGS"))
+        // Nationwide's saver, and the one that was still coming through as
+        // ordinary spending: "Transfer to START TO SAVE".
+        assertEquals("Savings", categoryFor("Transfer to START TO SAVE"))
+        assertEquals("Savings", categoryFor("Transfer to START TO SAVE ISA 998812"))
     }
 
     @Test

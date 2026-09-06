@@ -48,6 +48,10 @@ class AccountsViewModel @Inject constructor(
         AccountsState(
             isLoading = false,
             groups = buildGroups(visible, people),
+            // Offered as chips beside an account nobody owns, so saying whose
+            // it is takes one tap from the list rather than a trip into the
+            // account and back.
+            people = people.filterNot { it.isArchived },
             showArchived = archived,
             totalAssetsMinor = visible.filterNot { it.isLiability }.sumOf { it.balanceMinor },
             totalLiabilitiesMinor = visible.filter { it.isLiability }.sumOf { it.balanceMinor },
@@ -72,7 +76,16 @@ class AccountsViewModel @Inject constructor(
         return if (unassigned.isEmpty()) {
             groups
         } else {
-            groups + AccountGroup("Not assigned", "#455A64", unassigned)
+            groups + AccountGroup("Not assigned", "#455A64", unassigned, isUnassigned = true)
+        }
+    }
+
+    /** Puts an account under a person's name, from the list itself. */
+    fun assign(accountId: Long, person: PersonEntity) {
+        viewModelScope.launch {
+            val name = accountRepository.get(accountId)?.name
+            message.value = accountRepository.assignTo(accountId, person.id).errorMessageOrNull()
+                ?: name?.let { "\"$it\" is now ${person.name}'s" }
         }
     }
 
@@ -107,6 +120,8 @@ data class AccountGroup(
     val personName: String,
     val personColor: String,
     val accounts: List<AccountWithBalance>,
+    /** True for the group of accounts nobody owns, which offers to fix that. */
+    val isUnassigned: Boolean = false,
 ) {
     val totalMinor: Long get() = accounts.sumOf { it.balanceMinor }
 }
@@ -114,6 +129,7 @@ data class AccountGroup(
 data class AccountsState(
     val isLoading: Boolean = true,
     val groups: List<AccountGroup> = emptyList(),
+    val people: List<PersonEntity> = emptyList(),
     val showArchived: Boolean = false,
     val totalAssetsMinor: Long = 0L,
     val totalLiabilitiesMinor: Long = 0L,

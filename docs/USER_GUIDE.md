@@ -197,12 +197,33 @@ month's payments in are the figure. Adding the saver as an account is still
 better — then the balance is shown too — but nothing has to be set up for the
 saving to be counted.
 
+### Whose account is it
+
+Everything the app does per person — the Hannah / Rhys / Joint tabs on Home,
+the totals under each name on Accounts — works off who owns the account. An
+account under nobody's name holds its money perfectly well but appears in
+**nobody's** tab, so picking a person shows an empty screen while the money
+sits in a group called "Not assigned" on the Accounts screen.
+
+If that has happened, open **Accounts**. Anything unassigned is at the bottom,
+with the names listed beside it: tap one and the account moves under it, along
+with all its history. Do not add a new account instead — that makes a second
+copy and the same money is counted twice.
+
+The idea is one name per person and as many accounts under it as they have:
+bank 1, bank 2, saver 1, saver 2. You never pick between them — every tab and
+every total adds up whatever is under the name.
+
 ### The month's transactions on Home
 
 The card at the foot of Home holds every transaction in the month you are
 looking at, newest first. It shows eight and then a **Show all** button;
 **Show less** closes it again. After importing a statement that is two hundred
 rows, which is why it closes.
+
+Home opens on the current month. If you have imported older statements that
+month may be empty, and the card says which month your latest entries are in
+with a button to jump straight there.
 
 ### The monthly rollover
 

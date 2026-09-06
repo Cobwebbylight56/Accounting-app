@@ -30,6 +30,7 @@ import com.rhys.financetracker.domain.model.TransactionType
 import com.rhys.financetracker.domain.report.FinancialSummary
 import com.rhys.financetracker.domain.report.MonthPoint
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.LocalDate
 import java.time.YearMonth
 import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -218,6 +219,10 @@ class DashboardViewModel @Inject constructor(
             insightReport,
             accountActivity,
             savingsPaidIn,
+            // Only for saying where the money is when the month on screen is
+            // empty. Opening on today's month and finding nothing looks like a
+            // broken app when the entries are simply in an earlier month.
+            transactionRepository.observeRecent(1),
         ),
     ) { values -> buildState(values) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DashboardState())
@@ -243,8 +248,11 @@ class DashboardViewModel @Inject constructor(
         val insights = values[14] as InsightReport
         val activity = values[15] as List<AccountActivity>
         val paidIntoSavings = values[16] as Long
+        val latest = (values[17] as List<TransactionWithDetails>)
+            .firstOrNull()?.transaction?.date
 
         val inScope = accountList.filter { currentScope.matches(it) }
+        val unassigned = accountList.count { it.account.personId == null }
         val savingsTotal = inScope.filter { it.isSavings }.sumOf { it.balanceMinor }
         val liabilities = inScope.filter { it.isLiability }.sumOf { it.balanceMinor }
         val spendable = inScope.filterNot { it.isSavings || it.isLiability }
@@ -277,6 +285,9 @@ class DashboardViewModel @Inject constructor(
             insightCount = insights.insights.size,
             accountActivity = activity,
             widgets = mergeWidgets(widgets),
+            accountsInTotal = accountList.size,
+            unassignedAccounts = unassigned,
+            latestEntryDate = latest,
         )
     }
 
@@ -452,6 +463,12 @@ data class DashboardState(
     val upcomingBills: List<RecurringRuleWithDetails> = emptyList(),
     val overdueBills: List<RecurringRuleWithDetails> = emptyList(),
     val monthTransactions: List<TransactionWithDetails> = emptyList(),
+    /** Every account, whoever it belongs to — the person filter narrows [accounts]. */
+    val accountsInTotal: Int = 0,
+    /** Accounts nobody owns, which no person filter can ever show. */
+    val unassignedAccounts: Int = 0,
+    /** The date of the newest entry anywhere, for pointing at a month with data in it. */
+    val latestEntryDate: LocalDate? = null,
     val savingsGoals: List<SavingsGoalWithProgress> = emptyList(),
     val externalData: ExternalDataSnapshot = ExternalDataSnapshot(),
     val topInsight: Insight? = null,
@@ -460,6 +477,17 @@ data class DashboardState(
 ) {
     val isCurrentMonth: Boolean get() = month == DateUtils.currentYearMonth()
     val hasAnyData: Boolean get() = accounts.isNotEmpty() || monthTransactions.isNotEmpty()
+
+    /**
+     * True when the household has accounts but none of them are this person's.
+     *
+     * A different situation entirely from having nothing set up, and it was
+     * being shown as the same thing: picking a person whose accounts had never
+     * been put under their name offered to add an account, which makes a second
+     * copy of one the app already holds.
+     */
+    val scopeHasNothingButAppDoes: Boolean
+        get() = accounts.isEmpty() && accountsInTotal > 0
     fun isVisible(widget: DashboardWidget): Boolean =
         widgets.firstOrNull { it.widget == widget }?.isVisible ?: widget.defaultVisible
 }

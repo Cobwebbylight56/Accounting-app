@@ -87,9 +87,10 @@ object MerchantCategoriser {
         rule(
             "Savings",
             "savings", "to savings", "saver ", "regular saver", "instant saver",
-            "easy saver", "triple access", "help to save", "isa ", "cash isa",
-            "lifetime isa", "premium bonds", "ns and i", "nsandi",
-            "vanguard", "hargreaves", "moneybox", "chip savings", "plum savings",
+            "easy saver", "triple access", "start to save", "help to save",
+            "to save", "isa ", "cash isa", "lifetime isa", "premium bonds",
+            "ns and i", "nsandi", "vanguard", "hargreaves", "moneybox",
+            "chip savings", "plum savings",
         ),
 
         // -- specific cases that must beat the general ones below ----------

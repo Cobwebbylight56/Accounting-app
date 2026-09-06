@@ -41,6 +41,7 @@ import com.rhys.financetracker.ui.components.StatTile
 import com.rhys.financetracker.ui.components.chartColorAt
 import com.rhys.financetracker.ui.components.colorFromHex
 import com.rhys.financetracker.ui.theme.FinanceTheme
+import java.time.YearMonth
 
 /**
  * The individual dashboard cards.
@@ -352,6 +353,7 @@ internal fun RecentTransactionsCard(
     state: DashboardState,
     onOpenTransaction: (Long) -> Unit,
     onAddTransaction: () -> Unit,
+    onMonthClick: (YearMonth) -> Unit,
 ) {
     var showAll by rememberSaveable { mutableStateOf(false) }
     val all = state.monthTransactions
@@ -362,11 +364,28 @@ internal fun RecentTransactionsCard(
         action = { TextButton(onClick = onAddTransaction) { Text("Add") } },
     ) {
         if (all.isEmpty()) {
+            // Opening on today's month and finding it empty looks like the app
+            // has lost everything, when the entries are simply in an earlier
+            // month — which is exactly what importing old statements leaves
+            // you with. So it says where the money actually is.
+            val elsewhere = state.latestEntryDate
+                ?.let { YearMonth.from(it) }
+                ?.takeIf { it != state.month }
             Text(
-                text = "Nothing recorded this month. Tap Add to enter one.",
+                text = if (elsewhere != null) {
+                    "Nothing in ${DateUtils.formatMonth(state.month)}. Your most recent " +
+                        "entries are in ${DateUtils.formatMonth(elsewhere)}."
+                } else {
+                    "Nothing recorded this month. Tap Add to enter one."
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (elsewhere != null) {
+                TextButton(onClick = { onMonthClick(elsewhere) }) {
+                    Text("Go to ${DateUtils.formatMonth(elsewhere)}")
+                }
+            }
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 shown.forEach { item ->

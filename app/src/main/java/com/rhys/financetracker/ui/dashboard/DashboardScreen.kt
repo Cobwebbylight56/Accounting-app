@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -39,6 +40,7 @@ import com.rhys.financetracker.core.time.DateUtils
 import com.rhys.financetracker.domain.model.DashboardWidget
 import com.rhys.financetracker.ui.components.EmptyState
 import com.rhys.financetracker.ui.components.LoadingState
+import com.rhys.financetracker.ui.components.SectionCard
 import com.rhys.financetracker.ui.components.StatEmphasis
 import com.rhys.financetracker.ui.components.StatTile
 
@@ -83,7 +85,12 @@ fun DashboardScreen(
         when {
             state.isLoading -> LoadingState(Modifier.padding(padding))
 
-            !state.hasAnyData -> EmptyState(
+            // Only when there is genuinely nothing set up. A person with no
+            // accounts of their own is a different problem with a different
+            // answer, and showing this instead took the person tabs off the
+            // screen along with everything else — so there was no way back to
+            // Everyone except leaving Home.
+            !state.hasAnyData && !state.scopeHasNothingButAppDoes -> EmptyState(
                 icon = Icons.Outlined.AccountBalanceWallet,
                 title = "Let's set things up",
                 message = "Add an account to begin, or load the example household from " +
@@ -120,6 +127,10 @@ fun DashboardScreen(
                         state = state,
                         onScopeChange = viewModel::setScope,
                     )
+                }
+
+                if (state.scopeHasNothingButAppDoes) {
+                    item { NoAccountsForThisPerson(state, onOpenAccounts) }
                 }
 
                 items(
@@ -202,6 +213,39 @@ private fun MonthSelector(
 }
 
 /** Switches between the household, one person, and one account. */
+/**
+ * Shown when the person picked has no accounts, but the app has some.
+ *
+ * Almost always because the accounts are not under anybody's name — which is
+ * the state an imported statement leaves them in, and nothing anywhere said
+ * so. The old answer here was "add an account", which makes a second copy of
+ * one the app already holds.
+ */
+@Composable
+private fun NoAccountsForThisPerson(state: DashboardState, onOpenAccounts: () -> Unit) {
+    val name = state.people.firstOrNull { it.id == state.scope.personId }?.name
+    SectionCard(title = name?.let { "$it has no accounts yet" } ?: "Nothing under this filter") {
+        Text(
+            text = if (state.unassignedAccounts > 0) {
+                val many = state.unassignedAccounts > 1
+                "You have ${state.unassignedAccounts} account${if (many) "s" else ""} that " +
+                    "${if (many) "are" else "is"} not under anybody's name, so no person " +
+                    "shows ${if (many) "them" else "it"}. Open Accounts and tap a name " +
+                    "beside ${if (many) "them" else "it"} to fix that — do not add a new " +
+                    "one, or the same money is counted twice."
+            } else {
+                "Their accounts live under their name. Open Accounts to add one, or to " +
+                    "move an existing account across."
+            },
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Spacer(Modifier.height(12.dp))
+        Button(onClick = onOpenAccounts, modifier = Modifier.fillMaxWidth()) {
+            Text(if (state.unassignedAccounts > 0) "Sort this out in Accounts" else "Open Accounts")
+        }
+    }
+}
+
 @Composable
 private fun ScopeSelector(
     state: DashboardState,
@@ -262,7 +306,7 @@ private fun DashboardCard(
         DashboardWidget.UPCOMING_BILLS -> UpcomingBillsCard(state, onOpenRecurring)
         DashboardWidget.OVERDUE_BILLS -> OverdueBillsCard(state, onOpenRecurring)
         DashboardWidget.RECENT_TRANSACTIONS ->
-            RecentTransactionsCard(state, onOpenTransaction, onAddTransaction)
+            RecentTransactionsCard(state, onOpenTransaction, onAddTransaction, onMonthClick)
         DashboardWidget.SAVINGS_PROGRESS -> SavingsProgressCard(state, onOpenSavings)
         DashboardWidget.SPENDING_BY_CATEGORY ->
             SpendingByCategoryCard(state, onCategoryClick)

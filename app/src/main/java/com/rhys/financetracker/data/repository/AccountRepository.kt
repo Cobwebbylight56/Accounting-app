@@ -97,6 +97,35 @@ class AccountRepository @Inject constructor(
             )
         }
 
+    /**
+     * Puts an account under a person's name.
+     *
+     * Separate from [save] because it is the one change worth making without
+     * opening the account at all. An account nobody owns is invisible to every
+     * per-person view in the app — the person's tab on Home says they have
+     * nothing and offers to add an account, while their money sits in a group
+     * called "Not assigned" on another screen — and nothing on either screen
+     * connects the two.
+     */
+    suspend fun assignTo(accountId: Long, personId: Long?): AppResult<Unit> =
+        runCatchingApp("Could not change who this account belongs to") {
+            val account = accountDao.getById(accountId) ?: error("That account no longer exists")
+            val clash = accountDao.getByNameForPerson(account.name, personId)
+            if (clash != null && clash.id != accountId) {
+                val owner = personId?.let { personDao.getById(it)?.name }
+                error(
+                    if (owner == null) {
+                        "There is already a shared account called \"${account.name}\""
+                    } else {
+                        "$owner already has an account called \"${account.name}\""
+                    },
+                )
+            }
+            accountDao.update(
+                account.copy(personId = personId, updatedAt = Instant.now().toEpochMilli()),
+            )
+        }
+
     suspend fun setArchived(id: Long, archived: Boolean): AppResult<Unit> =
         runCatchingApp("Could not archive this account") {
             accountDao.setArchived(id, archived, Instant.now().toEpochMilli())

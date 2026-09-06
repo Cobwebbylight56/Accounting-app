@@ -23,12 +23,13 @@ class SavingsClassificationTest {
         type: AccountType,
         countsAsSavings: Boolean? = null,
         balanceMinor: Long = 100_000L,
+        personId: Long? = null,
     ) = AccountWithBalance(
         account = AccountEntity(
             id = 1L,
             name = name,
             type = type,
-            personId = null,
+            personId = personId,
             openingBalanceMinor = 0L,
             openingBalanceDate = LocalDate.of(2026, 1, 1),
             colorHex = "#455A64",
@@ -54,6 +55,21 @@ class SavingsClassificationTest {
         assertTrue(account("cash", AccountType.CASH, countsAsSavings = true).isSavings)
         // And the other way, for a savings account being spent down.
         assertTrue(!account("Saver", AccountType.SAVINGS, countsAsSavings = false).isSavings)
+    }
+
+    @Test
+    fun `an account nobody owns belongs to no person's view`() {
+        // The fault behind "when I select Rhys it just wants me to add an
+        // account": an imported account with no owner is filtered out of every
+        // person's slice of the app while still holding all of the money, and
+        // nothing on either screen said the two were connected.
+        val owned = account("Main account", AccountType.CURRENT, personId = 1L)
+        val nobodys = account("Rhys Evans", AccountType.CURRENT, personId = null)
+        val all = listOf(owned, nobodys)
+
+        assertEquals(listOf(owned), all.filter { it.account.personId == 1L })
+        assertTrue(all.none { it.account.personId == 2L })
+        assertEquals(1, all.count { it.account.personId == null })
     }
 
     @Test

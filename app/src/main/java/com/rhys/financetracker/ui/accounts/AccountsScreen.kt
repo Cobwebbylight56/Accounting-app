@@ -1,6 +1,7 @@
 package com.rhys.financetracker.ui.accounts
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +22,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.AccountBalance
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -51,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rhys.financetracker.core.money.Money
+import com.rhys.financetracker.data.local.entity.PersonEntity
 import com.rhys.financetracker.data.local.projection.AccountWithBalance
 import com.rhys.financetracker.data.local.seed.DefaultData
 import com.rhys.financetracker.domain.model.AccountType
@@ -172,6 +175,21 @@ fun AccountsScreen(
                         title = group.personName,
                         subtitle = Money.format(group.totalMinor),
                     ) {
+                        // An account nobody owns is invisible everywhere the
+                        // app works by person: their tab on Home says they have
+                        // nothing and offers to add an account, while their
+                        // money sits down here under a heading that does not
+                        // say what to do about it.
+                        if (group.isUnassigned && state.people.isNotEmpty()) {
+                            Text(
+                                text = "These are not under anybody's name yet, so they do " +
+                                    "not show when you pick a person on Home. Tap a name to " +
+                                    "put one under it.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(Modifier.height(10.dp))
+                        }
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             group.accounts.forEach { account ->
                                 AccountRow(
@@ -189,6 +207,14 @@ fun AccountsScreen(
                                     },
                                     onDelete = { pendingDelete = account.account.id },
                                 )
+                                if (group.isUnassigned && state.people.isNotEmpty()) {
+                                    OwnerChips(
+                                        people = state.people,
+                                        onPick = { person ->
+                                            viewModel.assign(account.account.id, person)
+                                        },
+                                    )
+                                }
                             }
                         }
                     }
@@ -226,6 +252,38 @@ fun AccountsScreen(
             onConfirm = { viewModel.delete(pendingDelete) },
             onDismiss = { pendingDelete = 0L },
         )
+    }
+}
+
+/**
+ * "Whose is this?", answered in one tap.
+ *
+ * The account form already has an owner picker, but nothing on the list says
+ * that an unowned account is the reason a person's tab on Home is empty — so
+ * the connection is made here, next to the account it is about.
+ */
+@Composable
+private fun OwnerChips(people: List<PersonEntity>, onPick: (PersonEntity) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(start = 36.dp, bottom = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "Whose?",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        people.forEach { person ->
+            AssistChip(
+                onClick = { onPick(person) },
+                label = { Text(person.name) },
+                leadingIcon = { ColorDot(colorFromHex(person.colorHex)) },
+            )
+        }
     }
 }
 
@@ -366,6 +424,18 @@ fun AccountEditScreen(
                 optionColor = { colorFromHex(it.colorHex) },
                 placeholder = "Not assigned",
             )
+            // An account under nobody's name is invisible to every per-person
+            // view in the app, and nothing said so — which is how a whole
+            // imported statement ended up unreachable from the person's tab.
+            if (state.form.personId == null && state.people.isNotEmpty()) {
+                Text(
+                    text = "Nobody's yet, so it will not show when you pick a person on " +
+                        "Home. Pick a name above — there is one for anything shared.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 4.dp, start = 4.dp),
+                )
+            }
 
             AmountField(
                 label = "Starting balance",
