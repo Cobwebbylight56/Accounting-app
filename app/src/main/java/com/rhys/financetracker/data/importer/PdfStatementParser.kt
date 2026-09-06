@@ -304,6 +304,18 @@ object PdfStatementParser {
             lines.count { line -> line.figures.any { near(it.endsAt, column) } }
         }
         val rightmost = columns.last()
+
+        // First, does it behave like a running total? On rows carrying both an
+        // amount and a balance, a balance moves by that amount. That is
+        // self-verifying and settles it outright.
+        //
+        // It has to come first because plenty of statements print the balance
+        // only at the end of each day. Judging the column by how often it is
+        // used then rejects it — the paid-out column is on far more rows — and
+        // rejecting it costs the reader the one piece of evidence that proves
+        // direction by arithmetic, leaving a whole statement to be guessed at.
+        if (runningTotalProofs(lines, rightmost) >= MIN_BALANCE_PROOF) return rightmost
+
         val busiestOther = columns.dropLast(1).maxOfOrNull { uses[it] ?: 0 } ?: 0
         if ((uses[rightmost] ?: 0) < busiestOther) return null
 
@@ -313,11 +325,44 @@ object PdfStatementParser {
         // not a balance — it is the money column, on a statement that prints
         // no running total. Getting that wrong does not misread those rows, it
         // discards them.
+        // A brought-forward line is *expected* to be a balance on its own, so
+        // it must not count against the column here.
         val emptied = lines.count { line ->
-            line.figures.size == 1 && near(line.figures.single().endsAt, rightmost)
+            line.figures.size == 1 &&
+                near(line.figures.single().endsAt, rightmost) &&
+                !BALANCE_LINE.containsMatchIn(line.description)
         }
         return rightmost.takeIf { emptied * 2 < lines.size }
     }
+
+    /**
+     * How many rows prove [column] is a running balance.
+     *
+     * A row proves it by carrying both an amount and a balance where the
+     * balance has moved by that amount since the last one printed. Rows in
+     * between, where the bank printed no balance, break the chain and simply
+     * do not count either way.
+     */
+    private fun runningTotalProofs(lines: List<ReadLine>, column: Int): Int {
+        var previous: Long? = null
+        var proofs = 0
+        for (line in lines) {
+            val last = line.figures.lastOrNull() ?: continue
+            if (!near(last.endsAt, column)) continue
+            val amounts = line.figures.dropLast(1)
+            val before = previous
+            previous = last.minor
+            if (before == null || amounts.isEmpty()) continue
+            val change = last.minor - before
+            if (change != 0L && amounts.any { kotlin.math.abs(it.minor) == kotlin.math.abs(change) }) {
+                proofs++
+            }
+        }
+        return proofs
+    }
+
+    /** Rows that have to agree before a column counts as the running balance. */
+    private const val MIN_BALANCE_PROOF = 2
 
     /**
      * Which column means money out, learned from the rows that prove it.
@@ -332,7 +377,9 @@ object PdfStatementParser {
         columns: List<Int>,
         balanceColumn: Int?,
     ): Pair<Int?, Int?> {
-        if (columns.size < 2 || balanceColumn == null) return null to null
+        if (columns.size < 2) return null to null
+        val moneyColumns = columns.filter { it != balanceColumn }
+        if (balanceColumn == null) return byHowBusy(lines, moneyColumns)
 
         val votes = mutableMapOf<Int, Int>()
         var previousBalance: Long? = null
@@ -358,15 +405,48 @@ object PdfStatementParser {
         // A column with more "money left the account" verdicts than the other
         // way is the paid-out column, and one with more the other way is
         // paid-in.
-        //
-        // There is deliberately no fallback to position. It used to assume
-        // paid-out came first, which is a coin toss on a convention banks do
-        // not share — and losing that toss inverts the whole statement, every
-        // direct debit and card payment arriving as income. Better to know
-        // nothing here and let the wording decide row by row.
         val out = votes.entries.filter { it.value > 0 }.maxByOrNull { it.value }?.key
         val inward = votes.entries.filter { it.value < 0 }.minByOrNull { it.value }?.key
-        return out to inward
+        if (out == null && inward == null) return byHowBusy(lines, moneyColumns)
+
+        // Only one of the two usually gets proved. A statement is mostly
+        // outgoings, so the paid-out column earns its votes early while the
+        // handful of credits may never happen to land next to a printed
+        // balance. But once one money column is known, the other one is the
+        // opposite by elimination — there are only two — and that is a
+        // deduction rather than a guess.
+        val other = moneyColumns.singleOrNull { it != out && it != inward }
+        return (out ?: other) to (inward ?: other)
+    }
+
+    /**
+     * Which money column is which, judged by how many rows use each.
+     *
+     * The busier one is paid-out. Not a guess about layout — a fact about
+     * accounts: a month holds dozens of card payments and direct debits
+     * against a salary and the odd refund. Where the running balance proves
+     * nothing, this is the only evidence that covers a whole file at once.
+     *
+     * Position was tried here and was a coin toss, because banks disagree
+     * about whether paid-out or paid-in comes first. How busy a column is does
+     * not depend on that convention.
+     *
+     * No margin is required beyond one being busier than the other. That would
+     * once have been reckless, since losing the call inverts the statement —
+     * but "Swap all" on the review screen now undoes an inversion in a single
+     * tap, while having no verdict at all leaves every row to be corrected one
+     * at a time. Being wrong costs a tap; saying nothing costs two hundred.
+     */
+    private fun byHowBusy(lines: List<ReadLine>, moneyColumns: List<Int>): Pair<Int?, Int?> {
+        if (moneyColumns.size < 2) return null to null
+        val uses = moneyColumns.associateWith { column ->
+            lines.count { line -> line.figures.any { near(it.endsAt, column) } }
+        }
+        val ranked = moneyColumns.sortedByDescending { uses[it] ?: 0 }
+        // A tie is genuinely no evidence, and inventing one here would be the
+        // coin toss again.
+        if (uses[ranked[0]] == uses[ranked[1]]) return null to null
+        return ranked[0] to ranked[1]
     }
 
     /**
@@ -514,21 +594,33 @@ object PdfStatementParser {
      * thrown away.
      */
     internal fun trailingMarker(line: String): String? {
-        val text = line.trimEnd()
-        var end = text.length
-        while (end > 0) {
-            val start = text.lastIndexOf(' ', end - 1) + 1
-            val token = text.substring(start, end)
-            val upper = token.uppercase()
-            when {
-                token.isEmpty() -> Unit
-                upper in DIRECTION_MARKERS -> return upper
-                looksLikeMoney(token) -> Unit
-                else -> return null
-            }
-            end = start - 1
+        val tokens = line.trim().split(WHITESPACE)
+        val start = trailingRunStart(tokens)
+        return tokens.drop(start).firstOrNull { it.uppercase() in DIRECTION_MARKERS }?.uppercase()
+    }
+
+    /**
+     * Where a line's trailing run of figures begins.
+     *
+     * Markers belong to that run only when a figure sits to their left inside
+     * it: in "42.15 D 1,957.85" the D marks the 42.15, but in "CARD PAYMENT C
+     * 2.10" the C is the last word of the payee. Without that distinction a
+     * description ending in a single letter has it eaten off the name and, far
+     * worse, is read as a credit — "C" being how some banks write one.
+     */
+    private fun trailingRunStart(tokens: List<String>): Int {
+        var index = tokens.size
+        while (index > 0) {
+            val token = tokens[index - 1]
+            if (!looksLikeMoney(token) && token.uppercase() !in DIRECTION_MARKERS) break
+            index--
         }
-        return null
+        // Markers at the left edge of the run have no figure of their own to
+        // mark, so they are part of the description after all.
+        while (index < tokens.size && tokens[index].uppercase() in DIRECTION_MARKERS) {
+            index++
+        }
+        return index
     }
 
     internal fun trailingAmounts(line: String): List<Long> {
@@ -569,16 +661,8 @@ object PdfStatementParser {
      * stray "D" cannot leave part of the payee behind or eat a word of it.
      */
     private fun describe(line: String): String {
-        val tokens = line.trim().split(WHITESPACE).toMutableList()
-        while (tokens.isNotEmpty()) {
-            val last = tokens.last()
-            if (last.uppercase() in DIRECTION_MARKERS || looksLikeMoney(last)) {
-                tokens.removeAt(tokens.lastIndex)
-            } else {
-                break
-            }
-        }
-        var text = tokens.joinToString(" ")
+        val tokens = line.trim().split(WHITESPACE)
+        var text = tokens.take(trailingRunStart(tokens)).joinToString(" ")
         // Then the date from the front, whichever form it took. First match
         // wins: the forms overlap, and "01 Mar 2026" must not be trimmed to
         // "2026" by the short form running afterwards.

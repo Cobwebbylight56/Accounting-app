@@ -414,4 +414,91 @@ class PdfStatementParserTest {
         assertEquals(3, rows.size)
         assertEquals(1299L, rows[0].moneyOutMinor)
     }
+
+    /** Out, then In, then Balance — with the balance only at the end of a day. */
+    private val endOfDayBalances = listOf(
+        "Date        Description                     £ Out      £ In   £ Balance",
+        "01 Dec 2025 Balance brought forward                            2,603.34",
+        "02 Dec 2025 CARD PAYMENT A                   20.13             2,583.21",
+        "03 Dec 2025 CARD PAYMENT B                   48.78             2,534.43",
+        "04 Dec 2025 CARD PAYMENT C                    2.10",
+        "05 Dec 2025 CARD PAYMENT D                   12.00",
+        "06 Dec 2025 CARD PAYMENT E                   28.15",
+        "07 Dec 2025 CARD PAYMENT F                    8.99             2,483.19",
+        "08 Dec 2025 CARD PAYMENT G                    1.65",
+        "09 Dec 2025 CARD PAYMENT H                   35.00",
+        "10 Dec 2025 CARD PAYMENT I                   50.00             2,396.54",
+        "11 Dec 2025 CARD PAYMENT J                    5.99             2,390.55",
+        "12 Dec 2025 ACME ENGINEERING LTD                     1,858.33",
+        "13 Dec 2025 CARD PAYMENT K                  183.95",
+        "14 Dec 2025 INTEREST                                     1.27  4,066.20",
+        "15 Dec 2025 J SMITH                                    500.00",
+        "16 Dec 2025 CARD PAYMENT L                   14.85",
+        "17 Dec 2025 CARD PAYMENT M                  174.29             4,377.06",
+    )
+
+    @Test
+    fun `a balance printed only at the end of a day still proves the columns`() {
+        // A real statement, and the one this reader kept getting wrong. The
+        // balance column is on eight rows where the paid-out column is on
+        // thirteen, so judging it by how often it is used rejected it — and
+        // without a balance nothing proves direction, so every credit came
+        // through as a payment.
+        val rows = PdfStatementParser.parse(endOfDayBalances)
+
+        assertEquals(16, rows.size)
+        assertEquals(235_960L, rows.sumOf { it.moneyInMinor ?: 0L })
+        assertEquals(58_588L, rows.sumOf { it.moneyOutMinor ?: 0L })
+        // The three credits, and nothing else.
+        assertEquals(
+            listOf("ACME ENGINEERING LTD", "INTEREST", "J SMITH"),
+            rows.filter { it.moneyInMinor != null }.map { it.description },
+        )
+    }
+
+    @Test
+    fun `a credit is found even where no balance sits beside it`() {
+        // Only the paid-out column ever lands next to a printed balance here,
+        // so only it is proved. The other money column is then paid-in by
+        // elimination — there are two — rather than being left unknown and
+        // defaulting every credit to a payment.
+        val rows = PdfStatementParser.parse(endOfDayBalances)
+        val salary = rows.single { it.description == "ACME ENGINEERING LTD" }
+        assertEquals(185_833L, salary.moneyInMinor)
+        assertNull(salary.moneyOutMinor)
+    }
+
+    @Test
+    fun `a payee ending in a single letter is not read as a credit marker`() {
+        // "C" and "D" are how some banks mark credit and debit, so a payee
+        // whose last word is one letter had it stripped from the name and the
+        // row turned into a credit. A marker only counts with a figure to its
+        // left.
+        val rows = PdfStatementParser.parse(endOfDayBalances)
+        assertEquals("CARD PAYMENT C", rows[2].description)
+        assertEquals(210L, rows[2].moneyOutMinor)
+        assertNull(PdfStatementParser.trailingMarker("04 Dec 2025 CARD PAYMENT C 2.10"))
+        // A real marker still is one.
+        assertEquals("D", PdfStatementParser.trailingMarker("02 Dec 2025 TESCO 42.15 D 1,957.85"))
+    }
+
+    @Test
+    fun `with no balance at all the busier money column is the paid-out one`() {
+        // A statement is mostly outgoings. That is a fact about accounts
+        // rather than a guess about layout, and it is the only thing left when
+        // no running total is printed anywhere.
+        val rows = PdfStatementParser.parse(
+            listOf(
+                "Date        Description                    £ In      £ Out",
+                "16 Dec 2025 CARD PAYMENT A                            12.99",
+                "17 Dec 2025 CARD PAYMENT B                            30.00",
+                "18 Dec 2025 CARD PAYMENT C                            60.79",
+                "19 Dec 2025 CARD PAYMENT D                             4.99",
+                "20 Dec 2025 ACME ENGINEERING LTD        1862.23",
+            ),
+        )
+        assertEquals(5, rows.size)
+        assertEquals(186_223L, rows.sumOf { it.moneyInMinor ?: 0L })
+        assertEquals(10_877L, rows.sumOf { it.moneyOutMinor ?: 0L })
+    }
 }
