@@ -86,7 +86,7 @@ object PdfStatementParser {
     /** Every transaction line found in [lines], in the order they appear. */
     fun parse(lines: List<String>): List<Row> {
         val documentYear = inferYear(lines)
-        val read = readLines(lines, documentYear)
+        val read = rollBackYearEnd(readLines(lines, documentYear), documentYear)
         if (read.isEmpty()) return emptyList()
 
         // Where the money columns sit. Right-aligned, so grouping the end
@@ -98,6 +98,55 @@ object PdfStatementParser {
 
         val result = mutableListOf<Row>()
         var previousBalance: Long? = null
+        // Rows seen since the last printed balance. A statement that prints one
+        // only at the end of a day leaves several here at a time.
+        val pending = mutableListOf<Pair<ReadLine, List<Figure>>>()
+
+        /**
+         * Settles every pending row against the balance that has just arrived.
+         *
+         * The balance has moved by the *sum* of the rows since the last one
+         * printed, not by any single row. Comparing it against one row at a
+         * time only ever reconciles a group of one, so on a statement with a
+         * daily balance almost nothing was proved and almost every row fell
+         * through to guesswork. Summed, the arithmetic settles the whole group
+         * at once — including which way it went, which is the part that
+         * matters.
+         */
+        fun settle(balance: Long?) {
+            if (pending.isEmpty()) {
+                if (balance != null) previousBalance = balance
+                return
+            }
+            val before = previousBalance
+            val change = if (balance != null && before != null) balance - before else null
+            val total = pending.sumOf { kotlin.math.abs(amountIn(it.second)?.minor ?: 0L) }
+            val proved = change != null && change != 0L && total != 0L &&
+                kotlin.math.abs(change) == total
+
+            pending.forEachIndexed { index, (line, others) ->
+                val carriesBalance = index == pending.lastIndex && balance != null
+                val rowBalance = if (carriesBalance) balance else null
+                result += if (proved) {
+                    val size = kotlin.math.abs(amountIn(others)!!.minor)
+                    Row(
+                        date = line.date,
+                        description = line.description,
+                        moneyOutMinor = if (change!! < 0) size else null,
+                        moneyInMinor = if (change > 0) size else null,
+                        balanceMinor = rowBalance,
+                    )
+                } else {
+                    // Only a group of one can be said to have failed its own
+                    // check; a group of several failing says nothing about any
+                    // particular row in it.
+                    val rowPrevious = if (carriesBalance && pending.size == 1) before else null
+                    read(line, others, rowBalance, rowPrevious, outColumn, inColumn)
+                }
+            }
+            pending.clear()
+            if (balance != null) previousBalance = balance
+        }
 
         for (line in read) {
             // Wording settles a brought-forward line before anything else. A
@@ -105,7 +154,7 @@ object PdfStatementParser {
             // position, and reading this as a payment invents an entry the
             // size of the entire balance.
             if (line.figures.size == 1 && BALANCE_LINE.containsMatchIn(line.description)) {
-                previousBalance = line.figures.single().minor
+                settle(line.figures.single().minor)
                 continue
             }
 
@@ -127,21 +176,56 @@ object PdfStatementParser {
             }
 
             if (others.isEmpty()) {
-                // A balance on its own updates the running total and is not
-                // an entry in its own right.
-                if (balance != null) previousBalance = balance
+                // A balance on its own closes the group and is not an entry in
+                // its own right.
+                settle(balance)
                 continue
             }
 
-            result += read(line, others, balance, previousBalance, outColumn, inColumn)
-            // A row that prints no balance breaks the running chain. Carrying
-            // the last one forward would compare the next row against a total
-            // two transactions old, so it would neither reconcile nor deserve
-            // to be flagged for failing to.
-            previousBalance = balance
+            pending += line to others
+            if (balance != null) settle(balance)
         }
+        // Anything after the last printed balance has nothing to be proved
+        // against, and is read row by row.
+        settle(null)
         return result
     }
+
+    /**
+     * Moves the rows before a year end back a year.
+     *
+     * A statement covering 23 December to 22 January names both years, and the
+     * later one is the right guess for most of its rows — but not for the
+     * December ones. Given only the year, those came out as *next* December,
+     * thirteen months after the payments they describe, which files a month of
+     * spending in the wrong year entirely.
+     *
+     * A statement runs in date order, so a jump backwards of most of a year is
+     * the year end itself. Everything before it that was dated by the guess
+     * belongs to the year before; rows that carried their own year are left
+     * exactly as the bank wrote them.
+     */
+    private fun rollBackYearEnd(read: List<ReadLine>, fallbackYear: Int?): List<ReadLine> {
+        if (fallbackYear == null || read.size < 2) return read
+        val wrap = (0 until read.size - 1).firstOrNull { index ->
+            read[index].date.toEpochDay() - read[index + 1].date.toEpochDay() > YEAR_WRAP_DAYS
+        } ?: return read
+
+        return read.mapIndexed { index, line ->
+            if (index <= wrap && line.date.year == fallbackYear) {
+                line.copy(date = line.date.minusYears(1))
+            } else {
+                line
+            }
+        }
+    }
+
+    /** A step backwards of more than this is a year end rather than a stray row. */
+    private const val YEAR_WRAP_DAYS = 180L
+
+    /** The figure on a row that is its amount, preferring a non-zero one. */
+    private fun amountIn(figures: List<Figure>): Figure? =
+        figures.firstOrNull { it.minor != 0L } ?: figures.firstOrNull()
 
     /**
      * Reads one row, using whatever evidence the line offers.
@@ -352,18 +436,24 @@ object PdfStatementParser {
      */
     private fun runningTotalProofs(lines: List<ReadLine>, column: Int): Int {
         var previous: Long? = null
+        var sinceLast = 0L
         var proofs = 0
         for (line in lines) {
             val last = line.figures.lastOrNull() ?: continue
-            if (!near(last.endsAt, column)) continue
-            val amounts = line.figures.dropLast(1)
+            val carriesBalance = near(last.endsAt, column)
+            val amounts = if (carriesBalance) line.figures.dropLast(1) else line.figures
+            sinceLast += kotlin.math.abs(amountIn(amounts)?.minor ?: 0L)
+            if (!carriesBalance) continue
+
             val before = previous
             previous = last.minor
-            if (before == null || amounts.isEmpty()) continue
-            val change = last.minor - before
-            if (change != 0L && amounts.any { kotlin.math.abs(it.minor) == kotlin.math.abs(change) }) {
-                proofs++
+            if (before == null || sinceLast == 0L) {
+                sinceLast = 0L
+                continue
             }
+            val change = last.minor - before
+            if (change != 0L && kotlin.math.abs(change) == sinceLast) proofs++
+            sinceLast = 0L
         }
         return proofs
     }
@@ -487,7 +577,7 @@ object PdfStatementParser {
         """(?i)\b(salary|wages|payroll|refund|refunded|reimbursement|rebate|cashback|""" +
             """dividend|bacs credit|credit from|credit interest|interest paid|""" +
             """transfer from|paid in|deposit|bgc|giro|payment received|""" +
-            """faster payment received|credit transfer)\b""",
+            """faster payment received|credit transfer|bank credit|credited)\b""",
     )
 
     /** Markers meaning the money arrived rather than left. */

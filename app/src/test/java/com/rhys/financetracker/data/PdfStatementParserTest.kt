@@ -501,4 +501,86 @@ class PdfStatementParserTest {
         assertEquals(186_223L, rows.sumOf { it.moneyInMinor ?: 0L })
         assertEquals(10_877L, rows.sumOf { it.moneyOutMinor ?: 0L })
     }
+
+    @Test
+    fun `the balance settles a whole group of rows, not just one`() {
+        // Your statement. The balance is printed on some rows only, and it has
+        // moved by the *sum* of the rows since the last one — comparing it
+        // against a single row reconciles a group of one and nothing else, so
+        // almost every row fell through to guesswork and came out as a payment.
+        val rows = PdfStatementParser.parse(
+            listOf(
+                "Statement 23 December 2025 to 22 January 2026",
+                "Date        Description                   Money out  Money in   Balance",
+                "20 Dec 2025 Balance brought forward                             4976.74",
+                "21 Dec 2025 Contactless Payment               10.00",
+                "22 Dec 2025 Direct debit UTILITY              71.18             4905.56",
+                "23 Dec 2025 Contactless Payment               20.50             4885.06",
+                "24 Dec 2025 Contactless Payment               17.50",
+                "24 Dec 2025 SAINSBURYS S/MKTS                 23.97             4843.59",
+                "29 Dec 2025 Contactless Payment               19.77",
+                "29 Dec 2025 Contactless Payment                7.05             4816.77",
+                "30 Dec 2025 Bank credit INDUSTRIAL AUTOMAT              1801.15  6617.92",
+            ),
+        )
+        assertEquals(8, rows.size)
+        // 4,885.06 to 4,843.59 is 41.47, which is 17.50 and 23.97 together. The
+        // pair either side of it is the same shape.
+        assertEquals(1750L, rows[3].moneyOutMinor)
+        assertEquals(2397L, rows[4].moneyOutMinor)
+        assertEquals(1977L, rows[5].moneyOutMinor)
+        assertEquals(705L, rows[6].moneyOutMinor)
+        // And the credit is a credit.
+        assertEquals(180_115L, rows[7].moneyInMinor)
+        assertNull(rows[7].moneyOutMinor)
+        assertEquals(16_997L, rows.sumOf { it.moneyOutMinor ?: 0L })
+    }
+
+    @Test
+    fun `bank credit is money arriving`() {
+        assertEquals(
+            false,
+            PdfStatementParser.directionFromWording("Bank credit INDUSTRIAL AUTOMAT"),
+        )
+    }
+
+    @Test
+    fun `a statement over a year end dates December to the earlier year`() {
+        // "23 December to 22 January" names both years and the later one is
+        // right for most of the file — but not for December. Those rows came
+        // out as next December, thirteen months after the payments they
+        // describe, filing a month of spending in the wrong year.
+        val rows = PdfStatementParser.parse(
+            listOf(
+                "Statement 23 December 2025 to 22 January 2026",
+                "23 Dec Contactless Payment      21.16   4900.00",
+                "31 Dec Direct debit UTILITY    183.95   4716.05",
+                "05 Jan Contactless Payment       5.90   4710.15",
+                "20 Jan SAINSBURYS S/MKTS        25.02   4685.13",
+            ),
+        )
+        assertEquals(
+            listOf(
+                LocalDate.of(2025, 12, 23),
+                LocalDate.of(2025, 12, 31),
+                LocalDate.of(2026, 1, 5),
+                LocalDate.of(2026, 1, 20),
+            ),
+            rows.map { it.date },
+        )
+    }
+
+    @Test
+    fun `a statement inside one year is not rolled back`() {
+        // The rollback must only fire on an actual year end, not on a file
+        // that happens to have a gap in it.
+        val rows = PdfStatementParser.parse(
+            listOf(
+                "Statement 1 March 2026 to 31 March 2026",
+                "02 Mar TESCO STORES 3294        42.15    1957.85",
+                "28 Mar SHELL FILLING STN        61.40    1896.45",
+            ),
+        )
+        assertEquals(listOf(LocalDate.of(2026, 3, 2), LocalDate.of(2026, 3, 28)), rows.map { it.date })
+    }
 }

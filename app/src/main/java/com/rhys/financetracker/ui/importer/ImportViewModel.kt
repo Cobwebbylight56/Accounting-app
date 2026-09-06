@@ -69,8 +69,19 @@ class ImportViewModel @Inject constructor(
                         selectedSheetIndex = 0,
                         detectedLayout = detected,
                         detectedStatement = statement,
+                        // A statement is a list of things that have already
+                        // happened, so it defaults to transactions. Offering
+                        // "Regular bills" for one invites every payment to be
+                        // set up as a repeating bill.
                         mapping = firstSheet?.let {
-                            importer.suggestMapping(it, ImportTarget.RECURRING_EXPENSE)
+                            importer.suggestMapping(
+                                it,
+                                if (statement != null) {
+                                    ImportTarget.TRANSACTION
+                                } else {
+                                    ImportTarget.RECURRING_EXPENSE
+                                },
+                            )
                         },
                     ).also { newState -> refreshCandidates(newState) }
                 }

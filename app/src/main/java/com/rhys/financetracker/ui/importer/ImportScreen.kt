@@ -240,6 +240,9 @@ private fun UnreadablePdfCard(text: String, onDismiss: () -> Unit) {
 /** Enough lines to show the shape of a statement without filling the screen. */
 private const val PREVIEW_LINES = 25
 
+/** Rows of the sheet shown before importing. Enough to recognise the file. */
+private const val PREVIEW_ROWS = 12
+
 @Composable
 private fun ChooseFileStep(onChoose: () -> Unit) {
     Column {
@@ -568,9 +571,25 @@ private fun MappingStep(state: ImportState, viewModel: ImportViewModel) {
 @Composable
 private fun SheetPreview(state: ImportState) {
     val sheet = state.sheet ?: return
-    val rows = sheet.rows.take(8)
+    val rows = sheet.rows.take(PREVIEW_ROWS)
+    val widest = sheet.rows.maxOfOrNull { it.size } ?: 0
 
-    SectionCard(title = "Your spreadsheet", subtitle = sheet.name) {
+    SectionCard(
+        title = "Your spreadsheet",
+        // A preview that shows part of the file without saying so reads as the
+        // whole file, and then a column that is merely off to the right looks
+        // like one the app failed to find.
+        subtitle = buildString {
+            append(sheet.name)
+            append(" · ")
+            if (sheet.rows.size > rows.size) {
+                append("first ${rows.size} of ${sheet.rows.size} rows")
+            } else {
+                append("all ${sheet.rows.size} rows")
+            }
+            if (widest > 3) append(", scroll sideways for every column")
+        },
+    ) {
         Column(
             modifier = Modifier.horizontalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -583,7 +602,7 @@ private fun SheetPreview(state: ImportState) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.width(24.dp),
                     )
-                    cells.take(10).forEach { cell ->
+                    cells.forEach { cell ->
                         Surface(
                             color = if (rowIndex == state.mapping?.headerRow) {
                                 MaterialTheme.colorScheme.secondaryContainer
