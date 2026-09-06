@@ -666,13 +666,24 @@ private fun ReviewStep(state: ImportState, viewModel: ImportViewModel) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
+                // Counted honestly: a corrected row is not an added one, and a
+                // row already held is neither, so a plain "will be added" over
+                // the whole selection promises more than the import does.
                 Text(
-                    text = "${state.selectedCount} of ${state.candidates.size} rows will be added",
+                    text = "${state.additionCount} of ${state.candidates.size} rows will be added",
                     style = MaterialTheme.typography.titleSmall,
                 )
                 if (state.usingDetectedLayout) {
                     Text(
                         text = "Read straight from your sheet's layout",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (state.alreadyPresentCount > 0) {
+                    Text(
+                        text = "${state.alreadyPresentCount} are already recorded and " +
+                            "have been left unticked",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

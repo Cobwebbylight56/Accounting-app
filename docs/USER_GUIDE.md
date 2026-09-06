@@ -164,6 +164,13 @@ it. It is never stored as a number that can drift out of step with the entries
 that are meant to explain it. If a balance looks wrong, a transaction is wrong,
 and the entries are all there to check.
 
+### Choosing what is on the home screen
+
+Settings > Dashboard layout turns each card on or off and changes the order.
+Every card the app has appears in that list, including the charts.
+
+If a card you expected is missing, that is where to switch it on.
+
 ### Available and Saved
 
 Home splits your money in two. **Available** is what there is to spend;

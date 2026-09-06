@@ -65,11 +65,15 @@ class MonthlyRolloverEngine @Inject constructor(
 
         var month = YearMonth.from(earliest)
         val archived = mutableListOf<String>()
+        // Asked once rather than once per month: this runs at every launch, and
+        // a few years of imported history is dozens of round trips at exactly
+        // the moment the first screen is waiting for its own queries.
+        val alreadyArchived = snapshotDao.archivedMonths().toSet()
 
         // 2. Archive every month strictly before the current one.
         while (month.isBefore(currentMonth)) {
             val key = DateUtils.yearMonthKey(month)
-            val alreadyDone = snapshotDao.hasMonth(key)
+            val alreadyDone = key in alreadyArchived
             if (!alreadyDone || rebuild) {
                 if (alreadyDone) snapshotDao.deleteMonth(key)
                 val snapshots = buildSnapshots(month)

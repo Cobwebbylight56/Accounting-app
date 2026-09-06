@@ -118,6 +118,31 @@ interface AccountDao {
     suspend fun getByName(name: String): AccountEntity?
 
     /**
+     * What this account's transactions add up to, without its opening balance.
+     *
+     * The difference between a balance somebody states and one the app works
+     * out. A spreadsheet says what is in the account *now*; the app derives
+     * that from the opening balance plus every transaction, so to make the two
+     * agree the opening balance has to be the stated figure less this.
+     */
+    @Query(
+        """
+        SELECT IFNULL((
+                SELECT SUM(CASE WHEN t.type = 'INCOME' THEN t.amount_minor ELSE -t.amount_minor END)
+                FROM transactions t
+                WHERE t.account_id = :accountId AND t.is_archived = 0
+            ), 0)
+            + IFNULL((
+                SELECT SUM(t2.amount_minor)
+                FROM transactions t2
+                WHERE t2.transfer_account_id = :accountId AND t2.type = 'TRANSFER'
+                  AND t2.is_archived = 0
+            ), 0)
+        """,
+    )
+    suspend fun getRecordedMovementMinor(accountId: Long): Long
+
+    /**
      * The account with this name belonging to this person.
      *
      * Names are unique per owner rather than across the whole app, so Rhys and

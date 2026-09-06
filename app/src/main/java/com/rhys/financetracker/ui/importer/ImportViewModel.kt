@@ -258,7 +258,15 @@ class ImportViewModel @Inject constructor(
     fun selectAll(selected: Boolean) {
         _state.value = _state.value.copy(
             candidates = _state.value.candidates.map {
-                if (it.isImportable) it.copy(isSelected = selected) else it
+                // Rows already in the ledger stay unticked. Ticking them makes
+                // no difference to what is written — they are skipped either
+                // way — but it makes the count above the list promise to add
+                // rows it is not going to add.
+                if (it.isImportable && !it.isAlreadyPresent) {
+                    it.copy(isSelected = selected)
+                } else {
+                    it
+                }
             },
         )
     }
@@ -355,7 +363,9 @@ data class ImportState(
     val sheet: SheetData?
         get() = workbook?.sheets?.getOrNull(selectedSheetIndex)
 
-    val selectedCount: Int get() = candidates.count { it.isSelected && it.isImportable }
+    /** How many rows the import will actually act on. */
+    val selectedCount: Int
+        get() = candidates.count { it.isSelected && it.isImportable && !it.isAlreadyPresent }
     val problemCount: Int get() = candidates.count { !it.isImportable }
 
     /** True when the sheet can be imported whole without any manual mapping. */
@@ -370,4 +380,7 @@ data class ImportState(
     /** How many rows will correct an entry already held rather than add one. */
     val correctionCount: Int
         get() = candidates.count { it.isSelected && it.isImportable && it.corrects != null }
+
+    /** How many rows will become new entries, which is not all the selected ones. */
+    val additionCount: Int get() = selectedCount - correctionCount
 }

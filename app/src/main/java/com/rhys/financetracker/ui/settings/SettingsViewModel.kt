@@ -244,7 +244,29 @@ class SettingsViewModel @Inject constructor(
 
     // ------------------------------------------------------------- dashboard
 
+    /**
+     * Turns a card on or off, creating its row if it has none.
+     *
+     * A card added in a later version has no stored row until the next launch
+     * seeds one, and an UPDATE against a row that is not there changes nothing
+     * and reports nothing — the switch would simply not work. Writing the row
+     * when it is missing makes the switch mean what it says whatever state the
+     * table is in.
+     */
     fun setWidgetVisible(widget: DashboardWidget, visible: Boolean) = launch {
+        val stored = widgetDao.getAll()
+        if (stored.none { it.widgetKey == widget.key }) {
+            widgetDao.upsertAll(
+                listOf(
+                    DashboardWidgetEntity(
+                        widgetKey = widget.key,
+                        position = (stored.maxOfOrNull { it.position } ?: -1) + 1,
+                        isVisible = visible,
+                    ),
+                ),
+            )
+            return@launch
+        }
         widgetDao.setVisible(widget.key, visible)
     }
 

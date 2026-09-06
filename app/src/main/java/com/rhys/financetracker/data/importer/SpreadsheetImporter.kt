@@ -527,13 +527,24 @@ class SpreadsheetImporter @Inject constructor(
         candidate: ImportCandidate,
         outcome: ImportOutcome,
     ): ImportOutcome {
-        val existing = accountDao.getByName(candidate.name)
-        if (existing != null) {
-            // Top up rather than duplicate: the balance in the sheet is newer.
-            accountDao.update(existing.copy(openingBalanceMinor = candidate.amountMinor))
-            return outcome
-        }
+        // The owner is resolved first because a name alone no longer identifies
+        // an account: two people can each have a "Main account", and looking up
+        // by name would let one person's balance overwrite the other's.
         val personResult = resolvePerson(candidate.personName, outcome)
+        val existing = accountDao.getByNameForPerson(candidate.name, personResult.first)
+        if (existing != null) {
+            // A sheet states what is in the account *now*. The app derives that
+            // from the opening balance plus every transaction, so writing the
+            // stated figure straight into the opening balance counts every
+            // transaction on the account a second time — and does it again on
+            // the next import. The opening balance is set to whatever makes the
+            // derived balance equal what the sheet says.
+            val recorded = accountDao.getRecordedMovementMinor(existing.id)
+            accountDao.update(
+                existing.copy(openingBalanceMinor = candidate.amountMinor - recorded),
+            )
+            return personResult.second
+        }
         accountDao.insert(
             AccountEntity(
                 name = candidate.name,

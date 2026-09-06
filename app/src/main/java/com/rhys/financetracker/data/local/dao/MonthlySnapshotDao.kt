@@ -28,6 +28,17 @@ interface MonthlySnapshotDao {
     @Query("SELECT COUNT(*) > 0 FROM monthly_snapshots WHERE year_month = :yearMonth")
     suspend fun hasMonth(yearMonth: String): Boolean
 
+    /**
+     * Every month already archived, in one go.
+     *
+     * The rollover walks from the first transaction to this month and used to
+     * ask about each one separately. On a ledger holding a few years of
+     * imported statements that is dozens of queries at launch, competing with
+     * the queries the first screen is waiting on.
+     */
+    @Query("SELECT DISTINCT year_month FROM monthly_snapshots")
+    suspend fun archivedMonths(): List<String>
+
     @Query("SELECT MAX(year_month) FROM monthly_snapshots")
     suspend fun latestArchivedMonth(): String?
 
