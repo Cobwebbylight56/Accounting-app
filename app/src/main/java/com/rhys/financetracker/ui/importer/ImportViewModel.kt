@@ -16,6 +16,7 @@ import com.rhys.financetracker.data.importer.SpreadsheetImporter
 import com.rhys.financetracker.data.importer.WorkbookData
 import com.rhys.financetracker.data.local.projection.AccountOption
 import com.rhys.financetracker.data.repository.AccountRepository
+import com.rhys.financetracker.domain.model.TransactionType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -54,7 +55,7 @@ class ImportViewModel @Inject constructor(
      */
     fun openFile(uri: Uri) {
         viewModelScope.launch {
-            _state.value = _state.value.copy(isBusy = true, error = null)
+            _state.value = _state.value.copy(isBusy = true, error = null, sourceUri = uri)
             when (val result = importer.readWorkbook(uri)) {
                 is AppResult.Success -> {
                     val workbook = result.data
@@ -63,6 +64,7 @@ class ImportViewModel @Inject constructor(
                     val statement = firstSheet?.let { importer.detectStatement(it) }
                     _state.value = ImportState(
                         step = if (firstSheet == null) ImportStep.CHOOSE_FILE else ImportStep.MAP,
+                        sourceUri = uri,
                         workbook = workbook,
                         selectedSheetIndex = 0,
                         detectedLayout = detected,
@@ -243,6 +245,60 @@ class ImportViewModel @Inject constructor(
         )
     }
 
+    /**
+     * Flips one row between money in and money out.
+     *
+     * The app cannot always tell. A statement gives a line of text, and where
+     * neither the running balance nor a debit/credit letter says which way the
+     * money went, an employer's name on a credit is indistinguishable from a
+     * shop's name on a payment. Rather than guessing and being confidently
+     * wrong across a whole file, the reading is shown and this changes it.
+     */
+    fun toggleDirection(id: String) {
+        applyDirections { candidate ->
+            if (candidate.id == id) candidate.flipped() else candidate
+        }
+    }
+
+    /** Flips every row at once, for a file read the wrong way round throughout. */
+    fun swapAllDirections() {
+        applyDirections { it.flipped() }
+    }
+
+    private fun ImportCandidate.flipped(): ImportCandidate =
+        if (target != ImportTarget.TRANSACTION) {
+            this
+        } else {
+            // Null means "nothing said", which is read as money out, so its
+            // opposite is money in.
+            copy(
+                transactionType = if (transactionType == TransactionType.INCOME) {
+                    TransactionType.EXPENSE
+                } else {
+                    TransactionType.INCOME
+                },
+            )
+        }
+
+    /**
+     * Applies a change of direction and then asks the ledger again.
+     *
+     * Duplicate checking and the corrections both key on which way the money
+     * went, so every verdict about these rows is stale the moment one is
+     * flipped.
+     */
+    private fun applyDirections(change: (ImportCandidate) -> ImportCandidate) {
+        val current = _state.value
+        val mapping = current.mapping ?: return
+        val changed = current.candidates.map(change)
+        _state.value = current.copy(candidates = changed)
+        viewModelScope.launch {
+            _state.value = _state.value.copy(
+                candidates = importer.refreshAgainstLedger(changed, mapping),
+            )
+        }
+    }
+
     fun toggleCandidate(id: String) {
         _state.value = _state.value.copy(
             candidates = _state.value.candidates.map { candidate ->
@@ -303,6 +359,24 @@ class ImportViewModel @Inject constructor(
         _state.value = ImportState()
     }
 
+    /**
+     * Puts the raw text of the PDF on screen at any point, not only when the
+     * reading failed outright.
+     *
+     * A statement that imports but reads wrongly is the harder case, and it
+     * cannot be diagnosed without seeing what the lines actually look like.
+     */
+    fun showWhatWasRead() {
+        val uri = _state.value.sourceUri ?: return
+        viewModelScope.launch {
+            val text = importer.readPdfText(uri)?.takeIf { it.isNotBlank() }
+            _state.value = _state.value.copy(
+                unreadablePdfText = text,
+                error = if (text == null) "That file is not a PDF, so there is no text to show." else null,
+            )
+        }
+    }
+
     fun clearUnreadablePdf() {
         _state.value = _state.value.copy(unreadablePdfText = null)
     }
@@ -344,6 +418,8 @@ data class ImportState(
     val mapping: ImportMapping? = null,
     /** Set when the sheet looks like a household budget the app can read whole. */
     val detectedLayout: DetectedLayout? = null,
+    /** The file being imported, kept so its text can be shown on request. */
+    val sourceUri: Uri? = null,
     /** Set when the sheet looks like a downloaded bank statement. */
     val detectedStatement: ImportMapping? = null,
     /** The account a statement is being filed against, once one is chosen. */
@@ -383,4 +459,11 @@ data class ImportState(
 
     /** How many rows will become new entries, which is not all the selected ones. */
     val additionCount: Int get() = selectedCount - correctionCount
+
+    private val transactions: List<ImportCandidate>
+        get() = candidates.filter { it.isImportable && it.target == ImportTarget.TRANSACTION }
+
+    /** How the rows are being read, which is the thing most worth checking. */
+    val moneyInCount: Int get() = transactions.count { it.transactionType == TransactionType.INCOME }
+    val moneyOutCount: Int get() = transactions.size - moneyInCount
 }

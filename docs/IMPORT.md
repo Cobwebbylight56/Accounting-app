@@ -144,9 +144,26 @@ evidence are used, strongest first:
    cash withdrawal is money leaving whatever column it landed in; a salary or a
    refund is money arriving.
 
-Anything still undecided is read as money out and flagged, because that is what
-almost everything on a current account is. Money in is only ever recorded when
+Anything still undecided is read as money out, because that is what almost
+everything on a current account is. Money in is only ever recorded when
 something positively says so.
+
+### Changing what it decided
+
+Some statements give the app nothing to go on. Where there is no running
+balance, no debit/credit letter, and the payee is just an employer's name, a
+credit is indistinguishable from a payment — no amount of cleverness fixes
+that, so the reading is shown and you change it.
+
+The review screen prints each row as `−£30.00` or `+£1,862.23` and says how
+many it read each way. **Tap an amount** to flip one row. **Swap all** flips
+the lot, for a file read the wrong way round throughout. Duplicate checking
+re-runs afterwards, because which way the money went is part of what identifies
+a row.
+
+**Show what was read** on the same screen prints the raw lines the app got out
+of the PDF, whether or not the import worked. That is what to send on if a
+layout needs teaching.
 
 ### If an import went in wrong anyway
 

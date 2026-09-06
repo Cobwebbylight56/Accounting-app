@@ -58,6 +58,7 @@ import com.rhys.financetracker.core.money.Money
 import com.rhys.financetracker.data.importer.ColumnRole
 import com.rhys.financetracker.data.importer.ImportCandidate
 import com.rhys.financetracker.data.importer.ImportTarget
+import com.rhys.financetracker.domain.model.TransactionType
 import com.rhys.financetracker.data.local.projection.labelFor
 import com.rhys.financetracker.ui.components.DropdownField
 import com.rhys.financetracker.ui.components.EmptyState
@@ -195,7 +196,7 @@ private fun UnreadablePdfCard(text: String, onDismiss: () -> Unit) {
 
     SectionCard(
         title = "What was read from the PDF",
-        subtitle = "The text is there, but no transaction rows were recognised",
+        subtitle = "The lines the app got out of your statement",
     ) {
         Text(
             text = "Copy this and send it on, and the app can be taught your bank's " +
@@ -708,6 +709,40 @@ private fun ReviewStep(state: ImportState, viewModel: ImportViewModel) {
             TextButton(onClick = { viewModel.selectAll(false) }) { Text("None") }
         }
 
+        // Above the list rather than inside it: reading a whole statement the
+        // wrong way round is the mistake worth catching, and it is invisible
+        // one row at a time.
+        if (state.moneyOutCount + state.moneyInCount > 0) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Reading ${state.moneyOutCount} as money out and " +
+                        "${state.moneyInCount} as money in",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = viewModel::swapAllDirections) { Text("Swap all") }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Tap an amount to change one row.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                if (state.sourceUri != null) {
+                    TextButton(onClick = viewModel::showWhatWasRead) { Text("Show what was read") }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+
         LazyColumn(
             modifier = Modifier.weight(1f),
             contentPadding = PaddingValues(horizontal = 16.dp),
@@ -716,6 +751,7 @@ private fun ReviewStep(state: ImportState, viewModel: ImportViewModel) {
                 CandidateRow(
                     candidate = candidate,
                     onToggle = { viewModel.toggleCandidate(candidate.id) },
+                    onFlip = { viewModel.toggleDirection(candidate.id) },
                 )
             }
         }
@@ -738,7 +774,11 @@ private fun ReviewStep(state: ImportState, viewModel: ImportViewModel) {
 }
 
 @Composable
-private fun CandidateRow(candidate: ImportCandidate, onToggle: () -> Unit) {
+private fun CandidateRow(
+    candidate: ImportCandidate,
+    onToggle: () -> Unit,
+    onFlip: () -> Unit,
+) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -779,10 +819,25 @@ private fun CandidateRow(candidate: ImportCandidate, onToggle: () -> Unit) {
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Text(
-            text = Money.format(candidate.amountMinor),
-            style = MaterialTheme.typography.bodyLarge,
-        )
+        // Tappable, because the app cannot always tell which way the money went
+        // and being confidently wrong about it is worse than asking. The sign
+        // and the colour make the reading legible at a glance down the list,
+        // which is what catches a whole file read the wrong way round.
+        val isIncome = candidate.transactionType == TransactionType.INCOME
+        TextButton(
+            onClick = onFlip,
+            enabled = candidate.isImportable && candidate.target == ImportTarget.TRANSACTION,
+        ) {
+            Text(
+                text = (if (isIncome) "+" else "−") + Money.format(candidate.amountMinor),
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (isIncome) {
+                    FinanceTheme.colors.positive
+                } else {
+                    FinanceTheme.colors.negative
+                },
+            )
+        }
     }
 }
 

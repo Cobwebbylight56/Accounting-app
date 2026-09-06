@@ -267,6 +267,29 @@ class SpreadsheetImporter @Inject constructor(
     }
 
     /**
+     * Re-checks duplicates and corrections after the directions have changed.
+     *
+     * Which way the money went is part of the fingerprint that recognises a
+     * re-import, so flipping a row makes every earlier verdict about it stale.
+     * Both are worked out again from scratch rather than adjusted, because a
+     * row that was a duplicate may no longer be one and the other way round.
+     */
+    suspend fun refreshAgainstLedger(
+        candidates: List<ImportCandidate>,
+        mapping: ImportMapping,
+    ): List<ImportCandidate> = withContext(ioDispatcher) {
+        val cleared = candidates.map {
+            it.copy(
+                isAlreadyPresent = false,
+                corrects = null,
+                isSelected = it.isImportable,
+            )
+        }
+        val accountId = resolveTargetAccount(mapping) ?: return@withContext cleared
+        markCorrections(markDuplicates(cleared, accountId), accountId)
+    }
+
+    /**
      * The account an import is filing against, when it is already known.
      *
      * By id where one was chosen — names are only unique per person, so a name

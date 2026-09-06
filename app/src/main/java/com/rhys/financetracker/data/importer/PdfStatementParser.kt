@@ -399,7 +399,8 @@ object PdfStatementParser {
     private val INCOMING_WORDS = Regex(
         """(?i)\b(salary|wages|payroll|refund|refunded|reimbursement|rebate|cashback|""" +
             """dividend|bacs credit|credit from|credit interest|interest paid|""" +
-            """transfer from|paid in|deposit)\b""",
+            """transfer from|paid in|deposit|bgc|giro|payment received|""" +
+            """faster payment received|credit transfer)\b""",
     )
 
     /** Markers meaning the money arrived rather than left. */

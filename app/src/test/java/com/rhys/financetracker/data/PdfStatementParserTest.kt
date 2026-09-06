@@ -386,6 +386,9 @@ class PdfStatementParserTest {
         assertEquals(true, PdfStatementParser.directionFromWording("ATM CASH WITHDRAWAL"))
         assertEquals(false, PdfStatementParser.directionFromWording("SALARY ACME LTD"))
         assertEquals(false, PdfStatementParser.directionFromWording("REFUND ASOS"))
+        // The standard UK markings for a credit arriving.
+        assertEquals(false, PdfStatementParser.directionFromWording("BGC ACME LTD"))
+        assertEquals(false, PdfStatementParser.directionFromWording("FASTER PAYMENT RECEIVED"))
         // Paying a credit card is money leaving, however much it says credit.
         assertEquals(
             true,
