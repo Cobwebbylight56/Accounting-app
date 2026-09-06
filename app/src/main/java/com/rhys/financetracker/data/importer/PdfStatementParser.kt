@@ -218,8 +218,15 @@ object PdfStatementParser {
                     "The balance on this line does not match the amount, and nothing " +
                         "said which way the money went; read as money out — check it"
                 mismatched -> "The balance on this line does not match the amount; check it"
-                outward == null ->
-                    "Read as money out — nothing on this line said which way it went"
+                // Falling back to money out is not itself a problem. On a
+                // current account that is what almost every line is, and now
+                // that position is no longer guessed at, the fallback carries
+                // ordinary shop names on any statement without a running
+                // balance. Flagging those marks half a normal file doubtful,
+                // which teaches you to ignore the flag that does mean
+                // something. The review screen shows each row's direction
+                // before anything is saved, which is the check that belongs
+                // here.
                 else -> null
             },
         )

@@ -169,13 +169,16 @@ class PdfStatementParserTest {
         assertTrue(rows.all { (it.moneyOutMinor ?: it.moneyInMinor) != null })
         assertEquals(4215L, rows[0].moneyOutMinor)
         assertEquals(360L, rows[1].moneyOutMinor)
-        // Read from its column: the balance said nothing about this row.
+        // The balance said nothing about this row and no column was proven, so
+        // what the line calls itself decides it. A salary is money arriving.
         assertEquals(186223L, rows[2].moneyInMinor)
         assertEquals(6140L, rows[3].moneyOutMinor)
         // And none of them is flagged. The balance on the Greggs line is two
         // transactions further on than the last one printed, so comparing the
-        // two would fail — and marking every second row doubtful on a
-        // perfectly ordinary statement teaches you to ignore the warning.
+        // two would fail; the shop names are read as money out because that is
+        // what a current account mostly holds. Neither is a fault worth
+        // marking — doing so makes half an ordinary statement look doubtful
+        // and teaches you to ignore the flag that does mean something.
         assertTrue(rows.all { it.problem == null })
     }
 
