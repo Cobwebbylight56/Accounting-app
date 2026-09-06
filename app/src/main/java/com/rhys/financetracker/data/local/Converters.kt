@@ -5,6 +5,7 @@ import com.rhys.financetracker.domain.model.AccountType
 import com.rhys.financetracker.domain.model.CategoryKind
 import com.rhys.financetracker.domain.model.Frequency
 import com.rhys.financetracker.domain.model.RecurrenceMode
+import com.rhys.financetracker.domain.model.RecordSource
 import com.rhys.financetracker.domain.model.TransactionType
 import java.time.LocalDate
 
@@ -38,6 +39,15 @@ class Converters {
     @TypeConverter
     fun stringToTransactionType(value: String): TransactionType =
         runCatching { TransactionType.valueOf(value) }.getOrDefault(TransactionType.EXPENSE)
+
+    @TypeConverter
+    fun recordSourceToString(value: RecordSource): String = value.name
+
+    // Anything unreadable is treated as the weakest source rather than as a
+    // statement, so a bad value can never protect a row from being corrected.
+    @TypeConverter
+    fun stringToRecordSource(value: String): RecordSource =
+        runCatching { RecordSource.valueOf(value) }.getOrDefault(RecordSource.UNKNOWN)
 
     @TypeConverter
     fun categoryKindToString(value: CategoryKind): String = value.name

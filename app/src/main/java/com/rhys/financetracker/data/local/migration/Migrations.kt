@@ -28,6 +28,25 @@ object Migrations {
         )
     }
 
+    /**
+     * Records where each transaction came from, so a bank statement can
+     * correct a remembered entry rather than sitting beside it as a second
+     * copy of the same payment.
+     *
+     * Existing rows become UNKNOWN rather than being guessed at. A stored
+     * import hash says a row was imported but not from what — the spreadsheet
+     * import and the statement import both set one — and labelling somebody's
+     * hand-built spreadsheet as bank-authoritative would protect it from the
+     * very correction this exists to allow. UNKNOWN is the weakest source, so
+     * the effect is that everything already in the ledger can be improved by a
+     * statement and nothing is wrongly shielded.
+     */
+    val MIGRATION_2_3 = Migration(2, 3) { db ->
+        db.execSQL(
+            "ALTER TABLE transactions ADD COLUMN source TEXT NOT NULL DEFAULT 'UNKNOWN'",
+        )
+    }
+
     /** Registered with Room in `di/DatabaseModule.kt`. */
-    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2)
+    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
 }

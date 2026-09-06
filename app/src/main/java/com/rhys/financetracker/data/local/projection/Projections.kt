@@ -6,6 +6,8 @@ import com.rhys.financetracker.data.local.entity.AccountEntity
 import com.rhys.financetracker.data.local.entity.RecurringRuleEntity
 import com.rhys.financetracker.data.local.entity.SavingsGoalEntity
 import com.rhys.financetracker.data.local.entity.TransactionEntity
+import com.rhys.financetracker.domain.model.RecordSource
+import com.rhys.financetracker.domain.model.TransactionType
 import java.time.LocalDate
 
 /**
@@ -139,6 +141,38 @@ data class AccountActivity(
     @ColumnInfo(name = "account_id") val accountId: Long,
     @ColumnInfo(name = "income_minor") val incomeMinor: Long,
     @ColumnInfo(name = "expense_minor") val expenseMinor: Long,
+)
+
+/**
+ * A stored transaction a statement row might turn out to be describing.
+ *
+ * Only what is needed to recognise the pair and to bring the stored one up to
+ * the statement, so a whole month of entities is never loaded to compare a
+ * date and an amount.
+ */
+data class ExistingEntry(
+    @ColumnInfo(name = "id") val id: Long,
+    @ColumnInfo(name = "date") val date: LocalDate,
+    @ColumnInfo(name = "amount_minor") val amountMinor: Long,
+    @ColumnInfo(name = "type") val type: TransactionType,
+    @ColumnInfo(name = "description") val description: String,
+    @ColumnInfo(name = "category_id") val categoryId: Long?,
+    @ColumnInfo(name = "notes") val notes: String?,
+    @ColumnInfo(name = "source") val source: RecordSource,
+)
+
+/**
+ * How often one payee appears on one account.
+ *
+ * Used to judge whether a statement is being filed against the right account:
+ * a household's payees are strikingly account-specific, so a file whose payees
+ * are all strangers here and all familiar somewhere else is almost certainly
+ * pointed at the wrong one.
+ */
+data class AccountPayee(
+    @ColumnInfo(name = "account_id") val accountId: Long,
+    @ColumnInfo(name = "description") val description: String,
+    @ColumnInfo(name = "occurrences") val occurrences: Int,
 )
 
 /**

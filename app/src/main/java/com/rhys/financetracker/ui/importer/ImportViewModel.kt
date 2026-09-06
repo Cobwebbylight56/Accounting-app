@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rhys.financetracker.core.result.AppResult
+import com.rhys.financetracker.data.importer.AccountFitCheck
 import com.rhys.financetracker.data.importer.ColumnRole
 import com.rhys.financetracker.data.importer.DetectedLayout
 import com.rhys.financetracker.data.importer.ImportCandidate
@@ -121,6 +122,11 @@ class ImportViewModel @Inject constructor(
             _state.value = _state.value.copy(
                 mapping = mapping,
                 candidates = candidates,
+                chosenAccount = account,
+                // Filing a statement against the wrong account is silent and
+                // expensive to undo, so it is checked while there is still a
+                // review screen to say it on.
+                accountFit = account?.let { importer.checkAccountFit(candidates, it.id) },
                 usingDetectedLayout = false,
                 step = ImportStep.REVIEW,
                 isBusy = false,
@@ -138,6 +144,31 @@ class ImportViewModel @Inject constructor(
     fun preselectAccount(accountId: Long?) {
         if (_state.value.preselectedAccountId == accountId) return
         _state.value = _state.value.copy(preselectedAccountId = accountId)
+    }
+
+    /**
+     * Goes back to pick a different account, with the suggested one already
+     * selected — the answer to "which one then?" is the whole point of having
+     * asked, and making the user find it again would be a poor reward for
+     * taking the advice.
+     *
+     * The warning itself is dropped on the way. It was about the account just
+     * left behind, and leaving it up would make the next choice look condemned
+     * before it had been checked.
+     */
+    fun chooseAnotherAccount() {
+        val suggested = _state.value.accountFit?.suggestedAccountId
+        _state.value = _state.value.copy(
+            step = ImportStep.MAP,
+            accountFit = null,
+            chosenAccount = null,
+            preselectedAccountId = suggested,
+        )
+    }
+
+    /** Keeps the chosen account despite the warning, and says no more about it. */
+    fun keepChosenAccount() {
+        _state.value = _state.value.copy(accountFit = null)
     }
 
     /** Falls back to mapping the columns by hand. */
@@ -307,6 +338,10 @@ data class ImportState(
     val detectedLayout: DetectedLayout? = null,
     /** Set when the sheet looks like a downloaded bank statement. */
     val detectedStatement: ImportMapping? = null,
+    /** The account a statement is being filed against, once one is chosen. */
+    val chosenAccount: AccountOption? = null,
+    /** Set when the rows look like they belong to a different account. */
+    val accountFit: AccountFitCheck.Verdict? = null,
     /** The account this import was started from, when it began on one. */
     val preselectedAccountId: Long? = null,
     /** Text pulled from a PDF whose layout was not recognised, for showing. */
@@ -331,4 +366,8 @@ data class ImportState(
 
     /** How many rows the import would skip because they are already recorded. */
     val alreadyPresentCount: Int get() = candidates.count { it.isAlreadyPresent }
+
+    /** How many rows will correct an entry already held rather than add one. */
+    val correctionCount: Int
+        get() = candidates.count { it.isSelected && it.isImportable && it.corrects != null }
 }

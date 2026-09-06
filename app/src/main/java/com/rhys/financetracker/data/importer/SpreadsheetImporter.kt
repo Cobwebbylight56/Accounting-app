@@ -21,6 +21,7 @@ import com.rhys.financetracker.data.repository.CategoryRepository
 import com.rhys.financetracker.domain.model.AccountType
 import com.rhys.financetracker.domain.model.CategoryKind
 import com.rhys.financetracker.domain.model.Frequency
+import com.rhys.financetracker.domain.model.RecordSource
 import com.rhys.financetracker.domain.model.TransactionType
 import java.time.LocalDate
 import java.time.YearMonth
@@ -259,7 +260,76 @@ class SpreadsheetImporter @Inject constructor(
         mapping: ImportMapping,
     ): List<ImportCandidate> = withContext(ioDispatcher) {
         val candidates = categorise(buildCandidates(sheet, mapping))
-        markDuplicates(candidates, mapping.defaultAccountName)
+            .map { it.copy(source = RecordSource.STATEMENT) }
+        val accountId = resolveTargetAccount(mapping)
+            ?: return@withContext candidates
+        markCorrections(markDuplicates(candidates, accountId), accountId)
+    }
+
+    /**
+     * The account an import is filing against, when it is already known.
+     *
+     * By id where one was chosen — names are only unique per person, so a name
+     * cannot identify an account on its own any more. Null when the account is
+     * about to be created, which is also the answer to "what does it already
+     * hold": nothing.
+     */
+    private suspend fun resolveTargetAccount(mapping: ImportMapping): Long? =
+        mapping.defaultAccountId
+            ?: mapping.defaultAccountName?.takeIf { it.isNotBlank() }
+                ?.let { accountDao.getByName(it) }?.id
+
+    /**
+     * Whether these rows look like they belong to a different account.
+     *
+     * Separate from building the candidates because it is advice rather than
+     * part of the reading: the import is identical either way, and only the
+     * user can say whether the odd-looking account is the right one.
+     */
+    suspend fun checkAccountFit(
+        candidates: List<ImportCandidate>,
+        accountId: Long,
+    ): AccountFitCheck.Verdict? = withContext(ioDispatcher) {
+        AccountFitCheck.check(candidates, accountId, transactionDao.payeesByAccount())
+    }
+
+    /**
+     * Marks rows that are the bank's version of something already recorded.
+     *
+     * Only the span the file actually covers is looked at, so importing one
+     * month never reads a year of history to compare against.
+     */
+    internal suspend fun markCorrections(
+        candidates: List<ImportCandidate>,
+        accountId: Long,
+    ): List<ImportCandidate> {
+        val dates = candidates
+            .filter { it.isImportable && it.target == ImportTarget.TRANSACTION }
+            .mapNotNull { it.dateIso?.let(DateUtils::parseIsoOrNull) }
+        val first = dates.minOrNull() ?: return candidates
+        val last = dates.maxOrNull() ?: return candidates
+
+        // Widened by the matching window, or a payment at either end of the
+        // statement could not reach the entry it corrects.
+        val existing = transactionDao.correctableBetween(
+            accountId = accountId,
+            from = first.minusDays(CORRECTION_MARGIN_DAYS),
+            to = last.plusDays(CORRECTION_MARGIN_DAYS),
+        )
+        val corrections = StatementPriority.corrections(candidates, existing)
+        if (corrections.isEmpty()) return candidates
+
+        return candidates.map { candidate ->
+            val correction = corrections[candidate.id] ?: return@map candidate
+            candidate.copy(
+                corrects = StatementCorrection(
+                    existingId = correction.existing.id,
+                    existingDescription = correction.existing.description,
+                    existingDateIso = correction.existing.date.toString(),
+                    payeesAgreed = correction.payeesAgreed,
+                ),
+            )
+        }
     }
 
     /**
@@ -294,14 +364,8 @@ class SpreadsheetImporter @Inject constructor(
      */
     internal suspend fun markDuplicates(
         candidates: List<ImportCandidate>,
-        accountName: String?,
+        accountId: Long,
     ): List<ImportCandidate> {
-        // Without a known account there is nothing to compare against: an
-        // account about to be created cannot already hold anything.
-        val accountId = accountName?.takeIf { it.isNotBlank() }
-            ?.let { accountDao.getByName(it) }?.id
-            ?: return candidates
-
         val fingerprints = candidates.map { candidate ->
             if (!candidate.isImportable || candidate.target != ImportTarget.TRANSACTION) {
                 null
@@ -357,6 +421,15 @@ class SpreadsheetImporter @Inject constructor(
             val problems = mutableListOf<String>()
 
             for (candidate in candidates) {
+                if (candidate.isSelected && candidate.isImportable && candidate.corrects != null) {
+                    outcome = try {
+                        correctExisting(candidate, candidate.corrects, outcome)
+                    } catch (error: IllegalStateException) {
+                        problems += "Row ${candidate.sourceRow + 1}: ${error.message}"
+                        outcome.copy(skipped = outcome.skipped + 1)
+                    }
+                    continue
+                }
                 if (candidate.isAlreadyPresent) {
                     outcome = outcome.copy(duplicatesSkipped = outcome.duplicatesSkipped + 1)
                     continue
@@ -384,6 +457,71 @@ class SpreadsheetImporter @Inject constructor(
     }
 
     // ------------------------------------------------------------- writers
+
+    /**
+     * Applies the bank's version of a payment to the entry already held.
+     *
+     * The date, the payee and the fingerprint are taken from the statement,
+     * because that is the point of the exercise. The category is not: a
+     * category is a decision somebody made, and a guess should not overrule
+     * one. And the old wording is kept in the notes, so a correction never
+     * costs information — only the app's confidence about which version is
+     * right, which is what is being fixed.
+     */
+    private suspend fun correctExisting(
+        candidate: ImportCandidate,
+        correction: StatementCorrection,
+        outcome: ImportOutcome,
+    ): ImportOutcome {
+        val existing = transactionDao.getById(correction.existingId)
+            ?: error("the entry it was going to update has since been deleted")
+        var running = outcome
+        val type = candidate.transactionType ?: TransactionType.EXPENSE
+        val categoryId = existing.categoryId ?: run {
+            val (resolved, afterCategory) = resolveCategory(candidate.categoryName, type, running)
+            running = afterCategory
+            resolved
+        }
+        val date = candidate.dateIso?.let { DateUtils.parseIsoOrNull(it) } ?: existing.date
+
+        transactionDao.applyStatementVersion(
+            id = existing.id,
+            date = date,
+            description = candidate.name,
+            categoryId = categoryId,
+            notes = mergedNotes(existing.description, existing.notes, candidate),
+            importHash = TransactionFingerprint.of(
+                accountId = existing.accountId,
+                date = date,
+                amountMinor = existing.amountMinor,
+                type = type,
+                description = candidate.name,
+            ),
+            updatedAt = System.currentTimeMillis(),
+        )
+        return running.copy(transactionsUpdated = running.transactionsUpdated + 1)
+    }
+
+    /**
+     * The notes to keep on a corrected entry.
+     *
+     * Whatever was already written stays. The old payee is added only when the
+     * statement actually renames it, since "Was recorded as TESCO STORES" under
+     * an entry that still says TESCO STORES is noise.
+     */
+    private fun mergedNotes(
+        previousDescription: String,
+        previousNotes: String?,
+        candidate: ImportCandidate,
+    ): String? {
+        val renamed = TransactionFingerprint.normaliseDescription(previousDescription) !=
+            TransactionFingerprint.normaliseDescription(candidate.name)
+        return listOfNotNull(
+            previousNotes?.takeIf { it.isNotBlank() },
+            candidate.notes?.takeIf { it.isNotBlank() },
+            if (renamed) "Was recorded as \"$previousDescription\"" else null,
+        ).joinToString("\n").takeIf { it.isNotBlank() }
+    }
 
     private suspend fun importAccount(
         candidate: ImportCandidate,
@@ -481,6 +619,10 @@ class SpreadsheetImporter @Inject constructor(
                 categoryId = categoryId,
                 personId = personId,
                 notes = candidate.notes,
+                // A statement is the bank talking, so rows read from one are
+                // marked as such and a later spreadsheet import cannot quietly
+                // overwrite them; see RecordSource.
+                source = candidate.source,
                 // Stamped now so the next statement covering this period
                 // recognises the row instead of adding it again.
                 importHash = TransactionFingerprint.of(
@@ -682,5 +824,13 @@ class SpreadsheetImporter @Inject constructor(
          * is one-off payments that will never be seen again.
          */
         const val LEARNED_PAYEE_LIMIT = 2_000
+
+        /**
+         * How far either side of the statement to look for entries it might be
+         * correcting. Matches the widest window [StatementPriority] allows, so
+         * a payment on the first or last day of the file can still reach the
+         * entry it belongs to.
+         */
+        const val CORRECTION_MARGIN_DAYS = 10L
     }
 }

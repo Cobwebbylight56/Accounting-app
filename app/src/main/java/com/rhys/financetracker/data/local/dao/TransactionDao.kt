@@ -15,6 +15,8 @@ import com.rhys.financetracker.data.local.entity.TransactionEntity
 import com.rhys.financetracker.data.local.projection.CategoryTotal
 import com.rhys.financetracker.data.local.projection.AccountActivity
 import com.rhys.financetracker.data.local.projection.DescriptionCategory
+import com.rhys.financetracker.data.local.projection.AccountPayee
+import com.rhys.financetracker.data.local.projection.ExistingEntry
 import com.rhys.financetracker.data.local.projection.FingerprintCount
 import com.rhys.financetracker.data.local.projection.IncomeExpenseTotals
 import com.rhys.financetracker.data.local.projection.MonthTotals
@@ -111,6 +113,81 @@ interface TransactionDao {
         """,
     )
     suspend fun countByFingerprint(hashes: List<String>): List<FingerprintCount>
+
+    /**
+     * Entries on [accountId] between [from] and [to] that a statement is
+     * allowed to correct.
+     *
+     * Rows already taken from a statement are left out: the bank has spoken
+     * about those, and a second statement covering them is recognised by its
+     * fingerprint rather than by this. Fetched as a range in one query, rather
+     * than asked row by row, because the pairing has to consider all of them
+     * at once to spot the ambiguous cases and refuse them.
+     */
+    @Query(
+        """
+        SELECT id, date, amount_minor, type, description, category_id, notes, source
+        FROM transactions
+        WHERE is_archived = 0
+          AND account_id = :accountId
+          AND source != 'STATEMENT'
+          AND date BETWEEN :from AND :to
+        ORDER BY date ASC, id ASC
+        """,
+    )
+    suspend fun correctableBetween(
+        accountId: Long,
+        from: LocalDate,
+        to: LocalDate,
+    ): List<ExistingEntry>
+
+    /**
+     * Applies a statement's version of a transaction to the row already held.
+     *
+     * Written as one statement so the whole correction lands together: a row
+     * left half updated — new date, old description — would be worse than
+     * either version on its own.
+     */
+    @Query(
+        """
+        UPDATE transactions
+        SET date = :date,
+            description = :description,
+            category_id = :categoryId,
+            notes = :notes,
+            import_hash = :importHash,
+            source = 'STATEMENT',
+            is_cleared = 1,
+            updated_at = :updatedAt
+        WHERE id = :id
+        """,
+    )
+    suspend fun applyStatementVersion(
+        id: Long,
+        date: LocalDate,
+        description: String,
+        categoryId: Long?,
+        notes: String?,
+        importHash: String,
+        updatedAt: Long,
+    )
+
+    /**
+     * Every payee on every account, with how often it appears.
+     *
+     * Grouped in SQL so what comes back is one row per payee per account —
+     * hundreds, not the whole ledger — which is small enough to compare a
+     * statement against in memory.
+     */
+    @Query(
+        """
+        SELECT account_id, description, COUNT(*) AS occurrences
+        FROM transactions
+        WHERE is_archived = 0 AND description != ''
+        GROUP BY account_id, description
+        """,
+    )
+    suspend fun payeesByAccount(): List<AccountPayee>
 
     /**
      * Payees that have already been filed, commonest first.

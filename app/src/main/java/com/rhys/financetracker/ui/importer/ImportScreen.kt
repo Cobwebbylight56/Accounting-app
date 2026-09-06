@@ -602,9 +602,59 @@ private fun SheetPreview(state: ImportState) {
     }
 }
 
+/**
+ * Says when the rows look like they belong to a different account.
+ *
+ * Placed above the list rather than in a dialog: it is a judgement about the
+ * whole file, and the rows underneath are the evidence for or against it.
+ */
+@Composable
+private fun WrongAccountWarning(state: ImportState, viewModel: ImportViewModel) {
+    val verdict = state.accountFit ?: return
+    val accounts by viewModel.accounts.collectAsStateWithLifecycle()
+    val suggested = accounts.firstOrNull { it.id == verdict.suggestedAccountId } ?: return
+    val chosen = state.chosenAccount
+
+    Surface(
+        color = FinanceTheme.colors.warningContainer,
+        contentColor = FinanceTheme.colors.onWarningContainer,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "This looks like ${accounts.labelFor(suggested)}",
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = buildString {
+                    append(verdict.recognisedThere)
+                    append(" of these payees already appear on ")
+                    append(accounts.labelFor(suggested))
+                    append(", and ")
+                    append(if (verdict.recognisedHere == 0) "none" else "only ${verdict.recognisedHere}")
+                    append(" on ")
+                    append(chosen?.let { accounts.labelFor(it) } ?: "this account")
+                    append(". If that is the right account, carry on — a new card ")
+                    append("or a first statement will look like this too.")
+                },
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = viewModel::chooseAnotherAccount) { Text("Change account") }
+                TextButton(onClick = viewModel::keepChosenAccount) { Text("Keep it") }
+            }
+        }
+    }
+    Spacer(Modifier.height(12.dp))
+}
+
 @Composable
 private fun ReviewStep(state: ImportState, viewModel: ImportViewModel) {
     Column(modifier = Modifier.fillMaxSize()) {
+        WrongAccountWarning(state = state, viewModel = viewModel)
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -617,6 +667,14 @@ private fun ReviewStep(state: ImportState, viewModel: ImportViewModel) {
                 if (state.usingDetectedLayout) {
                     Text(
                         text = "Read straight from your sheet's layout",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (state.correctionCount > 0) {
+                    Text(
+                        text = "${state.correctionCount} will update an entry you " +
+                            "already had rather than add a second copy",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -681,17 +739,24 @@ private fun CandidateRow(candidate: ImportCandidate, onToggle: () -> Unit) {
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = candidate.problem ?: listOfNotNull(
-                    candidate.categoryName,
-                    candidate.personName,
-                    candidate.accountName,
-                    candidate.dateIso,
-                ).joinToString(" · ").ifBlank { "Row ${candidate.sourceRow + 1}" },
+                text = candidate.problem
+                    // A correction changes an entry that is already there, so
+                    // it says which one. "Updated 3 entries" after the fact is
+                    // no help at all when one of them was the wrong entry.
+                    ?: candidate.corrects?.let {
+                        "Updates \"${it.existingDescription}\" from ${it.existingDateIso}"
+                    }
+                    ?: listOfNotNull(
+                        candidate.categoryName,
+                        candidate.personName,
+                        candidate.accountName,
+                        candidate.dateIso,
+                    ).joinToString(" · ").ifBlank { "Row ${candidate.sourceRow + 1}" },
                 style = MaterialTheme.typography.bodySmall,
-                color = if (candidate.isImportable) {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                } else {
-                    FinanceTheme.colors.warning
+                color = when {
+                    !candidate.isImportable -> FinanceTheme.colors.warning
+                    candidate.corrects != null -> MaterialTheme.colorScheme.primary
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
                 },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -733,6 +798,18 @@ private fun DoneStep(
                 if (it.transactionsCreated > 0) {
                     Text("${it.transactionsCreated} transactions added")
                 }
+                if (it.transactionsUpdated > 0) {
+                    Text("${it.transactionsUpdated} entries updated from the statement")
+                }
+            }
+            if (it.transactionsUpdated > 0) {
+                Text(
+                    text = "Those were already recorded by hand or from a spreadsheet. " +
+                        "The bank's date and payee replaced what was there, and what " +
+                        "it used to say was kept in the entry's notes.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             if (it.skipped > 0) {
                 // "14 skipped" on its own reads like something went wrong

@@ -12,6 +12,7 @@ import com.rhys.financetracker.domain.model.AccountType
 import com.rhys.financetracker.domain.model.CategoryKind
 import com.rhys.financetracker.domain.model.Frequency
 import com.rhys.financetracker.domain.model.RecurrenceMode
+import com.rhys.financetracker.domain.model.RecordSource
 import com.rhys.financetracker.domain.model.TransactionType
 import org.json.JSONArray
 import org.json.JSONObject
@@ -160,6 +161,12 @@ class BackupSerializer @Inject constructor() {
         put("isConfirmed", transaction.isConfirmed)
         put("isCleared", transaction.isCleared)
         putOpt("tags", transaction.tags)
+        // Both of these decide what a later import does with the row. Without
+        // the fingerprint, re-importing a statement after a restore adds every
+        // row a second time; without the source, everything restored looks
+        // hand-typed and the protection a bank record has is lost.
+        putOpt("importHash", transaction.importHash)
+        put("source", transaction.source.name)
         put("isArchived", transaction.isArchived)
         put("createdAt", transaction.createdAt)
         put("updatedAt", transaction.updatedAt)
@@ -181,6 +188,11 @@ class BackupSerializer @Inject constructor() {
         isConfirmed = json.optBoolean("isConfirmed", true),
         isCleared = json.optBoolean("isCleared", true),
         tags = json.optStringOrNull("tags"),
+        importHash = json.optStringOrNull("importHash"),
+        // A backup written before this was recorded restores as UNKNOWN, the
+        // weakest source, so an old backup is corrected by a statement rather
+        // than shielded from one.
+        source = json.optEnum("source", RecordSource.UNKNOWN) { RecordSource.valueOf(it) },
         isArchived = json.optBoolean("isArchived", false),
         createdAt = json.optLong("createdAt", System.currentTimeMillis()),
         updatedAt = json.optLong("updatedAt", System.currentTimeMillis()),

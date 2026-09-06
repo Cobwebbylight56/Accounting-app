@@ -1,5 +1,6 @@
 package com.rhys.financetracker.data.importer
 
+import com.rhys.financetracker.domain.model.RecordSource
 import com.rhys.financetracker.domain.model.TransactionType
 
 /**
@@ -153,6 +154,20 @@ data class ImportCandidate(
      * re-importing an overlapping statement adds only what is new.
      */
     val isAlreadyPresent: Boolean = false,
+    /**
+     * Where this row came from, which decides what it may overwrite later.
+     *
+     * Only rows read as a recognised bank statement are marked as such: a
+     * hand-mapped sheet may well be a statement, but the app has not been told
+     * so and should not claim the bank's authority on a guess.
+     */
+    val source: RecordSource = RecordSource.SPREADSHEET,
+    /**
+     * Set when this row is the bank's version of something already recorded by
+     * hand or from a spreadsheet, and will correct it rather than be added
+     * beside it. See [StatementPriority].
+     */
+    val corrects: StatementCorrection? = null,
     /** Set when the row cannot be imported; it is shown but not selected. */
     val problem: String? = null,
     val isSelected: Boolean = true,
@@ -163,6 +178,21 @@ data class ImportCandidate(
     val id: String get() = "$sourceRow:$sourceColumn"
 }
 
+/**
+ * The entry a statement row was found to be describing, and what it said.
+ *
+ * Kept on the candidate so the review screen can show what is about to change
+ * — a correction that happens unannounced is indistinguishable from the app
+ * losing somebody's entry.
+ */
+data class StatementCorrection(
+    val existingId: Long,
+    val existingDescription: String,
+    val existingDateIso: String,
+    /** True when the payees agreed rather than the pair simply having no alternative. */
+    val payeesAgreed: Boolean,
+)
+
 /** The outcome of writing the selected candidates to the database. */
 data class ImportOutcome(
     val peopleCreated: Int = 0,
@@ -171,6 +201,11 @@ data class ImportOutcome(
     val recurringCreated: Int = 0,
     val transactionsCreated: Int = 0,
     val skipped: Int = 0,
+    /**
+     * Entries the statement corrected rather than repeated: the bank's date,
+     * payee and amount applied to something already recorded by hand.
+     */
+    val transactionsUpdated: Int = 0,
     /** Rows that were already in the ledger — the cost of overlapping statements. */
     val duplicatesSkipped: Int = 0,
     val problems: List<String> = emptyList(),
@@ -183,6 +218,9 @@ data class ImportOutcome(
         append("$totalCreated ")
         append(if (totalCreated == 1) "record" else "records")
         append(" added")
+        if (transactionsUpdated > 0) {
+            append(", $transactionsUpdated updated")
+        }
         if (duplicatesSkipped > 0) {
             append(", $duplicatesSkipped already had")
         }

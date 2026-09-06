@@ -37,6 +37,33 @@ enum class TransactionType(val displayName: String) {
     TRANSFER("Transfer"),
 }
 
+/**
+ * Where a stored transaction came from, and so how much it is to be trusted.
+ *
+ * A bank statement is the account itself talking: it has the day the money
+ * actually moved, the amount to the penny, and the payee as the bank recorded
+ * it — `VIRGIN MEDIA PAYMENTS 998812` rather than a remembered "Virgin media".
+ * A spreadsheet row or a typed entry is somebody's account of the same event,
+ * written from memory and often dated the day it was noticed rather than the
+ * day it happened.
+ *
+ * So when both describe one transaction, the statement wins and the other is
+ * brought up to it. Nothing is lost by that: what the earlier entry said is
+ * kept in its notes. The reverse is never done — a spreadsheet import cannot
+ * overwrite what the bank said.
+ */
+enum class RecordSource(val displayName: String) {
+    /** Recorded before the app kept track of this. Treated as the weakest. */
+    UNKNOWN("Unknown"),
+    MANUAL("Typed in"),
+    SPREADSHEET("From a spreadsheet"),
+    STATEMENT("From a bank statement"),
+    ;
+
+    /** True when [other] should be allowed to overwrite a record from here. */
+    fun yieldsTo(other: RecordSource): Boolean = other == STATEMENT && this != STATEMENT
+}
+
 /** Which side of the books a category belongs to. */
 enum class CategoryKind(val displayName: String) {
     INCOME("Income"),

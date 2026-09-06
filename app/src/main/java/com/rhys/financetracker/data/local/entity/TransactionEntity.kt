@@ -5,6 +5,7 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.rhys.financetracker.domain.model.RecordSource
 import com.rhys.financetracker.domain.model.TransactionType
 import java.time.Instant
 import java.time.LocalDate
@@ -90,6 +91,13 @@ data class TransactionEntity(
      * Null for anything typed in by hand, which is never a re-import.
      */
     @ColumnInfo(name = "import_hash") val importHash: String? = null,
+    /**
+     * Where this record came from, which decides what may overwrite it; see
+     * [RecordSource]. Rows stored before the app tracked this read as
+     * [RecordSource.UNKNOWN], the weakest, so a statement may correct them.
+     */
+    @ColumnInfo(name = "source", defaultValue = "UNKNOWN")
+    val source: RecordSource = RecordSource.MANUAL,
     @ColumnInfo(name = "is_archived") val isArchived: Boolean = false,
     @ColumnInfo(name = "created_at") val createdAt: Long = Instant.now().toEpochMilli(),
     @ColumnInfo(name = "updated_at") val updatedAt: Long = Instant.now().toEpochMilli(),

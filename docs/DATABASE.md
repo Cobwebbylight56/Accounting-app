@@ -3,12 +3,13 @@
 SQLite via Room. The schema is exported to `app/schemas/` on every build, so
 every change is reviewable and every migration is testable.
 
-Current version: **2**.
+Current version: **3**.
 
 | Version | Change |
 |---|---|
 | 1 | Initial schema |
 | 2 | `transactions.import_hash` — the fingerprint that stops a re-imported bank statement being counted twice. Additive and indexed; existing rows are left null, which simply never matches. |
+| 3 | `transactions.source` — where a record came from, so a bank statement can correct a remembered entry rather than sit beside it. Existing rows become `UNKNOWN`, the weakest source, because a stored hash says a row was imported but not from what; labelling a hand-built spreadsheet as bank-authoritative would shield it from the very correction this allows. |
 
 ---
 
@@ -137,6 +138,7 @@ The atom of the application.
 | `is_cleared` | INTEGER | False for a payment arranged but not yet gone through |
 | `tags` | TEXT? | Comma separated, searchable |
 | `import_hash` | TEXT? | Fingerprint of account, date, amount, direction and payee. Set on import, null when typed in. Indexed, and matched by **count** so two identical purchases on one day both survive |
+| `source` | TEXT | Where the record came from: `UNKNOWN`, `MANUAL`, `SPREADSHEET`, `STATEMENT`. A statement outranks the rest and may correct them; nothing may overwrite a statement row |
 | `is_archived` | INTEGER | Excluded from balances and totals |
 | `created_at`, `updated_at` | INTEGER | |
 

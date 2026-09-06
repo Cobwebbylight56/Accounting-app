@@ -97,6 +97,50 @@ Because the fingerprint includes the account, choose the right one when you
 import. The same £40 at the same shop on the same day can honestly appear on
 two different cards.
 
+### The bank's version wins
+
+A fingerprint recognises the same *file* imported twice. It cannot recognise
+the same *payment* written down twice, because the two never agree on the
+wording:
+
+| Where from | Date | Description | Amount |
+|---|---|---|---|
+| Your spreadsheet | 1 Mar | Virgin media | 46.50 |
+| The statement | 3 Mar | VIRGIN MEDIA PAYMENTS 998812 | 46.50 |
+
+Different day, different words, one payment. So when a statement row turns out
+to be the bank's account of something already recorded by hand or from a
+spreadsheet, it **updates that entry instead of adding a second copy**. The
+review screen says which: *Updates "Virgin media" from 2026-03-01*.
+
+What changes is the date and the payee, because the bank has those exactly and
+a remembered entry usually does not. What does not change is the category —
+that was your decision, not a guess — and nothing is lost: the old wording is
+kept in the entry's notes.
+
+A statement row is never overwritten in turn. Once the bank has spoken about a
+payment, a later spreadsheet import cannot quietly rewrite it.
+
+**When it declines to act.** The amount and direction must match exactly, and
+either the payees must share a distinctive word or there must be nothing else
+either of them could be. Two £20 payments a day apart with no payee in common
+are left alone. An unmerged pair is two similar rows you can see and delete; a
+wrongly merged pair attaches your note to the wrong payment and says nothing.
+
+### Filing against the wrong account
+
+This is the one import mistake that leaves no trace — every row imports
+cleanly, and both accounts are quietly wrong afterwards.
+
+So before the review screen the payees are compared against what each account
+has seen before. If most of them are strangers here and familiar somewhere
+else, a banner says so and offers to switch, with the suggested account already
+chosen.
+
+It only ever warns. A new card or a genuine first statement looks exactly the
+same, and it stays quiet unless the difference is substantial — several payees
+either way, not four against three.
+
 ### Spending is sorted for you
 
 Descriptions like `TESCO STORES 3294` are matched against the shops and
