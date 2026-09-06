@@ -38,3 +38,22 @@ since those need no import.
 
 Run all three before pushing; together they take about a second and cover the
 failures that have actually cost round trips here.
+
+## validate_constructors.py
+
+Checks that every data-class construction passes the arguments that have no
+default.
+
+Written after a test shipped without `personId`, which the compiler in CI found
+five minutes later. The mistake was easy to make from a read: an annotated
+property such as `@ColumnInfo(name = "person_id") val personId: Long?` has an
+`=` in it and looks like it carries a default when it does not.
+
+Only call sites written entirely with named arguments are checked, and only
+where the name resolves to the project's own class — Compose has a `Row` and a
+`Text` of its own. Anything else is left to the compiler rather than guessed
+at.
+
+```
+python3 tools/validate_constructors.py
+```

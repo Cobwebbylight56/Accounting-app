@@ -28,6 +28,7 @@ class SavingsClassificationTest {
             id = 1L,
             name = name,
             type = type,
+            personId = null,
             openingBalanceMinor = 0L,
             openingBalanceDate = LocalDate.of(2026, 1, 1),
             colorHex = "#455A64",
