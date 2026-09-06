@@ -280,8 +280,13 @@ private fun BalanceSummaryCard(state: DashboardState, onOpenAccounts: () -> Unit
     val summary = state.summary
     Column {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Which accounts land in which tile is a judgement the app cannot
+            // make alone — a current account nobody touches is savings, and a
+            // savings account being spent down is not. So each says what it
+            // counts, and the account screen has the switch that decides.
             StatTile(
                 label = "Available",
+                caption = "To spend",
                 value = Money.format(summary.totalBalanceMinor),
                 emphasis = if (summary.totalBalanceMinor < 0L) {
                     StatEmphasis.NEGATIVE
@@ -293,6 +298,7 @@ private fun BalanceSummaryCard(state: DashboardState, onOpenAccounts: () -> Unit
             )
             StatTile(
                 label = "Saved",
+                caption = "Set aside",
                 value = Money.format(summary.totalSavingsMinor),
                 emphasis = StatEmphasis.POSITIVE,
                 modifier = Modifier.weight(1f),

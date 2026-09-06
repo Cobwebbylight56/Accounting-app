@@ -430,6 +430,16 @@ fun AccountEditScreen(
                 },
             )
             SwitchRow(
+                label = "Money set aside",
+                description = "Counts under Saved on the home screen instead of " +
+                    "Available. Use it for anything you are not planning to spend, " +
+                    "whatever kind of account it is.",
+                checked = state.form.countsAsSavings,
+                onCheckedChange = { value ->
+                    viewModel.update { it.copy(countsAsSavings = value) }
+                },
+            )
+            SwitchRow(
                 label = "Shared household account",
                 checked = state.form.isShared,
                 onCheckedChange = { value -> viewModel.update { it.copy(isShared = value) } },

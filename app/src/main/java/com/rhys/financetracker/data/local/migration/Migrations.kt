@@ -47,6 +47,18 @@ object Migrations {
         )
     }
 
+    /**
+     * Lets an account be counted as savings whatever its type says.
+     *
+     * Nullable on purpose: null means "no opinion, follow the type", which is
+     * true of every account that existed before there was a way to say
+     * otherwise. A NOT NULL column would have had to invent an answer for all
+     * of them.
+     */
+    val MIGRATION_3_4 = Migration(3, 4) { db ->
+        db.execSQL("ALTER TABLE accounts ADD COLUMN counts_as_savings INTEGER")
+    }
+
     /** Registered with Room in `di/DatabaseModule.kt`. */
-    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
+    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
 }

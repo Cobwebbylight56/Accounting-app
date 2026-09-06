@@ -20,6 +20,8 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asExecutor
 
 /**
  * Provides the database and its DAOs.
@@ -37,6 +39,16 @@ object DatabaseModule {
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, AppDatabase.DATABASE_NAME)
             .addMigrations(*Migrations.ALL)
+            // Room's own default is a fixed pool of four threads, shared by
+            // every observed query AND by the invalidation refresh that tells
+            // those queries something changed. The dashboard alone keeps
+            // fourteen queries live, several of them totalling every
+            // transaction ever recorded, so after a write the refresh queues
+            // up behind all of them and the screen can sit on stale figures.
+            // A restart re-runs the queries from scratch, which is why closing
+            // and reopening the app "fixes" it.
+            .setQueryExecutor(Dispatchers.IO.asExecutor())
+            .setTransactionExecutor(Dispatchers.IO.asExecutor())
             // Foreign keys are enforced so orphaned rows cannot appear.
             .build()
 

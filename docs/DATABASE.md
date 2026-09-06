@@ -3,13 +3,14 @@
 SQLite via Room. The schema is exported to `app/schemas/` on every build, so
 every change is reviewable and every migration is testable.
 
-Current version: **3**.
+Current version: **4**.
 
 | Version | Change |
 |---|---|
 | 1 | Initial schema |
 | 2 | `transactions.import_hash` — the fingerprint that stops a re-imported bank statement being counted twice. Additive and indexed; existing rows are left null, which simply never matches. |
 | 3 | `transactions.source` — where a record came from, so a bank statement can correct a remembered entry rather than sit beside it. Existing rows become `UNKNOWN`, the weakest source, because a stored hash says a row was imported but not from what; labelling a hand-built spreadsheet as bank-authoritative would shield it from the very correction this allows. |
+| 4 | `accounts.counts_as_savings` — whether an account counts under Saved rather than Available, overriding its type. Nullable on purpose: null means "follow the type", which is true of every account that existed before there was a way to say otherwise. |
 
 ---
 
@@ -88,6 +89,7 @@ Where money sits.
 | `interest_rate_percent` | REAL? | |
 | `color_hex` | TEXT | |
 | `include_in_net_worth` | INTEGER | |
+| `counts_as_savings` | INTEGER? | Overrides the type for the Saved/Available split. Null follows the type |
 | `is_shared` | INTEGER | |
 | `sort_order` | INTEGER | |
 | `notes` | TEXT? | |

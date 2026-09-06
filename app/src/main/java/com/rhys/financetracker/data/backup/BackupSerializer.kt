@@ -75,6 +75,7 @@ class BackupSerializer @Inject constructor() {
         putOpt("interestRatePercent", account.interestRatePercent)
         put("colorHex", account.colorHex)
         put("includeInNetWorth", account.includeInNetWorth)
+        putOpt("countsAsSavings", account.countsAsSavings)
         put("isShared", account.isShared)
         put("sortOrder", account.sortOrder)
         putOpt("notes", account.notes)
@@ -103,6 +104,11 @@ class BackupSerializer @Inject constructor() {
         },
         colorHex = json.optString("colorHex", "#455A64"),
         includeInNetWorth = json.optBoolean("includeInNetWorth", true),
+        countsAsSavings = if (json.has("countsAsSavings")) {
+            json.optBoolean("countsAsSavings")
+        } else {
+            null
+        },
         isShared = json.optBoolean("isShared", false),
         sortOrder = json.optInt("sortOrder", 0),
         notes = json.optStringOrNull("notes"),

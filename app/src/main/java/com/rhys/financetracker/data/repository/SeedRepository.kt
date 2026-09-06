@@ -45,12 +45,39 @@ class SeedRepository @Inject constructor(
                 database.personDao().insertAll(DefaultData.defaultPeople())
                 didSeed = true
             }
-            if (database.dashboardWidgetDao().count() == 0) {
-                database.dashboardWidgetDao().upsertAll(DefaultData.defaultDashboardWidgets())
-                didSeed = true
-            }
+            // Topped up rather than seeded once. Checking only for an empty
+            // table meant a card added in a later version never appeared for
+            // anybody who had already run the app: their row was missing and
+            // the table was not empty, so nothing was ever inserted. The
+            // charts were added after the first release, which is exactly the
+            // case that went missing.
+            if (seedMissingWidgets()) didSeed = true
             didSeed
         }
+
+    /**
+     * Adds a row for any dashboard card that has none, keeping the positions
+     * and visibility of the ones already there.
+     *
+     * @return true when anything was added.
+     */
+    private suspend fun seedMissingWidgets(): Boolean {
+        val existing = database.dashboardWidgetDao().getAll()
+        val known = existing.map { it.widgetKey }.toSet()
+        val missing = DefaultData.defaultDashboardWidgets()
+            .filter { it.widgetKey !in known }
+        if (missing.isEmpty()) return false
+
+        // Placed after whatever is already on screen, so a new card never
+        // displaces the order somebody has arranged.
+        val nextPosition = (existing.maxOfOrNull { it.position } ?: -1) + 1
+        database.dashboardWidgetDao().upsertAll(
+            missing.mapIndexed { index, widget ->
+                widget.copy(position = nextPosition + index)
+            },
+        )
+        return true
+    }
 
     /**
      * Inserts the example household from the "Book r and h" spreadsheet:

@@ -53,6 +53,13 @@ object HouseholdLayoutDetector {
         "date", "description", "amount", "value", "cost", "price", "category",
         "notes", "note", "memo", "account", "person", "who", "type", "frequency",
         "name", "item", "day", "month", "year", "reference", "payee", "details",
+        // A bank statement's own headings. These sit above columns of figures,
+        // which is precisely the shape this detector looks for in a person, so
+        // without them a statement imports as people called "Money out" and
+        // "Money in" — and every import adds two more.
+        "money in", "money out", "paid in", "paid out", "money-in", "money-out",
+        "debit", "credit", "debits", "credits", "withdrawn", "withdrawal",
+        "withdrawals", "deposit", "deposits",
     )
 
     /** Words that introduce a block of balances. */

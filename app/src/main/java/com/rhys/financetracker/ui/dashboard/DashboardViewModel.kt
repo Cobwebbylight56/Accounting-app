@@ -139,7 +139,13 @@ class DashboardViewModel @Inject constructor(
      * the card fills itself once it arrives.
      */
     private val insightReport: StateFlow<InsightReport> =
-        combine(visibleMonth, scope) { month, currentScope -> month to currentScope }
+        // Accounts are in here as the change signal, not for their value: their
+        // balances are computed from every transaction, so this re-runs when
+        // anything the advice is about actually moves. Keyed only on the month
+        // and scope, the card sat still while the figures beneath it changed.
+        combine(visibleMonth, scope, accounts) { month, currentScope, _ ->
+            month to currentScope
+        }
             .flatMapLatest { (month, currentScope) ->
                 flow {
                     emit(

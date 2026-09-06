@@ -48,6 +48,16 @@ data class AccountEntity(
     @ColumnInfo(name = "interest_rate_percent") val interestRatePercent: Double? = null,
     @ColumnInfo(name = "color_hex") val colorHex: String,
     @ColumnInfo(name = "include_in_net_worth") val includeInNetWorth: Boolean = true,
+    /**
+     * Whether this account counts as money set aside on the home screen,
+     * overriding what its type would say. Null follows the type.
+     *
+     * The type cannot answer this on its own. A current account somebody never
+     * touches is savings to them; a "Savings" account being spent down this
+     * month is not. Only the person whose money it is knows which, so they can
+     * say, and the type remains the sensible default rather than the verdict.
+     */
+    @ColumnInfo(name = "counts_as_savings") val countsAsSavings: Boolean? = null,
     /** Visible to every person rather than just its owner. */
     @ColumnInfo(name = "is_shared") val isShared: Boolean = false,
     @ColumnInfo(name = "sort_order") val sortOrder: Int = 0,

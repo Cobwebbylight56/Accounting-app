@@ -39,7 +39,8 @@ data class AccountWithBalance(
     val netWorthContributionMinor: Long
         get() = if (!account.includeInNetWorth) 0L else balanceMinor
 
-    val isSavings: Boolean get() = account.type.isSavings
+    /** What the owner said, or what the type suggests when they have not said. */
+    val isSavings: Boolean get() = account.countsAsSavings ?: account.type.isSavings
     val isLiability: Boolean get() = account.type.isLiability
     val availableMinor: Long get() = balanceMinor + account.overdraftLimitMinor
 }

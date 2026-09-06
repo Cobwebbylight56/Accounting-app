@@ -68,7 +68,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun importProfileDao(): ImportProfileDao
 
     companion object {
-        const val DATABASE_VERSION = 3
+        const val DATABASE_VERSION = 4
         const val DATABASE_NAME = "finance_tracker.db"
     }
 }

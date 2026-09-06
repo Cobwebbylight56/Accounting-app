@@ -164,6 +164,24 @@ it. It is never stored as a number that can drift out of step with the entries
 that are meant to explain it. If a balance looks wrong, a transaction is wrong,
 and the entries are all there to check.
 
+### Available and Saved
+
+Home splits your money in two. **Available** is what there is to spend;
+**Saved** is what is set aside.
+
+The app cannot work out which is which on its own — a current account you never
+touch is savings, and cash in a tin can be savings too. So each account decides
+for itself. Open the account and turn on **Money set aside** for anything you
+are not planning to spend, whatever kind of account it is.
+
+By default it follows the account's type: Savings, Investment and Pension count
+as set aside, everything else counts as available. Turning the switch on or off
+overrides that for good; leaving it alone lets the account follow its type if
+you change it later.
+
+Nothing is counted twice, and nothing is left out: every account is in exactly
+one of the two.
+
 ### The monthly rollover
 
 At the start of each month, the app:

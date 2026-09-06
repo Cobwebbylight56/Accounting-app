@@ -387,7 +387,13 @@ private fun MappingStep(state: ImportState, viewModel: ImportViewModel) {
         if (state.canImportStatement) {
             item { DetectedStatementCard(state = state, viewModel = viewModel) }
         }
-        if (state.canAutoImport) {
+        // Never both. A statement's "Money out" and "Money in" headings are
+        // columns of figures with text headings, which is exactly what a
+        // household budget's per-person columns look like — so the household
+        // reader offers to import a statement as two people called "Money out"
+        // and "Money in". Being a statement is the more specific answer and
+        // wins outright.
+        if (state.canAutoImport && !state.canImportStatement) {
             item { DetectedLayoutCard(state = state, viewModel = viewModel) }
         }
         if (state.canAutoImport || state.canImportStatement) {

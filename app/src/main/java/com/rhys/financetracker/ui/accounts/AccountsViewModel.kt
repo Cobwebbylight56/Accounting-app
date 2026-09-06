@@ -37,7 +37,10 @@ class AccountsViewModel @Inject constructor(
 
     val state: StateFlow<AccountsState> = combine(
         accountRepository.observeAllWithBalances(),
-        peopleRepository.observeActive(),
+        // Every person, not only the active ones. Grouping skipped anybody who
+        // was not in this list, and their accounts went with them — archiving a
+        // person silently hid accounts that still held money.
+        peopleRepository.observeAll(),
         showArchived,
         message,
     ) { accounts, people, archived, text ->
@@ -168,6 +171,7 @@ class AccountEditViewModel @Inject constructor(
                     interestRateText = account.interestRatePercent?.toString().orEmpty(),
                     colorHex = account.colorHex,
                     includeInNetWorth = account.includeInNetWorth,
+                    countsAsSavings = account.countsAsSavings ?: account.type.isSavings,
                     isShared = account.isShared,
                     notes = account.notes.orEmpty(),
                 )
@@ -195,6 +199,11 @@ class AccountEditViewModel @Inject constructor(
                 interestRatePercent = current.interestRateText.toDoubleOrNull(),
                 colorHex = current.colorHex,
                 includeInNetWorth = current.includeInNetWorth,
+                // Only stored when it actually disagrees with the type, so
+                // changing the type later still moves the account with it
+                // rather than being quietly outvoted by a stale override.
+                countsAsSavings = current.countsAsSavings
+                    .takeIf { it != current.type.isSavings },
                 isShared = current.isShared,
                 notes = current.notes.trim().takeIf { it.isNotEmpty() },
             )
@@ -222,6 +231,7 @@ data class AccountForm(
     val interestRateText: String = "",
     val colorHex: String = DefaultData.PALETTE.first(),
     val includeInNetWorth: Boolean = true,
+    val countsAsSavings: Boolean = false,
     val isShared: Boolean = false,
     val notes: String = "",
     val errorSummary: String? = null,

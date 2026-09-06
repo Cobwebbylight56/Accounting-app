@@ -212,4 +212,40 @@ class HouseholdLayoutDetectorTest {
         assertTrue(description.contains("Rhys"))
         assertTrue(description.contains("Hannah"))
     }
+
+    @Test
+    fun `a bank statement is not a household budget`() {
+        // A statement's money columns are columns of figures under a text
+        // heading, which is exactly the shape a person's column has. Read as a
+        // household budget it imported two people called "Money out" and
+        // "Money in", and every statement after that added two more.
+        val statement = SheetData(
+            name = "statement",
+            rows = listOf(
+                row("Date", "Description", "Money out", "Money in", "Balance"),
+                row("2026-03-01", "TESCO STORES 3294", "42.15", "", "1957.85"),
+                row("2026-03-02", "SALARY ACME LTD", "", "1862.23", "3820.08"),
+                row("2026-03-03", "SHELL FILLING STN", "61.40", "", "3758.68"),
+                row("2026-03-04", "GREGGS PLC 1042", "3.60", "", "3755.08"),
+            ),
+        )
+        assertTrue(HouseholdLayoutDetector.personColumns(statement, 0).isEmpty())
+        assertTrue(HouseholdLayoutDetector.detect(statement)?.isUsable != true)
+    }
+
+    @Test
+    fun `no statement heading is ever read as a person`() {
+        listOf(
+            "Money in", "Money out", "money in", "MONEY OUT", "Paid in", "Paid out",
+            "Debit", "Credit", "Withdrawn", "Deposits", "Balance", "In", "Out",
+        ).forEach { heading ->
+            assertTrue(
+                "\"$heading\" should not be read as a person",
+                !HouseholdLayoutDetector.looksLikePersonName(heading),
+            )
+        }
+        // And the people in a real sheet still are.
+        assertTrue(HouseholdLayoutDetector.looksLikePersonName("Rhys"))
+        assertTrue(HouseholdLayoutDetector.looksLikePersonName("Hannah"))
+    }
 }
