@@ -94,7 +94,7 @@ object PdfStatementParser {
         // though the text has been flattened.
         val columns = columnsIn(read)
         val balanceColumn = balanceColumnIn(read, columns)
-        val outColumn = directionColumn(read, columns, balanceColumn)
+        val (outColumn, inColumn) = directionColumns(read, columns, balanceColumn)
 
         val result = mutableListOf<Row>()
         var previousBalance: Long? = null
@@ -133,7 +133,7 @@ object PdfStatementParser {
                 continue
             }
 
-            result += read(line, others, balance, previousBalance, outColumn)
+            result += read(line, others, balance, previousBalance, outColumn, inColumn)
             // A row that prints no balance breaks the running chain. Carrying
             // the last one forward would compare the next row against a total
             // two transactions old, so it would neither reconcile nor deserve
@@ -161,6 +161,7 @@ object PdfStatementParser {
         balance: Long?,
         previousBalance: Long?,
         outColumn: Int?,
+        inColumn: Int?,
     ): Row {
         val figure = others.firstOrNull { it.minor != 0L }
             ?: others.firstOrNull()
@@ -184,13 +185,20 @@ object PdfStatementParser {
             }
         }
 
-        // 2. Otherwise the column it sits in, which is why the columns were
-        //    calibrated against the rows the balance did prove.
-        val fromColumn = outColumn?.let { near(figure.endsAt, it) }
+        // 2. Otherwise every other kind of evidence, strongest first.
+        //
+        // Note what is NOT here: "this figure is not in the paid-out column"
+        // is not evidence that it is money in. It was, and on a statement
+        // whose columns were not proven that inverted the lot — a current
+        // account showing £25,000 in and £2,900 out, with every direct debit
+        // and card payment recorded as income. A figure only counts as money
+        // in when something positively says so.
         val outward = when {
             figure.minor < 0L -> true
-            fromColumn != null -> fromColumn
-            else -> null
+            line.marker != null -> line.marker !in CREDIT_MARKERS
+            outColumn != null && near(figure.endsAt, outColumn) -> true
+            inColumn != null && near(figure.endsAt, inColumn) -> false
+            else -> directionFromWording(line.description)
         }
 
         // Reaching here with both balances present means the line had a
@@ -222,6 +230,8 @@ object PdfStatementParser {
         val date: LocalDate,
         val description: String,
         val figures: List<Figure>,
+        /** "CR", "DR" and so on, where the bank marks direction with a letter. */
+        val marker: String? = null,
     )
 
     /** The lines that look like statement rows, in order. */
@@ -239,7 +249,7 @@ object PdfStatementParser {
             lastDate = date
             val description = describe(line)
             if (description.isBlank()) continue
-            read += ReadLine(date, description, figures)
+            read += ReadLine(date, description, figures, trailingMarker(line))
         }
         return read
     }
@@ -288,7 +298,18 @@ object PdfStatementParser {
         }
         val rightmost = columns.last()
         val busiestOther = columns.dropLast(1).maxOfOrNull { uses[it] ?: 0 } ?: 0
-        return rightmost.takeIf { (uses[it] ?: 0) >= busiestOther }
+        if ((uses[rightmost] ?: 0) < busiestOther) return null
+
+        // And it has to leave the statement with transactions in it. A figure
+        // alone in the balance column is a balance and not an entry, so if
+        // calling this column the balance would empty most of the rows, it is
+        // not a balance — it is the money column, on a statement that prints
+        // no running total. Getting that wrong does not misread those rows, it
+        // discards them.
+        val emptied = lines.count { line ->
+            line.figures.size == 1 && near(line.figures.single().endsAt, rightmost)
+        }
+        return rightmost.takeIf { emptied * 2 < lines.size }
     }
 
     /**
@@ -299,16 +320,12 @@ object PdfStatementParser {
      * used as worked examples, and the majority verdict is applied to the rows
      * where there is nothing to check against. Null when nothing proved it.
      */
-    private fun directionColumn(
+    private fun directionColumns(
         lines: List<ReadLine>,
         columns: List<Int>,
         balanceColumn: Int?,
-    ): Int? {
-        if (columns.size < 2) return null
-        if (balanceColumn == null) {
-            // No balance to learn from; position is all there is.
-            return columns.firstOrNull()
-        }
+    ): Pair<Int?, Int?> {
+        if (columns.size < 2 || balanceColumn == null) return null to null
 
         val votes = mutableMapOf<Int, Int>()
         var previousBalance: Long? = null
@@ -332,15 +349,54 @@ object PdfStatementParser {
         }
 
         // A column with more "money left the account" verdicts than the other
-        // way is the paid-out column.
-        votes.entries.filter { it.value > 0 }.maxByOrNull { it.value }?.let { return it.key }
-
-        // Nothing proved it. Fall back to where paid-out sits on a UK
-        // statement — first, before paid-in — which only means anything when
-        // there are two money columns to tell apart.
-        val moneyColumns = columns.filterNot { balanceColumn != null && it == balanceColumn }
-        return moneyColumns.firstOrNull().takeIf { moneyColumns.size >= 2 }
+        // way is the paid-out column, and one with more the other way is
+        // paid-in.
+        //
+        // There is deliberately no fallback to position. It used to assume
+        // paid-out came first, which is a coin toss on a convention banks do
+        // not share — and losing that toss inverts the whole statement, every
+        // direct debit and card payment arriving as income. Better to know
+        // nothing here and let the wording decide row by row.
+        val out = votes.entries.filter { it.value > 0 }.maxByOrNull { it.value }?.key
+        val inward = votes.entries.filter { it.value < 0 }.minByOrNull { it.value }?.key
+        return out to inward
     }
+
+    /**
+     * Which way the money went according to what the line calls itself.
+     *
+     * Weaker than the balance and weaker than a column the balance proved, but
+     * far stronger than a guess — a direct debit is not income, whatever
+     * column its figure landed in. Outgoings are tested first because "credit
+     * card payment" is money leaving, and the words for money arriving are
+     * kept narrow for the same reason.
+     */
+    internal fun directionFromWording(description: String): Boolean? {
+        val text = description.lowercase()
+        if (OUTGOING_WORDS.containsMatchIn(text)) return true
+        if (INCOMING_WORDS.containsMatchIn(text)) return false
+        return null
+    }
+
+    /** How a statement writes "money left the account". */
+    private val OUTGOING_WORDS = Regex(
+        """(?i)\b(direct debit|standing order|card payment|contactless|debit card|""" +
+            """cash withdrawal|withdrawal|atm|cash machine|bill payment|payment to|""" +
+            """purchase|pay at pump|faster payment to|transfer to|charge|fee)\b""",
+    )
+
+    /**
+     * And "money arrived". Kept to wordings that cannot mean an outgoing:
+     * "credit" alone is in half the card payments on a statement.
+     */
+    private val INCOMING_WORDS = Regex(
+        """(?i)\b(salary|wages|payroll|refund|refunded|reimbursement|rebate|cashback|""" +
+            """dividend|bacs credit|credit from|credit interest|interest paid|""" +
+            """transfer from|paid in|deposit)\b""",
+    )
+
+    /** Markers meaning the money arrived rather than left. */
+    private val CREDIT_MARKERS = setOf("CR", "C")
 
     private fun near(position: Int, column: Int): Boolean =
         kotlin.math.abs(position - column) <= COLUMN_TOLERANCE
@@ -441,6 +497,32 @@ object PdfStatementParser {
         return figures.asReversed()
     }
 
+    /**
+     * The debit/credit letter among a line's trailing figures, if it has one.
+     *
+     * Banks that mark direction this way state it outright — "42.15 D",
+     * "1,862.23 CR" — which is better evidence than any amount of reasoning
+     * about columns. It was being stepped over to get at the figures and then
+     * thrown away.
+     */
+    internal fun trailingMarker(line: String): String? {
+        val text = line.trimEnd()
+        var end = text.length
+        while (end > 0) {
+            val start = text.lastIndexOf(' ', end - 1) + 1
+            val token = text.substring(start, end)
+            val upper = token.uppercase()
+            when {
+                token.isEmpty() -> Unit
+                upper in DIRECTION_MARKERS -> return upper
+                looksLikeMoney(token) -> Unit
+                else -> return null
+            }
+            end = start - 1
+        }
+        return null
+    }
+
     internal fun trailingAmounts(line: String): List<Long> {
         val amounts = mutableListOf<Long>()
         for (token in line.trim().split(WHITESPACE).asReversed()) {
@@ -535,11 +617,21 @@ object PdfStatementParser {
     private val NAMED_DATE = Regex("""^(\d{1,2})\s+([A-Za-z]{3,9})\.?\s+(\d{4})""")
 
     /**
-     * A money token: optional sign or bracket, digits with optional thousands
-     * separators, and exactly two decimal places. A trailing minus is included
+     * A money token: optional sign or bracket, digits with two decimal places,
+     * with or without thousands separators. A trailing minus is included
      * because some banks print debits that way.
+     *
+     * Both groupings have to be accepted. Requiring the separator meant
+     * "1862.23" was not money at all — so any amount of a thousand or more
+     * printed without a comma was not merely misread, it was invisible, and
+     * the row carrying it was dropped from the import without a word. Plenty
+     * of statements print salaries and transfers exactly that way.
+     *
+     * Separated groups still have to be groups of three, so "1,23.45" is
+     * rejected rather than quietly read as some other number.
      */
-    private val MONEY = Regex("""^[(\-+]?[£$€]?\d{1,3}(?:,\d{3})*(?:\.\d{2})[)\-]?$""")
+    private val MONEY =
+        Regex("""^[(\-+]?[£$€]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d{2})[)\-]?$""")
 
     private val MONTHS = mapOf(
         "jan" to 1, "feb" to 2, "mar" to 3, "apr" to 4, "may" to 5, "jun" to 6,

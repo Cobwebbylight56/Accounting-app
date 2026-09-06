@@ -487,6 +487,15 @@ interface TransactionDao {
     @Query("DELETE FROM transactions WHERE id = :id")
     suspend fun deleteById(id: Long)
 
+    /**
+     * Deletes a named set of entries.
+     *
+     * Sent in batches by the repository: SQLite caps how many values an IN
+     * clause may bind, and undoing a whole statement is well past it.
+     */
+    @Query("DELETE FROM transactions WHERE id IN (:ids)")
+    suspend fun deleteByIds(ids: List<Long>)
+
     @Query("UPDATE transactions SET is_archived = :archived, updated_at = :updatedAt WHERE id = :id")
     suspend fun setArchived(id: Long, archived: Boolean, updatedAt: Long)
 

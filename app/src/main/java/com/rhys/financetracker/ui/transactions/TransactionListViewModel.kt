@@ -163,6 +163,28 @@ class TransactionListViewModel @Inject constructor(
 
     fun confirm(id: Long) = runAction { transactionRepository.confirm(id) }
 
+    /**
+     * Deletes everything the list is currently showing.
+     *
+     * Filter to what you want gone, check the count in the confirmation, then
+     * it goes. Driven by the same filter as the list so there is never a gap
+     * between what is on screen and what is removed.
+     */
+    fun deleteShown() {
+        viewModelScope.launch {
+            when (val result = transactionRepository.deleteMatching(effectiveFilter.value)) {
+                is com.rhys.financetracker.core.result.AppResult.Success ->
+                    message.value = if (result.data == 1) {
+                        "1 entry deleted"
+                    } else {
+                        "${result.data} entries deleted"
+                    }
+                is com.rhys.financetracker.core.result.AppResult.Failure ->
+                    message.value = result.message
+            }
+        }
+    }
+
     fun delete(id: Long) {
         viewModelScope.launch {
             val entity = transactionRepository.get(id) ?: return@launch

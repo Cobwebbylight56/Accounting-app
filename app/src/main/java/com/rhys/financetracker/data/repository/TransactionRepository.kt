@@ -124,6 +124,26 @@ class TransactionRepository @Inject constructor(
             transactionDao.confirm(id, Instant.now().toEpochMilli())
         }
 
+    /**
+     * Deletes every entry [filter] matches, and says how many that was.
+     *
+     * The way back from an import that went wrong. Correcting the reading is
+     * not enough on its own: direction is part of the fingerprint that spots a
+     * re-import, so a statement read the wrong way round and then read again
+     * correctly does not replace the first attempt — it sits beside it. The
+     * bad rows have to be removable, and one at a time is not removal when
+     * there are a couple of hundred of them.
+     *
+     * Deliberately driven by the same filter the list on screen is showing, so
+     * what goes is exactly what was being looked at.
+     */
+    suspend fun deleteMatching(filter: TransactionFilter): AppResult<Int> =
+        runCatchingApp("Could not delete those entries") {
+            val ids = transactionDao.searchRawOnce(TransactionQuery.build(filter)).map { it.transaction.id }
+            ids.chunked(DELETE_BATCH).forEach { transactionDao.deleteByIds(it) }
+            ids.size
+        }
+
     suspend fun delete(transaction: TransactionEntity): AppResult<Unit> =
         runCatchingApp("Could not delete this transaction") {
             transactionDao.delete(transaction)
@@ -153,5 +173,10 @@ class TransactionRepository @Inject constructor(
                 error("A transfer must be between two different accounts")
             }
         }
+    }
+
+    private companion object {
+        /** SQLite caps how many values an IN clause may bind. */
+        const val DELETE_BATCH = 400
     }
 }

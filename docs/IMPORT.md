@@ -127,6 +127,39 @@ either of them could be. Two £20 payments a day apart with no payee in common
 are left alone. An unmerged pair is two similar rows you can see and delete; a
 wrongly merged pair attaches your note to the wrong payment and says nothing.
 
+### Which way the money went
+
+A PDF gives a line of text with nothing marking direction. Four kinds of
+evidence are used, strongest first:
+
+1. **The running balance**, where the row carries one. It moves by exactly the
+   amount, and which way it moved settles it by arithmetic.
+2. **A debit or credit letter** beside the figure — `42.15 D`, `1,862.23 CR` —
+   where the bank marks direction that way.
+3. **The column the figure sits in**, but *only* where the balance already
+   proved which column is which. Position is never guessed at: banks disagree
+   about whether paid-out or paid-in comes first, and guessing wrong inverts a
+   whole statement.
+4. **What the line calls itself.** A direct debit, a contactless payment or a
+   cash withdrawal is money leaving whatever column it landed in; a salary or a
+   refund is money arriving.
+
+Anything still undecided is read as money out and flagged, because that is what
+almost everything on a current account is. Money in is only ever recorded when
+something positively says so.
+
+### If an import went in wrong anyway
+
+Open the Money tab, filter to what should not be there — by account, by date,
+by whatever narrows it down — then **Delete these N entries** from the menu at
+the top right. It removes exactly what the list is showing, and tells you the
+count before it does.
+
+Correcting the reading is not enough on its own: which way the money went is
+part of the fingerprint that recognises a re-import, so a statement read the
+wrong way round and then read again correctly will not replace the first
+attempt. Remove the bad rows first, then import again.
+
 ### Filing against the wrong account
 
 This is the one import mistake that leaves no trace — every row imports

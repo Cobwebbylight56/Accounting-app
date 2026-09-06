@@ -308,4 +308,104 @@ class PdfStatementParserTest {
         assertEquals("2026-03-01", sheet.rows[1][0])
         assertEquals("TESCO STORES 3294", sheet.rows[1][1])
     }
+
+    @Test
+    fun `a statement that puts paid-in first is not read inside out`() {
+        // What went wrong on a real statement: with no balance to prove which
+        // column was which, the reader assumed paid-out came first, and every
+        // figure that was not in that column was taken for money in. A whole
+        // December of direct debits and card payments arrived as income —
+        // £25,000 in against £2,900 out on a current account.
+        val rows = PdfStatementParser.parse(
+            listOf(
+                "Statement 1 December 2025 to 31 December 2025",
+                "Date        Description                    Paid in    Paid out",
+                "16 Dec 2025 Direct debit SAMSUNGFIN                     12.99",
+                "17 Dec 2025 TESCO PAY AT PUMP 383                       30.00",
+                "18 Dec 2025 Direct Debit - First Payment                60.79",
+                "19 Dec 2025 Direct debit CAPITAL ONE                     4.99",
+                "20 Dec 2025 SALARY ACME LTD               1862.23",
+            ),
+        )
+        assertEquals(5, rows.size)
+        assertEquals(10_877L, rows.sumOf { it.moneyOutMinor ?: 0L })
+        assertEquals(186_223L, rows.sumOf { it.moneyInMinor ?: 0L })
+    }
+
+    @Test
+    fun `a figure not in the paid-out column is never money in on that alone`() {
+        // The rule that matters: money in has to be positively evidenced.
+        // Absence of evidence used to be treated as proof of income, which is
+        // what inverted the statement above.
+        val rows = PdfStatementParser.parse(
+            listOf(
+                "Date        Description                    Paid in    Paid out",
+                "16 Dec 2025 SOMETHING UNRECOGNISED                      12.99",
+                "17 Dec 2025 ANOTHER MYSTERY                             30.00",
+                "18 Dec 2025 A THIRD ONE                                 60.79",
+            ),
+        )
+        assertTrue(rows.all { it.moneyInMinor == null })
+        assertTrue(rows.all { it.moneyOutMinor != null })
+    }
+
+    @Test
+    fun `an amount over a thousand without a comma is money`() {
+        // "1862.23" was not matched as money at all, so the row carrying it was
+        // not misread — it was dropped from the import without a word. Plenty
+        // of statements print salaries and transfers with no separator.
+        assertEquals(listOf(186223L), PdfStatementParser.trailingAmounts("20 Dec 2025 SALARY 1862.23"))
+        assertEquals(listOf(1234567L), PdfStatementParser.trailingAmounts("20 Dec 2025 X 12345.67"))
+        // Separated groups must still be groups of three.
+        assertEquals(emptyList<Long>(), PdfStatementParser.trailingAmounts("20 Dec 2025 X 1,23.45"))
+    }
+
+    @Test
+    fun `a debit or credit letter settles the direction the balance cannot`() {
+        val rows = PdfStatementParser.parse(
+            listOf(
+                "01 Dec 2025 Balance brought forward 2000.00",
+                "16 Dec 2025 Direct debit SAMSUNGFIN 12.99 D",
+                "20 Dec 2025 SALARY ACME LTD 1862.23 CR",
+            ),
+        )
+        assertEquals(2, rows.size)
+        assertEquals(1299L, rows[0].moneyOutMinor)
+        assertEquals(186223L, rows[1].moneyInMinor)
+        assertEquals("CR", PdfStatementParser.trailingMarker("20 Dec 2025 SALARY 1862.23 CR"))
+        assertNull(PdfStatementParser.trailingMarker("20 Dec 2025 SALARY 1862.23"))
+    }
+
+    @Test
+    fun `what a line calls itself decides when nothing else can`() {
+        assertEquals(true, PdfStatementParser.directionFromWording("Direct debit CAPITAL ONE"))
+        assertEquals(true, PdfStatementParser.directionFromWording("Contactless Payment"))
+        assertEquals(true, PdfStatementParser.directionFromWording("ATM CASH WITHDRAWAL"))
+        assertEquals(false, PdfStatementParser.directionFromWording("SALARY ACME LTD"))
+        assertEquals(false, PdfStatementParser.directionFromWording("REFUND ASOS"))
+        // Paying a credit card is money leaving, however much it says credit.
+        assertEquals(
+            true,
+            PdfStatementParser.directionFromWording("DIRECT DEBIT CAPITAL ONE CREDIT CARD"),
+        )
+        // And an ordinary shop name says nothing either way.
+        assertNull(PdfStatementParser.directionFromWording("TESCO STORES 3294"))
+    }
+
+    @Test
+    fun `the busiest column is not a balance when calling it one empties the file`() {
+        // A statement with no running total has its amounts in the rightmost
+        // column. Taking that for a balance turns every row into a balance
+        // line with no entry on it, and they vanish from the import.
+        val rows = PdfStatementParser.parse(
+            listOf(
+                "Date        Description                    Paid in    Paid out",
+                "16 Dec 2025 Direct debit SAMSUNGFIN                     12.99",
+                "17 Dec 2025 TESCO PAY AT PUMP 383                       30.00",
+                "18 Dec 2025 Direct Debit - First Payment                60.79",
+            ),
+        )
+        assertEquals(3, rows.size)
+        assertEquals(1299L, rows[0].moneyOutMinor)
+    }
 }

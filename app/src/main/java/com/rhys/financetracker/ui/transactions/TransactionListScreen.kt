@@ -59,6 +59,7 @@ import com.rhys.financetracker.data.local.projection.TransactionWithDetails
 import com.rhys.financetracker.domain.model.ExportFormat
 import com.rhys.financetracker.domain.model.TransactionType
 import com.rhys.financetracker.ui.components.ColorDot
+import com.rhys.financetracker.ui.components.ConfirmDialog
 import com.rhys.financetracker.ui.components.EmptyState
 import com.rhys.financetracker.ui.components.LoadingState
 import com.rhys.financetracker.ui.components.colorFromHex
@@ -84,6 +85,7 @@ fun TransactionListScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var showFilters by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
+    var confirmDeleteShown by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     LaunchedEffect(state.message) {
@@ -91,6 +93,22 @@ fun TransactionListScreen(
             snackbarHostState.showSnackbar(it)
             viewModel.clearMessage()
         }
+    }
+
+    if (confirmDeleteShown) {
+        ConfirmDialog(
+            title = "Delete these ${state.resultCount} entries?",
+            message = "Everything the list is showing right now will be removed, and that " +
+                "cannot be undone. Only what matches your filters goes — change them first " +
+                "if you meant something narrower.",
+            confirmLabel = "Delete",
+            isDestructive = true,
+            onConfirm = {
+                viewModel.deleteShown()
+                confirmDeleteShown = false
+            },
+            onDismiss = { confirmDeleteShown = false },
+        )
     }
 
     LaunchedEffect(state.exportedFile) {
