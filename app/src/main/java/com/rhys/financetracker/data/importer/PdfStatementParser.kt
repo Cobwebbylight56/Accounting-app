@@ -325,14 +325,21 @@ object PdfStatementParser {
         // not a balance — it is the money column, on a statement that prints
         // no running total. Getting that wrong does not misread those rows, it
         // discards them.
-        // A brought-forward line is *expected* to be a balance on its own, so
-        // it must not count against the column here.
+        // Nothing above proved this column is a running total, so it is only
+        // being taken on position and frequency. On that much evidence it may
+        // not cost the file a single row: a figure alone in the balance column
+        // is read as a balance rather than an entry, and on a statement with
+        // no running total those figures are the amounts themselves.
+        //
+        // A brought-forward line is exempt. It is a balance on its own by
+        // definition, and counting it here would reject the column on exactly
+        // the statements that do print one.
         val emptied = lines.count { line ->
             line.figures.size == 1 &&
                 near(line.figures.single().endsAt, rightmost) &&
                 !BALANCE_LINE.containsMatchIn(line.description)
         }
-        return rightmost.takeIf { emptied * 2 < lines.size }
+        return rightmost.takeIf { emptied == 0 }
     }
 
     /**
