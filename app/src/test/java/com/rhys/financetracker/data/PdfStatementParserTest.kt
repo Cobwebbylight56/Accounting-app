@@ -81,6 +81,9 @@ class PdfStatementParserTest {
         )
         assertEquals(1, rows.size)
         assertNotNull(rows[0].problem)
+        // Naming the balance matters: the line also gave no clue which way the
+        // money went, and saying only that hides the fact that there was a
+        // check available and it failed.
         assertTrue(rows[0].problem!!.contains("balance"))
         // Still read. Returning no amount left the row with no value at all,
         // which the importer could only treat as unreadable — silently
@@ -169,6 +172,11 @@ class PdfStatementParserTest {
         // Read from its column: the balance said nothing about this row.
         assertEquals(186223L, rows[2].moneyInMinor)
         assertEquals(6140L, rows[3].moneyOutMinor)
+        // And none of them is flagged. The balance on the Greggs line is two
+        // transactions further on than the last one printed, so comparing the
+        // two would fail — and marking every second row doubtful on a
+        // perfectly ordinary statement teaches you to ignore the warning.
+        assertTrue(rows.all { it.problem == null })
     }
 
     @Test

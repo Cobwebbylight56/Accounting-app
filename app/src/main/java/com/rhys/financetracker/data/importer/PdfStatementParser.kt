@@ -133,9 +133,12 @@ object PdfStatementParser {
                 continue
             }
 
-            val row = read(line, others, balance, previousBalance, outColumn)
-            result += row
-            (balance ?: row.balanceMinor)?.let { previousBalance = it }
+            result += read(line, others, balance, previousBalance, outColumn)
+            // A row that prints no balance breaks the running chain. Carrying
+            // the last one forward would compare the next row against a total
+            // two transactions old, so it would neither reconcile nor deserve
+            // to be flagged for failing to.
+            previousBalance = balance
         }
         return result
     }
@@ -190,6 +193,12 @@ object PdfStatementParser {
             else -> null
         }
 
+        // Reaching here with both balances present means the line had a
+        // balance to check against and failed the check, which is the more
+        // useful thing to say — and usually the reason the direction could
+        // not be proven either.
+        val mismatched = balance != null && previousBalance != null
+
         return Row(
             date = line.date,
             description = line.description,
@@ -197,10 +206,12 @@ object PdfStatementParser {
             moneyInMinor = if (outward == false) size else null,
             balanceMinor = balance,
             problem = when {
+                mismatched && outward == null ->
+                    "The balance on this line does not match the amount, and nothing " +
+                        "said which way the money went; read as money out — check it"
+                mismatched -> "The balance on this line does not match the amount; check it"
                 outward == null ->
                     "Read as money out — nothing on this line said which way it went"
-                balance != null && previousBalance != null ->
-                    "The balance on this line does not match the amount; check it"
                 else -> null
             },
         )
@@ -315,7 +326,9 @@ object PdfStatementParser {
                     }
                 }
             }
-            if (balance != null) previousBalance = balance
+            // Same broken chain as in the main read: a row with no balance
+            // leaves the next one nothing to be proved against.
+            previousBalance = balance
         }
 
         // A column with more "money left the account" verdicts than the other
