@@ -13,6 +13,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
@@ -335,31 +339,60 @@ private fun BillRow(
     }
 }
 
+/**
+ * The month's transactions, a few at a time.
+ *
+ * A statement import puts two hundred rows into a month, and this card showed
+ * eight of them with no way to reach the ninth. It now holds the whole month
+ * and opens on request, because scrolling past two hundred rows to reach the
+ * cards underneath is its own kind of unusable — so it closes again too.
+ */
 @Composable
 internal fun RecentTransactionsCard(
     state: DashboardState,
     onOpenTransaction: (Long) -> Unit,
     onAddTransaction: () -> Unit,
 ) {
+    var showAll by rememberSaveable { mutableStateOf(false) }
+    val all = state.monthTransactions
+    val shown = if (showAll) all else all.take(TRANSACTIONS_SHOWN)
+
     SectionCard(
-        title = "Recent",
+        title = "This month",
         action = { TextButton(onClick = onAddTransaction) { Text("Add") } },
     ) {
-        if (state.recentTransactions.isEmpty()) {
+        if (all.isEmpty()) {
             Text(
-                text = "Nothing recorded yet. Tap Add to enter your first transaction.",
+                text = "Nothing recorded this month. Tap Add to enter one.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                state.recentTransactions.forEach { item ->
+                shown.forEach { item ->
                     TransactionRowCompact(item) { onOpenTransaction(item.transaction.id) }
+                }
+                if (all.size > TRANSACTIONS_SHOWN) {
+                    TextButton(
+                        onClick = { showAll = !showAll },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            if (showAll) {
+                                "Show less"
+                            } else {
+                                "Show all ${all.size}"
+                            },
+                        )
+                    }
                 }
             }
         }
     }
 }
+
+/** How many of the month's transactions the card shows before it is opened. */
+private const val TRANSACTIONS_SHOWN = 8
 
 @Composable
 private fun TransactionRowCompact(item: TransactionWithDetails, onClick: () -> Unit) {

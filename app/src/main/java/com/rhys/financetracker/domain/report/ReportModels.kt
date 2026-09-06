@@ -134,6 +134,12 @@ data class FinancialSummary(
     val monthIncomeMinor: Long,
     val monthExpenseMinor: Long,
     val committedRecurringMinor: Long,
+    /**
+     * Paid into savings this month, read from the categories on the payments
+     * rather than from any account balance — so a saver held at another bank,
+     * which this app has no account for, still shows up as saving.
+     */
+    val savingsPaidInMinor: Long = 0L,
 ) {
     val monthNetMinor: Long get() = monthIncomeMinor - monthExpenseMinor
 

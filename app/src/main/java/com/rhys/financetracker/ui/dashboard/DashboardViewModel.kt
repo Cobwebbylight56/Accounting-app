@@ -103,6 +103,33 @@ class DashboardViewModel @Inject constructor(
         )
     }
 
+    /**
+     * Every transaction in the month on screen, newest first.
+     *
+     * The card below shows a few of them and opens to the rest. It used to be
+     * the last eight of all time, which on a freshly imported statement is
+     * eight rows out of two hundred and no way to see the ninth without
+     * leaving the screen.
+     */
+    private val monthTransactions = monthFlow.flatMapLatest { (month, _) ->
+        val range = DateUtils.monthRange(month)
+        transactionRepository.observeBetween(range.start, range.endInclusive)
+    }
+
+    /**
+     * What was paid into savings this month, whether or not a savings account
+     * exists in the app to hold it.
+     */
+    private val savingsPaidIn = monthFlow.flatMapLatest { (month, currentScope) ->
+        val range = DateUtils.monthRange(month)
+        transactionRepository.observeSavingsPaidIn(
+            start = range.start,
+            end = range.endInclusive,
+            accountId = currentScope.accountId,
+            personId = currentScope.personId,
+        )
+    }
+
     /** Money in and out of each account for the month on screen. */
     private val accountActivity = monthFlow.flatMapLatest { (month, _) ->
         val range = DateUtils.monthRange(month)
@@ -180,7 +207,7 @@ class DashboardViewModel @Inject constructor(
             monthlyTrend,
             recurringRepository.observeUpcoming(days = UPCOMING_DAYS),
             recurringRepository.observeOverdue(),
-            transactionRepository.observeRecent(RECENT_COUNT),
+            monthTransactions,
             savingsRepository.observeWithProgress(),
             peopleRepository.observeActive(),
             widgetDao.observeAll(),
@@ -190,6 +217,7 @@ class DashboardViewModel @Inject constructor(
             committed,
             insightReport,
             accountActivity,
+            savingsPaidIn,
         ),
     ) { values -> buildState(values) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DashboardState())
@@ -214,6 +242,7 @@ class DashboardViewModel @Inject constructor(
         val committed = values[13] as Long
         val insights = values[14] as InsightReport
         val activity = values[15] as List<AccountActivity>
+        val paidIntoSavings = values[16] as Long
 
         val inScope = accountList.filter { currentScope.matches(it) }
         val savingsTotal = inScope.filter { it.isSavings }.sumOf { it.balanceMinor }
@@ -235,12 +264,13 @@ class DashboardViewModel @Inject constructor(
                 monthIncomeMinor = monthTotals.incomeMinor,
                 monthExpenseMinor = monthTotals.expenseMinor,
                 committedRecurringMinor = committed,
+                savingsPaidInMinor = paidIntoSavings,
             ),
             spendingByCategory = categories,
             monthlyTrend = trend,
             upcomingBills = upcoming,
             overdueBills = overdue,
-            recentTransactions = recent,
+            monthTransactions = recent,
             savingsGoals = goals,
             externalData = external,
             topInsight = insights.topPriority,
@@ -385,7 +415,6 @@ class DashboardViewModel @Inject constructor(
     private companion object {
         const val MONTHS_ON_CHART = 6
         const val UPCOMING_DAYS = 30L
-        const val RECENT_COUNT = 8
     }
 }
 
@@ -422,7 +451,7 @@ data class DashboardState(
     val monthlyTrend: List<MonthPoint> = emptyList(),
     val upcomingBills: List<RecurringRuleWithDetails> = emptyList(),
     val overdueBills: List<RecurringRuleWithDetails> = emptyList(),
-    val recentTransactions: List<TransactionWithDetails> = emptyList(),
+    val monthTransactions: List<TransactionWithDetails> = emptyList(),
     val savingsGoals: List<SavingsGoalWithProgress> = emptyList(),
     val externalData: ExternalDataSnapshot = ExternalDataSnapshot(),
     val topInsight: Insight? = null,
@@ -430,7 +459,7 @@ data class DashboardState(
     val widgets: List<VisibleWidget> = emptyList(),
 ) {
     val isCurrentMonth: Boolean get() = month == DateUtils.currentYearMonth()
-    val hasAnyData: Boolean get() = accounts.isNotEmpty() || recentTransactions.isNotEmpty()
+    val hasAnyData: Boolean get() = accounts.isNotEmpty() || monthTransactions.isNotEmpty()
     fun isVisible(widget: DashboardWidget): Boolean =
         widgets.firstOrNull { it.widget == widget }?.isVisible ?: widget.defaultVisible
 }

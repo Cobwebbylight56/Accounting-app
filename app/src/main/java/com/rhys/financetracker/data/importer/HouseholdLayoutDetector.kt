@@ -58,6 +58,7 @@ object HouseholdLayoutDetector {
         // without them a statement imports as people called "Money out" and
         // "Money in" — and every import adds two more.
         "money in", "money out", "paid in", "paid out", "money-in", "money-out",
+        "payments", "receipts",
         "debit", "credit", "debits", "credits", "withdrawn", "withdrawal",
         "withdrawals", "deposit", "deposits",
     )

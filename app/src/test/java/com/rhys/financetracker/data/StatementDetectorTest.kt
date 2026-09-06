@@ -33,6 +33,38 @@ class StatementDetectorTest {
         ),
     )
 
+    /**
+     * A building society savings statement: Payments and Receipts rather than
+     * paid out and paid in, and one movement in the period.
+     */
+    private val saverStatement = SheetData(
+        name = "Statement",
+        rows = listOf(
+            /* 0 */ row("Flex Instant Saver", "", "", "", ""),
+            /* 1 */ row("Date", "Details", "Payments", "Receipts", "Balance"),
+            /* 2 */ row("31/01/2026", "Interest", "", "1.23", "3001.23"),
+        ),
+    )
+
+    @Test
+    fun `payments and receipts are money out and money in`() {
+        // How the building societies word it. Read as anything else, a saver
+        // statement had no money columns at all and was not a statement.
+        val mapping = StatementDetector.detect(saverStatement)
+        assertNotNull(mapping)
+        assertEquals(ColumnRole.DATE, mapping!!.columnRoles[0])
+        assertEquals(ColumnRole.MONEY_OUT, mapping.columnRoles[2])
+        assertEquals(ColumnRole.MONEY_IN, mapping.columnRoles[3])
+        assertEquals(ColumnRole.BALANCE, mapping.columnRoles[4])
+    }
+
+    @Test
+    fun `one movement in the month is enough to be a statement`() {
+        // A saver really can have a single line in it, and refusing that told
+        // the user their statement was a layout the app did not recognise.
+        assertTrue(StatementDetector.looksLikeStatement(saverStatement))
+    }
+
     /** Monzo, Starling and most CSV exports: one signed column. */
     private val signedStatement = SheetData(
         name = "Statement",

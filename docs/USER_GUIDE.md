@@ -189,6 +189,21 @@ you change it later.
 Nothing is counted twice, and nothing is left out: every account is in exactly
 one of the two.
 
+**If your saver is with another bank** there is no account here to hold its
+balance, and every payment into it used to look like ordinary spending. Those
+payments are now filed under Savings, and the Saved tile says what went in this
+month underneath the figure. Where there is no savings account at all, the
+month's payments in are the figure. Adding the saver as an account is still
+better — then the balance is shown too — but nothing has to be set up for the
+saving to be counted.
+
+### The month's transactions on Home
+
+The card at the foot of Home holds every transaction in the month you are
+looking at, newest first. It shows eight and then a **Show all** button;
+**Show less** closes it again. After importing a statement that is two hundred
+rows, which is why it closes.
+
 ### The monthly rollover
 
 At the start of each month, the app:

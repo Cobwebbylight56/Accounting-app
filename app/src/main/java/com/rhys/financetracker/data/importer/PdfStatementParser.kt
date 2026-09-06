@@ -67,7 +67,15 @@ object PdfStatementParser {
      */
     fun toSheet(lines: List<String>, sheetName: String): SheetData? {
         val rows = parse(lines)
-        if (rows.size < MIN_ROWS) return null
+        // Two rows is the ordinary bar, and it is there so that a letter or a
+        // payslip with a couple of dated figures on it is not offered as a
+        // statement. A savings account breaks that assumption honestly: a
+        // month on a saver is often one interest payment and nothing else, and
+        // refusing it told the user their real statement was a layout the app
+        // did not recognise. So a single row is accepted when the document
+        // says outright that it is a statement — a running balance line, or
+        // headings naming a date beside a money column.
+        if (rows.size < MIN_ROWS && !(rows.isNotEmpty() && saysItIsAStatement(lines))) return null
 
         return SheetData(
             name = sheetName,
@@ -86,7 +94,7 @@ object PdfStatementParser {
     /** Every transaction line found in [lines], in the order they appear. */
     fun parse(lines: List<String>): List<Row> {
         val documentYear = inferYear(lines)
-        val read = rollBackYearEnd(readLines(lines, documentYear), documentYear)
+        val read = rollBackYearEnd(readLinesHowever(lines, documentYear), documentYear)
         if (read.isEmpty()) return emptyList()
 
         // Where the money columns sit. Right-aligned, so grouping the end
@@ -94,7 +102,7 @@ object PdfStatementParser {
         // though the text has been flattened.
         val columns = columnsIn(read)
         val balanceColumn = balanceColumnIn(read, columns)
-        val (outColumn, inColumn) = directionColumns(read, columns, balanceColumn)
+        val directions = directionColumns(read, columns, balanceColumn)
 
         val result = mutableListOf<Row>()
         var previousBalance: Long? = null
@@ -141,7 +149,7 @@ object PdfStatementParser {
                     // check; a group of several failing says nothing about any
                     // particular row in it.
                     val rowPrevious = if (carriesBalance && pending.size == 1) before else null
-                    read(line, others, rowBalance, rowPrevious, outColumn, inColumn)
+                    read(line, others, rowBalance, rowPrevious, directions)
                 }
             }
             pending.clear()
@@ -244,8 +252,7 @@ object PdfStatementParser {
         others: List<Figure>,
         balance: Long?,
         previousBalance: Long?,
-        outColumn: Int?,
-        inColumn: Int?,
+        directions: Directions,
     ): Row {
         val figure = others.firstOrNull { it.minor != 0L }
             ?: others.firstOrNull()
@@ -277,12 +284,27 @@ object PdfStatementParser {
         // account showing £25,000 in and £2,900 out, with every direct debit
         // and card payment recorded as income. A figure only counts as money
         // in when something positively says so.
+        //
+        // And note what comes *before* the columns: what the line calls
+        // itself, whenever the columns were never proved. Where no running
+        // balance settles them, the columns are told apart by which is busier
+        // — sound on a current account, where a month is dozens of payments
+        // against one salary, and exactly backwards on a savings account,
+        // where the busy direction is money arriving. A line saying "Received
+        // from" or "Interest" is evidence about that row; the busier column is
+        // a guess about the whole file, so the row's own wording goes first.
+        val said = directionFromWording(line.description)
         val outward = when {
             figure.minor < 0L -> true
             line.marker != null -> line.marker !in CREDIT_MARKERS
-            outColumn != null && near(figure.endsAt, outColumn) -> true
-            inColumn != null && near(figure.endsAt, inColumn) -> false
-            else -> directionFromWording(line.description)
+            directions.proven && directions.out != null && near(figure.endsAt, directions.out) ->
+                true
+            directions.proven && directions.inward != null &&
+                near(figure.endsAt, directions.inward) -> false
+            said != null -> said
+            directions.out != null && near(figure.endsAt, directions.out) -> true
+            directions.inward != null && near(figure.endsAt, directions.inward) -> false
+            else -> null
         }
 
         // Reaching here with both balances present means the line had a
@@ -323,6 +345,111 @@ object PdfStatementParser {
         val figures: List<Figure>,
         /** "CR", "DR" and so on, where the bank marks direction with a letter. */
         val marker: String? = null,
+    )
+
+    /**
+     * The statement rows, read straight if that works and stitched if it does
+     * not.
+     *
+     * PDFBox usually keeps a table row on one line, and everything here is
+     * built on that. Usually — some statements are laid out so that each cell
+     * comes out on a line of its own:
+     *
+     * ```
+     * 31 Jan 2026
+     * Interest
+     * 1.23
+     * 3,001.23
+     * ```
+     *
+     * Not one of those lines is a transaction by itself, so the whole file
+     * came back as "no transaction rows" — a real statement refused with
+     * nothing to be done about it.
+     *
+     * Joining is only tried when reading straight found almost nothing, and
+     * only kept when it found more. A file that already reads is never put
+     * through it, so a layout that works cannot be broken by this.
+     */
+    private fun readLinesHowever(lines: List<String>, documentYear: Int?): List<ReadLine> {
+        val direct = readLines(lines, documentYear)
+        if (direct.size >= MIN_ROWS) return direct
+        val stitched = readLines(stitch(lines), documentYear)
+        return if (stitched.size > direct.size) stitched else direct
+    }
+
+    /**
+     * Joins a line holding only a date to the lines that follow it, up to and
+     * including its figures.
+     *
+     * A row ends at the first line that is not money, so a description broken
+     * over two lines is gathered and the next row's date is never swallowed.
+     * Money-only lines keep being taken because the amount and the balance
+     * arrive as separate lines of their own.
+     */
+    private fun stitch(lines: List<String>): List<String> {
+        val joined = mutableListOf<String>()
+        var held: String? = null
+        var taken = 0
+        for (raw in lines) {
+            val line = raw.trim()
+            // Any year will do here: this only asks whether the line begins
+            // with a date, not what that date is.
+            val startsARow = line.isNotEmpty() && leadingDate(line, ANY_YEAR) != null
+            val current = held
+            if (current != null) {
+                val complete = trailingFigures(current).isNotEmpty() && !isMoneyOnly(line)
+                if (startsARow || line.isEmpty() || taken >= MOST_STITCHED_LINES || complete) {
+                    joined += current
+                    held = null
+                    taken = 0
+                } else {
+                    held = "$current  $line"
+                    taken++
+                    continue
+                }
+            }
+            if (startsARow && trailingFigures(line).isEmpty()) {
+                held = line
+                taken = 0
+            } else {
+                joined += raw
+            }
+        }
+        held?.let { joined += it }
+        return joined
+    }
+
+    /** True when a line holds nothing but figures, which is a stray table cell. */
+    private fun isMoneyOnly(line: String): Boolean {
+        val tokens = line.trim().split(WHITESPACE).filter { it.isNotEmpty() }
+        return tokens.isNotEmpty() &&
+            tokens.all { looksLikeMoney(it) || it.uppercase() in DIRECTION_MARKERS }
+    }
+
+    /** Only used to ask whether a line starts with a date at all. */
+    private const val ANY_YEAR = 2000
+
+    /** How many lines a single stitched row may gather. */
+    private const val MOST_STITCHED_LINES = 4
+
+    /**
+     * Whether the document says outright that it is a bank statement.
+     *
+     * Used only to let a statement with a single transaction on it through.
+     * A running balance line, or headings naming a date beside a money column,
+     * is something a letter or a payslip does not have.
+     */
+    private fun saysItIsAStatement(lines: List<String>): Boolean =
+        lines.any { BALANCE_LINE.containsMatchIn(it) && trailingFigures(it).isNotEmpty() } ||
+            lines.any { line ->
+                val text = line.lowercase()
+                text.contains("date") && STATEMENT_HEADINGS.any { text.contains(it) }
+            }
+
+    /** Column names no document but a statement puts beside a date. */
+    private val STATEMENT_HEADINGS = listOf(
+        "balance", "paid out", "paid in", "money out", "money in", "payments",
+        "receipts", "withdrawn", "deposited", "debit", "credit",
     )
 
     /** The lines that look like statement rows, in order. */
@@ -467,14 +594,29 @@ object PdfStatementParser {
      * Rather than assuming an order — banks disagree about whether paid-out or
      * paid-in comes first — the rows where a balance is present and moves are
      * used as worked examples, and the majority verdict is applied to the rows
-     * where there is nothing to check against. Null when nothing proved it.
+     * where there is nothing to check against. When nothing proves it the
+     * columns are still named, but marked unproven so that a row's own wording
+     * is trusted ahead of them.
      */
+    /**
+     * Which money column is which, and whether anything actually proved it.
+     *
+     * [proven] separates a verdict the running balance worked out from one the
+     * busier-column rule guessed at. Both are worth having, but only the first
+     * should outrank what a line calls itself.
+     */
+    private data class Directions(
+        val out: Int?,
+        val inward: Int?,
+        val proven: Boolean,
+    )
+
     private fun directionColumns(
         lines: List<ReadLine>,
         columns: List<Int>,
         balanceColumn: Int?,
-    ): Pair<Int?, Int?> {
-        if (columns.size < 2) return null to null
+    ): Directions {
+        if (columns.size < 2) return Directions(null, null, proven = false)
         val moneyColumns = columns.filter { it != balanceColumn }
         if (balanceColumn == null) return byHowBusy(lines, moneyColumns)
 
@@ -513,7 +655,7 @@ object PdfStatementParser {
         // opposite by elimination — there are only two — and that is a
         // deduction rather than a guess.
         val other = moneyColumns.singleOrNull { it != out && it != inward }
-        return (out ?: other) to (inward ?: other)
+        return Directions(out ?: other, inward ?: other, proven = true)
     }
 
     /**
@@ -528,22 +670,27 @@ object PdfStatementParser {
      * about whether paid-out or paid-in comes first. How busy a column is does
      * not depend on that convention.
      *
+     * It does depend on the kind of account, which is why this verdict is
+     * marked unproven. A savings account is mostly money arriving, so on a
+     * saver this rule points the wrong way and anything a row says about
+     * itself is believed ahead of it.
+     *
      * No margin is required beyond one being busier than the other. That would
      * once have been reckless, since losing the call inverts the statement —
      * but "Swap all" on the review screen now undoes an inversion in a single
      * tap, while having no verdict at all leaves every row to be corrected one
      * at a time. Being wrong costs a tap; saying nothing costs two hundred.
      */
-    private fun byHowBusy(lines: List<ReadLine>, moneyColumns: List<Int>): Pair<Int?, Int?> {
-        if (moneyColumns.size < 2) return null to null
+    private fun byHowBusy(lines: List<ReadLine>, moneyColumns: List<Int>): Directions {
+        if (moneyColumns.size < 2) return Directions(null, null, proven = false)
         val uses = moneyColumns.associateWith { column ->
             lines.count { line -> line.figures.any { near(it.endsAt, column) } }
         }
         val ranked = moneyColumns.sortedByDescending { uses[it] ?: 0 }
         // A tie is genuinely no evidence, and inventing one here would be the
         // coin toss again.
-        if (uses[ranked[0]] == uses[ranked[1]]) return null to null
-        return ranked[0] to ranked[1]
+        if (uses[ranked[0]] == uses[ranked[1]]) return Directions(null, null, proven = false)
+        return Directions(ranked[0], ranked[1], proven = false)
     }
 
     /**
@@ -566,18 +713,24 @@ object PdfStatementParser {
     private val OUTGOING_WORDS = Regex(
         """(?i)\b(direct debit|standing order|card payment|contactless|debit card|""" +
             """cash withdrawal|withdrawal|atm|cash machine|bill payment|payment to|""" +
-            """purchase|pay at pump|faster payment to|transfer to|charge|fee)\b""",
+            """purchase|pay at pump|faster payment to|transfer to|charge|fee|""" +
+            """overdraft interest|interest charged|debit interest|transfer out)\b""",
     )
 
     /**
      * And "money arrived". Kept to wordings that cannot mean an outgoing:
      * "credit" alone is in half the card payments on a statement.
+     *
+     * "Interest" is here because on a savings account it is most of the file,
+     * and the ways it can mean money leaving — overdraft interest, interest
+     * charged — are named above, where they are tested first.
      */
     private val INCOMING_WORDS = Regex(
         """(?i)\b(salary|wages|payroll|refund|refunded|reimbursement|rebate|cashback|""" +
             """dividend|bacs credit|credit from|credit interest|interest paid|""" +
             """transfer from|paid in|deposit|bgc|giro|payment received|""" +
-            """faster payment received|credit transfer|bank credit|credited)\b""",
+            """faster payment received|credit transfer|bank credit|credited|""" +
+            """received from|receipt|receipts|interest|transfer in|credit in)\b""",
     )
 
     /** Markers meaning the money arrived rather than left. */

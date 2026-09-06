@@ -570,6 +570,118 @@ class PdfStatementParserTest {
         )
     }
 
+    /**
+     * A savings statement from a building society: Payments and Receipts
+     * rather than money out and money in, a single movement in the period,
+     * and the year printed once above the rows.
+     */
+    private val saver = listOf(
+        "Nationwide Building Society",
+        "Flex Instant Saver",
+        "Sort code 07-01-16   Account number 12345678",
+        "Date       Details                          Payments   Receipts    Balance",
+        "2026",
+        "15 Jan     Balance from statement 0028                             3,000.00",
+        "31 Jan     Interest                                       1.23     3,001.23",
+        "14 Feb     Balance carried forward                                 3,001.23",
+    )
+
+    @Test
+    fun `a saver with one movement in the month is still a statement`() {
+        // Two rows is the ordinary bar and it is there to keep letters and
+        // payslips out. A saver honestly breaks it: a month can be one
+        // interest payment, and refusing it told the user their real statement
+        // was a layout the app did not recognise.
+        val rows = PdfStatementParser.parse(saver)
+        assertEquals(1, rows.size)
+        assertEquals(123L, rows[0].moneyInMinor)
+        assertNotNull(PdfStatementParser.toSheet(saver, "saver"))
+    }
+
+    @Test
+    fun `a letter with a single dated figure is still not a statement`() {
+        // The other half of the same rule: dropping the bar to one row must
+        // not start offering anything with a date and an amount on it.
+        assertNull(
+            PdfStatementParser.toSheet(
+                listOf(
+                    "Dear Mr Evans",
+                    "01 Mar 2026 Your monthly premium is 42.15",
+                    "Yours faithfully",
+                ),
+                "letter",
+            ),
+        )
+    }
+
+    @Test
+    fun `on a saver what a row calls itself beats the busier column`() {
+        // With no running balance the columns are told apart by which is
+        // busier, which is sound on a current account and exactly backwards on
+        // a saver — where money arriving is the busy direction. Every deposit
+        // came through as a withdrawal.
+        val rows = PdfStatementParser.parse(
+            listOf(
+                "Date        Details                          Payments   Receipts",
+                "20 Jan 2026 Received from MR R M W EVANS                  500.00",
+                "28 Jan 2026 Faster payment to CURRENT ACCOUNT   250.00",
+                "31 Jan 2026 Interest                                        1.23",
+            ),
+        )
+        assertEquals(3, rows.size)
+        assertEquals(50_000L, rows[0].moneyInMinor)
+        assertEquals(25_000L, rows[1].moneyOutMinor)
+        assertEquals(123L, rows[2].moneyInMinor)
+    }
+
+    @Test
+    fun `interest is money in unless the statement says it was charged`() {
+        assertEquals(false, PdfStatementParser.directionFromWording("Interest"))
+        assertEquals(false, PdfStatementParser.directionFromWording("Received from J SMITH"))
+        // The ways it can mean money leaving are tested first.
+        assertEquals(true, PdfStatementParser.directionFromWording("Overdraft interest"))
+        assertEquals(true, PdfStatementParser.directionFromWording("Interest charged"))
+    }
+
+    @Test
+    fun `a statement whose cells come out one to a line is still read`() {
+        // Some layouts extract a cell at a time, and not one of those lines is
+        // a transaction by itself — so a real statement came back as "no
+        // transaction rows" with nothing to be done about it.
+        val rows = PdfStatementParser.parse(
+            listOf(
+                "Date Details Payments Receipts Balance",
+                "15 Jan 2026",
+                "Balance from statement 0028",
+                "3,000.00",
+                "20 Jan 2026",
+                "Received from R EVANS",
+                "500.00",
+                "3,500.00",
+                "31 Jan 2026",
+                "Interest",
+                "1.23",
+                "3,501.23",
+            ),
+        )
+        assertEquals(2, rows.size)
+        assertEquals("Received from R EVANS", rows[0].description)
+        assertEquals(50_000L, rows[0].moneyInMinor)
+        assertEquals(123L, rows[1].moneyInMinor)
+        assertEquals(350_123L, rows[1].balanceMinor)
+    }
+
+    @Test
+    fun `stitching never runs on a statement that already reads`() {
+        // The joining pass is a last resort and must not touch a file the
+        // ordinary read handles, or a layout that works could be broken by it.
+        assertEquals(3, PdfStatementParser.parse(statement).size)
+        assertEquals(
+            listOf("TESCO STORES 3294", "SALARY ACME LTD", "SHELL FILLING STN"),
+            PdfStatementParser.parse(statement).map { it.description },
+        )
+    }
+
     @Test
     fun `a statement inside one year is not rolled back`() {
         // The rollback must only fire on an actual year end, not on a file

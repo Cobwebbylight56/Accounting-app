@@ -4,6 +4,7 @@ import com.rhys.financetracker.data.importer.MerchantCategoriser
 import com.rhys.financetracker.data.importer.TransactionFingerprint
 import com.rhys.financetracker.domain.model.TransactionType
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -24,6 +25,29 @@ class MerchantCategoriserTest {
         pairs.associate { (merchant, category) ->
             TransactionFingerprint.normaliseDescription(merchant) to category
         }
+
+    @Test
+    fun `money moved to a saver is savings, not spending`() {
+        // The payment that starts the saving was the one thing never counted
+        // as saving: a standing order to a saver at another bank looked like
+        // ordinary spending, so a household saving every month was shown as
+        // having saved nothing.
+        assertEquals("Savings", categoryFor("TRANSFER TO SAVER"))
+        assertEquals("Savings", categoryFor("REGULAR SAVER 12345678"))
+        assertEquals("Savings", categoryFor("NATIONWIDE ISA 998812"))
+        assertEquals("Savings", categoryFor("MONEYBOX"))
+        assertEquals("Savings", categoryFor("NS AND I PREMIUM BONDS"))
+        assertEquals("Savings", categoryFor("STANDING ORDER TO SAVINGS"))
+    }
+
+    @Test
+    fun `a shop and a person are not savings for starting the same way`() {
+        // Keywords match at the start of a word, so "saver" reaches SAVERS the
+        // shop and "isa" reaches ISABELLAS. Both are ordinary spending.
+        assertNotEquals("Savings", categoryFor("SAVERS HEALTH AND BEAUTY 204"))
+        assertNotEquals("Savings", categoryFor("ISABELLAS FLOWERS"))
+        assertNotEquals("Savings", categoryFor("LISA EVANS"))
+    }
 
     @Test
     fun `recognises the everyday shops`() {

@@ -28,8 +28,15 @@ object StatementDetector {
     /** How far down to look for the headings before giving up. */
     private const val MAX_PREAMBLE_ROWS = 30
 
-    /** A statement needs at least this many data rows to be worth offering. */
-    private const val MIN_DATA_ROWS = 2
+    /**
+     * A statement needs at least this many data rows to be worth offering.
+     *
+     * One, because a savings account really can have a single movement in a
+     * month. The headings have already had to name a date beside a money
+     * column to get this far, which is the part that says "statement"; the
+     * number of rows underneath says nothing except how busy the account was.
+     */
+    private const val MIN_DATA_ROWS = 1
 
     /**
      * The mapping for [sheet] when it looks like a statement, or null when it
@@ -142,6 +149,6 @@ object StatementDetector {
 
     private val MONEY_HEADINGS = setOf(
         "amount", "paid out", "paid in", "money out", "money in", "debit", "credit",
-        "withdrawn", "deposited", "value", "balance",
+        "withdrawn", "deposited", "value", "balance", "payments", "receipts",
     )
 }

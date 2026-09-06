@@ -73,6 +73,25 @@ object MerchantCategoriser {
      * "Shell Energy" is a gas bill — each sits above Tesco, Uber and Shell.
      */
     private val EXPENSE_RULES: List<Rule> = listOf(
+        // -- money moved into savings ---------------------------------------
+        //
+        // First, because a saver is usually named after the bank it is with
+        // and the general rules below would file "TRANSFER TO NATIONWIDE" as
+        // shopping. Without this the payment that starts the saving is the one
+        // thing the app never counts as saving, and a household putting money
+        // aside every month is shown as having saved nothing at all.
+        // A trailing space where the word is short enough to start another
+        // one. Keywords match at the start of a word, so a bare "isa" files
+        // ISABELLAS CAFE under savings and a bare "saver" does the same to
+        // SAVERS, the high-street shop.
+        rule(
+            "Savings",
+            "savings", "to savings", "saver ", "regular saver", "instant saver",
+            "easy saver", "triple access", "help to save", "isa ", "cash isa",
+            "lifetime isa", "premium bonds", "ns and i", "nsandi",
+            "vanguard", "hargreaves", "moneybox", "chip savings", "plum savings",
+        ),
+
         // -- specific cases that must beat the general ones below ----------
         rule("Mobile", "tesco mobile", "sky mobile", "asda mobile"),
         rule("Eating out", "uber eats", "ubereats"),

@@ -68,10 +68,29 @@ Bank exports are all slightly different, and the awkward parts are dealt with:
 | Use one signed "Amount" (Monzo, Starling) | A minus means money out |
 | Include a running **Balance** column | Recognised and deliberately ignored |
 | Word things differently — Debit, Credit, Withdrawn, Money out | All recognised |
+| Use "Payments" and "Receipts" (the building societies) | Recognised as money out and money in |
+| Print the year once above the rows instead of on each one | Taken from the heading, and rolled back across a year end |
+| Break each cell onto a line of its own in the PDF | Joined back into a row, but only when reading it straight found nothing |
 
 The balance column matters more than it looks. It is a column of entirely
 plausible amounts sitting next to the real one, and importing it would add the
 account's whole history a second time.
+
+### Savings statements
+
+A saver reads like any other statement, with two differences worth knowing.
+
+* **A month with one movement in it is still a statement.** Ordinarily a file
+  needs a couple of transaction rows before the app will offer it, so that a
+  letter or a payslip with a date and an amount on it is not mistaken for one.
+  A saver often has a single interest payment and nothing else, so where the
+  document says outright that it is a statement — a running balance, or
+  headings naming a date beside a money column — one row is enough.
+* **What a row calls itself outranks which column it sits in**, where no
+  running balance proves the columns. Told apart by which column is busier, a
+  saver reads backwards: money arriving is the busy direction on a savings
+  account and the busy column is otherwise taken for payments. "Received from",
+  "Interest" and "Transfer in" say what they are, and are believed first.
 
 ### Importing old statements
 

@@ -296,10 +296,24 @@ private fun BalanceSummaryCard(state: DashboardState, onOpenAccounts: () -> Unit
                 modifier = Modifier.weight(1f),
                 onClick = onOpenAccounts,
             )
+            // Two different things are true of savings and only one of them
+            // is a balance. Somebody whose saver is at another bank has no
+            // account here to hold it, so the tile read nothing saved while
+            // money left for the saver every month. The caption says what the
+            // month put in, and where there is no savings account at all that
+            // is the only savings figure there is.
             StatTile(
                 label = "Saved",
-                caption = "Set aside",
-                value = Money.format(summary.totalSavingsMinor),
+                caption = when {
+                    summary.savingsPaidInMinor > 0L ->
+                        "${Money.format(summary.savingsPaidInMinor)} in this month"
+                    else -> "Set aside"
+                },
+                value = if (summary.totalSavingsMinor == 0L && summary.savingsPaidInMinor > 0L) {
+                    Money.format(summary.savingsPaidInMinor)
+                } else {
+                    Money.format(summary.totalSavingsMinor)
+                },
                 emphasis = StatEmphasis.POSITIVE,
                 modifier = Modifier.weight(1f),
                 onClick = onOpenAccounts,

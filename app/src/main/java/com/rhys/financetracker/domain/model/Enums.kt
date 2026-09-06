@@ -129,7 +129,7 @@ enum class DashboardWidget(val key: String, val title: String, val defaultVisibl
     DISPOSABLE_INCOME("disposable_income", "Left to spend", true),
     UPCOMING_BILLS("upcoming_bills", "Upcoming bills", true),
     OVERDUE_BILLS("overdue_bills", "Overdue", true),
-    RECENT_TRANSACTIONS("recent_transactions", "Recent transactions", true),
+    RECENT_TRANSACTIONS("recent_transactions", "This month's transactions", true),
     SAVINGS_PROGRESS("savings_progress", "Savings goals", true),
     SPENDING_BY_CATEGORY("spending_by_category", "Spending by category", true),
     INSIGHTS("insights", "Advice", true),

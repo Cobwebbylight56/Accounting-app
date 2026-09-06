@@ -305,6 +305,39 @@ interface TransactionDao {
         personId: Long?,
     ): Flow<List<CategoryTotal>>
 
+    /**
+     * Money paid into savings over a period.
+     *
+     * Savings are not only an account balance. Somebody whose saver is with
+     * another bank has nothing in this app to hold that balance, and every
+     * standing order into it looked like ordinary spending — so the app showed
+     * nothing saved by a household that was saving every month.
+     *
+     * What it can see is the payment leaving, and the category on it says
+     * where it went. Anything filed under a saving category counts here,
+     * whether or not an account exists for the other end of it.
+     */
+    @Query(
+        """
+        SELECT IFNULL(SUM(t.amount_minor), 0)
+        FROM transactions t
+        JOIN categories c ON c.id = t.category_id
+        LEFT JOIN accounts a ON a.id = t.account_id
+        WHERE t.is_archived = 0
+          AND t.type = 'EXPENSE'
+          AND c.kind = 'SAVING'
+          AND t.date BETWEEN :start AND :end
+          AND (:accountId IS NULL OR t.account_id = :accountId)
+          AND (:personId IS NULL OR COALESCE(t.person_id, a.person_id) = :personId)
+        """,
+    )
+    fun observeSavingsPaidIn(
+        start: LocalDate,
+        end: LocalDate,
+        accountId: Long?,
+        personId: Long?,
+    ): Flow<Long>
+
     @Query(
         """
         SELECT t.category_id AS category_id,

@@ -33,13 +33,15 @@ object ColumnDetector {
     // Bank statement headings. UK banks all word these slightly differently:
     // "Paid out"/"Paid in" (Lloyds, Halifax), "Money out"/"Money in" (Nationwide,
     // Santander), "Debit"/"Credit" (Barclays, HSBC), "Withdrawn"/"Deposited".
+    // "Payments"/"Receipts" is how the building societies word it, Nationwide
+    // among them, and a savings statement is the one most likely to use it.
     private val MONEY_OUT_WORDS = setOf(
         "paid out", "money out", "withdrawn", "withdrawal", "withdrawals",
-        "debit", "debits", "out (", "spent", "payments out",
+        "debit", "debits", "out (", "spent", "payments out", "payments",
     )
     private val MONEY_IN_WORDS = setOf(
         "paid in", "money in", "deposited", "deposit", "credit", "credits",
-        "in (", "received", "payments in",
+        "in (", "received", "payments in", "receipts", "receipt",
     )
     // Read so it can be excluded: a running balance is a column of perfectly
     // good-looking amounts, and importing it would add the account's whole
@@ -87,14 +89,16 @@ object ColumnDetector {
     private fun roleFromHeader(header: String): ColumnRole? {
         if (header.isBlank()) return null
         fun matches(words: Set<String>) = words.any { header.contains(it) }
+        val money = moneyDirection(header)
         return when {
             matches(FREQUENCY_WORDS) -> ColumnRole.FREQUENCY
             matches(DATE_WORDS) -> ColumnRole.DATE
             // Before AMOUNT, all three of them: "Balance", "Paid out" and
             // "Debit" would otherwise be swallowed by the amount words.
             matches(BALANCE_WORDS) -> ColumnRole.BALANCE
-            matches(MONEY_OUT_WORDS) -> ColumnRole.MONEY_OUT
-            matches(MONEY_IN_WORDS) -> ColumnRole.MONEY_IN
+            // Longest match wins between the two, so "Payments in" is money
+            // in rather than money out on the strength of "Payments".
+            money != null -> money
             matches(AMOUNT_WORDS) -> ColumnRole.AMOUNT
             matches(PERSON_WORDS) -> ColumnRole.PERSON
             matches(ACCOUNT_WORDS) -> ColumnRole.ACCOUNT
@@ -102,6 +106,23 @@ object ColumnDetector {
             matches(NOTES_WORDS) -> ColumnRole.NOTES
             matches(NAME_WORDS) -> ColumnRole.NAME
             else -> null
+        }
+    }
+
+    /**
+     * Money in or money out, when the heading names one of them.
+     *
+     * The two word-lists overlap on purpose — "Payments" is money out and
+     * "Payments in" is money in — so the longer match is the one that decides,
+     * rather than whichever list happened to be tested first.
+     */
+    private fun moneyDirection(header: String): ColumnRole? {
+        val out = MONEY_OUT_WORDS.filter { header.contains(it) }.maxOfOrNull { it.length } ?: 0
+        val inward = MONEY_IN_WORDS.filter { header.contains(it) }.maxOfOrNull { it.length } ?: 0
+        return when {
+            out == 0 && inward == 0 -> null
+            inward > out -> ColumnRole.MONEY_IN
+            else -> ColumnRole.MONEY_OUT
         }
     }
 

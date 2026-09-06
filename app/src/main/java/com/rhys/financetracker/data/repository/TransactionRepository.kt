@@ -64,6 +64,14 @@ class TransactionRepository @Inject constructor(
     ): Flow<List<CategoryTotal>> =
         transactionDao.observeCategoryTotals(type.name, start, end, accountId, personId)
 
+    /** Money paid into savings over a period, from the categories on it. */
+    fun observeSavingsPaidIn(
+        start: LocalDate,
+        end: LocalDate,
+        accountId: Long? = null,
+        personId: Long? = null,
+    ): Flow<Long> = transactionDao.observeSavingsPaidIn(start, end, accountId, personId)
+
     /** Money in and out of every account over a period, one row per account. */
     fun observeAccountActivity(start: LocalDate, end: LocalDate): Flow<List<AccountActivity>> =
         transactionDao.observeAccountActivity(start, end)
