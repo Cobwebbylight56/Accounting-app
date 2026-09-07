@@ -219,11 +219,27 @@ class AccountEditViewModel @Inject constructor(
     fun save() {
         viewModelScope.launch {
             val current = form.value
+            // A name typed here becomes a person, and the account goes under
+            // it. Without this the account is saved owned by nobody, which is
+            // invisible to every per-person view in the app.
+            val ownerId = current.personId ?: current.newPersonName.trim()
+                .takeIf { it.isNotEmpty() }
+                ?.let { name ->
+                    when (val made = peopleRepository.save(
+                        PersonEntity(name = name, colorHex = DefaultData.PALETTE.random()),
+                    )) {
+                        is AppResult.Success -> made.data
+                        is AppResult.Failure -> {
+                            form.value = current.copy(errorSummary = made.message)
+                            return@launch
+                        }
+                    }
+                }
             val entity = AccountEntity(
                 id = if (accountId == Routes.NEW_ID) 0L else accountId,
                 name = current.name.trim(),
                 type = current.type,
-                personId = current.personId,
+                personId = ownerId,
                 openingBalanceMinor = Money.parseOrNull(current.openingBalanceText) ?: 0L,
                 openingBalanceDate = current.openingBalanceDate,
                 overdraftLimitMinor = Money.parseOrNull(current.overdraftText) ?: 0L,
@@ -241,7 +257,30 @@ class AccountEditViewModel @Inject constructor(
                 notes = current.notes.trim().takeIf { it.isNotEmpty() },
             )
             when (val result = accountRepository.save(entity)) {
-                is AppResult.Success -> saved.value = true
+                is AppResult.Success -> {
+                    // The savings account, if it was asked for. Its own
+                    // failure is reported rather than swallowed, but the
+                    // account that did save is not rolled back for it.
+                    val second = if (current.alsoCreateSavings && accountId == Routes.NEW_ID) {
+                        accountRepository.save(
+                            AccountEntity(
+                                name = SAVINGS_ACCOUNT_NAME,
+                                type = AccountType.SAVINGS,
+                                personId = ownerId,
+                                openingBalanceDate = current.openingBalanceDate,
+                                colorHex = DefaultData.PALETTE.random(),
+                            ),
+                        )
+                    } else {
+                        null
+                    }
+                    val failed = (second as? AppResult.Failure)?.message
+                    if (failed == null) {
+                        saved.value = true
+                    } else {
+                        form.value = current.copy(errorSummary = failed)
+                    }
+                }
                 is AppResult.Failure -> form.value = current.copy(errorSummary = result.message)
             }
         }
@@ -250,12 +289,33 @@ class AccountEditViewModel @Inject constructor(
     fun clearError() {
         form.value = form.value.copy(errorSummary = null)
     }
+
+    private companion object {
+        /** What the savings account made alongside a current one is called. */
+        const val SAVINGS_ACCOUNT_NAME = "Savings"
+    }
 }
 
 data class AccountForm(
     val name: String = "",
     val type: AccountType = AccountType.CURRENT,
     val personId: Long? = null,
+
+    /**
+     * A person to create along with the account.
+     *
+     * Setting up meant adding a person, then an account, then going back to
+     * put the one under the other — three screens to record one thing. Typing
+     * the name here does all of it at once.
+     */
+    val newPersonName: String = "",
+
+    /**
+     * Whether to create a savings account for the same person at the same
+     * time. Almost nobody has a current account and nothing else, and adding
+     * the second one was another trip through the same form.
+     */
+    val alsoCreateSavings: Boolean = false,
     val openingBalanceText: String = "",
     val openingBalanceDate: LocalDate = DateUtils.today(),
     val overdraftText: String = "",

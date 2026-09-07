@@ -460,18 +460,45 @@ fun AccountEditScreen(
                 onSelect = { person -> viewModel.update { it.copy(personId = person.id) } },
                 optionLabel = { it.name },
                 optionColor = { colorFromHex(it.colorHex) },
-                placeholder = "Not assigned",
+                placeholder = if (state.people.isEmpty()) "Nobody yet" else "Not assigned",
             )
+            // Typing a name here makes the person and puts the account under
+            // them in one go. Setting up used to mean adding a person, then an
+            // account, then going back to join the two — three screens to
+            // record one thing.
+            if (state.form.personId == null) {
+                LabelledTextField(
+                    label = "Or type a new name",
+                    value = state.form.newPersonName,
+                    onValueChange = { name ->
+                        viewModel.update { it.copy(newPersonName = name) }
+                    },
+                    placeholder = "e.g. Rhys Evans",
+                    supportingText = "They will be created and this account put under them.",
+                )
+            }
             // An account under nobody's name is invisible to every per-person
             // view in the app, and nothing said so — which is how a whole
             // imported statement ended up unreachable from the person's tab.
-            if (state.form.personId == null && state.people.isNotEmpty()) {
+            if (state.form.personId == null && state.form.newPersonName.isBlank()) {
                 Text(
                     text = "Nobody's yet, so it will not show when you pick a person on " +
-                        "Home. Pick a name above — there is one for anything shared.",
+                        "Home. Pick a name above, or type one.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(top = 4.dp, start = 4.dp),
+                )
+            }
+            // Almost nobody has a current account and nothing else, and the
+            // second one was another trip through this same form.
+            if (state.isNew && !state.form.type.isSavings) {
+                SwitchRow(
+                    label = "Also add a savings account",
+                    description = "Made under the same name, and counted as money set aside.",
+                    checked = state.form.alsoCreateSavings,
+                    onCheckedChange = { on ->
+                        viewModel.update { it.copy(alsoCreateSavings = on) }
+                    },
                 )
             }
 

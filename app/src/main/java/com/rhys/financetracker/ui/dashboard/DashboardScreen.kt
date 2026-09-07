@@ -391,25 +391,31 @@ private fun BalanceSummaryCard(state: DashboardState, onOpenAccounts: () -> Unit
             // money left for the saver every month. The caption says what the
             // month put in, and where there is no savings account at all that
             // is the only savings figure there is.
+            // A savings account, where there is one, is the real answer.
+            // Where there is not, what the app has watched move in stands in
+            // for it — but only while that is a positive number. Showing
+            // "-£200 set aside" because it saw £200 leave a saver it has no
+            // account for is not a balance, it is a movement wearing the
+            // wrong label, and it reads as money owed.
+            val hasSavingsAccount = summary.totalSavingsMinor != 0L
+            val watched = summary.savingsEverMovedMinor
+            val savedMinor = when {
+                hasSavingsAccount -> summary.totalSavingsMinor
+                watched > 0L -> watched
+                else -> 0L
+            }
             StatTile(
                 label = "Saved",
                 caption = when {
+                    !hasSavingsAccount && watched <= 0L -> "No savings account yet"
                     summary.savingsNetMinor > 0L ->
                         "${Money.format(summary.savingsNetMinor)} in this month"
                     summary.savingsNetMinor < 0L ->
                         "${Money.format(-summary.savingsNetMinor)} out this month"
                     else -> "Set aside"
                 },
-                // A savings account, where there is one, is the real answer.
-                // Where there is not, what the app has watched move in and out
-                // is the best it can say — and better than the £0.00 it used
-                // to show a household that saves every month.
-                value = if (summary.totalSavingsMinor == 0L && summary.savingsEverMovedMinor != 0L) {
-                    Money.format(summary.savingsEverMovedMinor)
-                } else {
-                    Money.format(summary.totalSavingsMinor)
-                },
-                emphasis = StatEmphasis.POSITIVE,
+                value = Money.format(savedMinor),
+                emphasis = if (savedMinor < 0L) StatEmphasis.NEGATIVE else StatEmphasis.POSITIVE,
                 modifier = Modifier.weight(1f),
                 onClick = onOpenAccounts,
             )

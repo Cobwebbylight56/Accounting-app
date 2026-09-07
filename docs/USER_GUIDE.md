@@ -205,6 +205,19 @@ The Everyone / name chips on Home appear once there is **more than one
 person**. With one person they say nothing — "Everyone" and the one name are
 the same screen — so they stay out of the way until a second person is added.
 
+### Setting up in one go
+
+Adding an account is the whole of setting up. On the add-account form:
+
+* **Belongs to** picks an existing person, or **type a new name** underneath
+  and that person is created with the account already under them. No separate
+  trip to the People screen and back.
+* **Also add a savings account** makes a second account called Savings under
+  the same name at the same time, counted as money set aside.
+
+So a current account, a savings account and the person who owns them are one
+form and one Save.
+
 ### Getting savings counted
 
 Whether an account is money set aside comes down to its **type**. The app

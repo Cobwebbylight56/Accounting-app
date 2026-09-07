@@ -135,6 +135,36 @@ class SavingsClassificationTest {
     }
 
     @Test
+    fun `money seen leaving a saver is never shown as a negative balance`() {
+        // What "Saved -£200.00" was: with no savings account in the app, the
+        // tile stands in the movements it has watched — and a month that only
+        // saw £200 come out of a saver makes that figure negative. A movement
+        // wearing a balance's label reads as money owed.
+        val onlyWentOut = FinancialSummary.EMPTY.copy(savingsEverMovedMinor = -20_000L)
+        assertEquals(-20_000L, onlyWentOut.savingsEverMovedMinor)
+        // The tile shows nothing rather than a negative, because there is no
+        // savings account for it to be the balance of.
+        assertEquals(0L, savedTile(onlyWentOut))
+
+        // Money in, and it stands in for the balance it has no account for.
+        assertEquals(15_000L, savedTile(FinancialSummary.EMPTY.copy(savingsEverMovedMinor = 15_000L)))
+
+        // A real savings account always wins, whatever the movements said.
+        val withAccount = FinancialSummary.EMPTY.copy(
+            totalSavingsMinor = 300_000L,
+            savingsEverMovedMinor = -20_000L,
+        )
+        assertEquals(300_000L, savedTile(withAccount))
+    }
+
+    /** The Saved tile's rule, kept here so it can be checked without a screen. */
+    private fun savedTile(summary: FinancialSummary): Long = when {
+        summary.totalSavingsMinor != 0L -> summary.totalSavingsMinor
+        summary.savingsEverMovedMinor > 0L -> summary.savingsEverMovedMinor
+        else -> 0L
+    }
+
+    @Test
     fun `the two totals split the money without dropping or double counting it`() {
         val accounts = listOf(
             account("Main account", AccountType.CURRENT, balanceMinor = -9_382L),
