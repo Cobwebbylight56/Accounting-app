@@ -130,6 +130,18 @@ class MerchantCategoriserTest {
     }
 
     @Test
+    fun `matching a phrase's first word is not a truncation of the phrase`() {
+        // What the truncation rule cost on its first outing: "SAINSBURYS" is
+        // the whole of the first word of "sainsburys petrol", so the weekly
+        // shop was read as a cut-off petrol station and filed under Fuel. A
+        // real truncation runs past the space, as "SAMSUNGFINAN" does.
+        assertEquals("Groceries", categoryFor("SAINSBURYS LOCAL 42"))
+        assertEquals("Groceries", categoryFor("SAINSBURYS 0421"))
+        // And the phrase itself still wins where it genuinely applies.
+        assertEquals("Fuel", categoryFor("SAINSBURYS PETROL 88"))
+    }
+
+    @Test
     fun `recognises the everyday shops`() {
         assertEquals("Groceries", categoryFor("TESCO STORES 3294"))
         assertEquals("Groceries", categoryFor("ALDI 812 CARDIFF"))

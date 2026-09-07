@@ -63,9 +63,16 @@ object MerchantCategoriser {
         // "NCC COLLECTI", "DWR CYMRU WE". A word long enough to be
         // distinctive, which is where the keyword starts once the spaces come
         // out of both, is that same payee cut short.
-        val squashed = keyword.replace(" ", "")
+        val parts = keyword.split(' ')
+        val squashed = parts.joinToString("")
         return text.split(' ').any { word ->
-            word.length >= MIN_TRUNCATED && squashed.length > word.length &&
+            word.length >= MIN_TRUNCATED &&
+                squashed.length > word.length &&
+                // A word that merely equals the first word of a phrase is not
+                // a truncation of it. Without this "SAINSBURYS" was read as a
+                // cut-off "sainsburys petrol" and the weekly shop was filed
+                // under fuel. A real truncation runs past the space.
+                (parts.size == 1 || word.length > parts.first().length) &&
                 squashed.startsWith(word)
         }
     }
