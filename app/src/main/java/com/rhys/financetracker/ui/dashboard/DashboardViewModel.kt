@@ -2,12 +2,15 @@ package com.rhys.financetracker.ui.dashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rhys.financetracker.core.money.Money
 import com.rhys.financetracker.core.time.DateUtils
 import com.rhys.financetracker.data.local.dao.DashboardWidgetDao
 import com.rhys.financetracker.data.local.dao.TransactionFilter
 import com.rhys.financetracker.data.local.dao.TransactionSort
+import com.rhys.financetracker.data.local.entity.AccountEntity
 import com.rhys.financetracker.data.local.entity.DashboardWidgetEntity
 import com.rhys.financetracker.data.local.entity.PersonEntity
+import com.rhys.financetracker.data.local.entity.TransactionEntity
 import com.rhys.financetracker.data.local.projection.AccountActivity
 import com.rhys.financetracker.data.local.projection.AccountWithBalance
 import com.rhys.financetracker.data.local.projection.CategoryTotal
@@ -26,8 +29,10 @@ import com.rhys.financetracker.data.repository.SavingsRepository
 import com.rhys.financetracker.data.repository.TransactionRepository
 import com.rhys.financetracker.domain.insight.Insight
 import com.rhys.financetracker.domain.insight.InsightReport
+import com.rhys.financetracker.domain.model.AccountType
 import com.rhys.financetracker.domain.model.CategoryKind
 import com.rhys.financetracker.domain.model.DashboardWidget
+import com.rhys.financetracker.domain.model.RecordSource
 import com.rhys.financetracker.domain.model.TransactionType
 import com.rhys.financetracker.domain.report.FinancialSummary
 import com.rhys.financetracker.domain.report.MonthPoint
@@ -73,6 +78,10 @@ class DashboardViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val scope = MutableStateFlow(DashboardScope())
+
+    /** Feedback from the cash pot buttons, shown once and cleared. */
+    private val message = MutableStateFlow<String?>(null)
+    val messages: StateFlow<String?> = message
 
     /** The month the dashboard is showing; the user can step back through history. */
     private val visibleMonth = MutableStateFlow(DateUtils.currentYearMonth())
@@ -415,6 +424,74 @@ class DashboardViewModel @Inject constructor(
     }
 
     /** Jumps to the month behind a tapped bar. */
+    /**
+     * Starts a cash pot: an account standing for the notes in the house.
+     *
+     * Cash leaving the bank counts as spent, which is what the month should
+     * say — but the notes still exist, and until there is somewhere to put
+     * them the app has nothing to count. One tap makes that somewhere.
+     */
+    fun startCashPot() {
+        viewModelScope.launch {
+            val owner = scope.value.personId
+            val existing = accountRepository.getAll()
+                .firstOrNull { it.type == AccountType.CASH && it.personId == owner }
+            if (existing != null) {
+                message.value = "\"${existing.name}\" is already your cash pot"
+                return@launch
+            }
+            val result = accountRepository.save(
+                AccountEntity(
+                    name = CASH_POT_NAME,
+                    type = AccountType.CASH,
+                    personId = owner,
+                    openingBalanceMinor = 0L,
+                    openingBalanceDate = DateUtils.today(),
+                    colorHex = CASH_POT_COLOUR,
+                    notes = "The notes and coins in the house.",
+                ),
+            )
+            message.value = result.errorMessageOrNull() ?: "Cash pot ready"
+        }
+    }
+
+    /**
+     * Records cash going into or out of the house.
+     *
+     * Money put in is income to the pot and money spent from it is an expense,
+     * which is the same shape as every other account — so it flows through the
+     * balances, the reports and the month's totals without a special case.
+     */
+    fun adjustCash(accountId: Long, amountText: String, isSpending: Boolean) {
+        val amount = Money.parseOrNull(amountText)
+        if (amount == null || amount <= 0L) {
+            message.value = "Enter an amount"
+            return
+        }
+        viewModelScope.launch {
+            val result = transactionRepository.save(
+                TransactionEntity(
+                    amountMinor = amount,
+                    type = if (isSpending) TransactionType.EXPENSE else TransactionType.INCOME,
+                    date = DateUtils.today(),
+                    description = if (isSpending) "Cash spent" else "Cash put in",
+                    accountId = accountId,
+                    source = RecordSource.MANUAL,
+                ),
+            )
+            message.value = result.errorMessageOrNull()
+                ?: if (isSpending) {
+                    "${Money.format(amount)} spent from the cash pot"
+                } else {
+                    "${Money.format(amount)} added to the cash pot"
+                }
+        }
+    }
+
+    fun clearMessage() {
+        message.value = null
+    }
+
     fun showMonth(month: YearMonth) {
         if (!month.isAfter(DateUtils.currentYearMonth())) visibleMonth.value = month
     }
@@ -459,6 +536,8 @@ class DashboardViewModel @Inject constructor(
     private companion object {
         /** Early enough to be "everything", without pretending to be a date. */
         val FIRST_POSSIBLE_DATE: LocalDate = LocalDate.of(1900, 1, 1)
+        const val CASH_POT_NAME = "Cash in the house"
+        const val CASH_POT_COLOUR = "#6D4C41"
         const val MONTHS_ON_CHART = 6
         const val UPCOMING_DAYS = 30L
     }

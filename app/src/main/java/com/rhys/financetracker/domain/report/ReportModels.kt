@@ -168,10 +168,13 @@ data class FinancialSummary(
     /** Cash taken out and not paid back in this month. */
     val cashNetMinor: Long get() = cashOutMinor - cashInMinor
 
+    /** True when savings moved at all this month, either way. */
+    val hasSavingsActivity: Boolean
+        get() = savingsInMinor != 0L || savingsOutMinor != 0L
+
     /** True when there is anything at all to say about savings or cash. */
     val hasPotActivity: Boolean
-        get() = savingsInMinor != 0L || savingsOutMinor != 0L ||
-            cashOutMinor != 0L || cashInMinor != 0L
+        get() = hasSavingsActivity || cashOutMinor != 0L || cashInMinor != 0L
 
     companion object {
         val EMPTY = FinancialSummary(0, 0, 0, 0, 0, 0, 0)

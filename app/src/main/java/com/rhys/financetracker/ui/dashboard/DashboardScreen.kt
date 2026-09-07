@@ -25,11 +25,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -69,8 +73,20 @@ fun DashboardScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val categoryDetail by viewModel.categoryDetail.collectAsStateWithLifecycle()
+    val message by viewModel.messages.collectAsStateWithLifecycle()
+    val snackbar = remember { SnackbarHostState() }
+
+    // The cash buttons change a number further up the card, which is easy to
+    // miss on a screen this busy — so what happened is said outright.
+    LaunchedEffect(message) {
+        message?.let {
+            snackbar.showSnackbar(it)
+            viewModel.clearMessage()
+        }
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
                 title = { Text("Finance Tracker") },
@@ -149,6 +165,8 @@ fun DashboardScreen(
                         onOpenInsights = onOpenInsights,
                         onCategoryClick = viewModel::showCategoryDetail,
                         onMonthClick = viewModel::showMonth,
+                        onStartCashPot = viewModel::startCashPot,
+                        onAdjustCash = viewModel::adjustCash,
                     )
                 }
 
@@ -296,6 +314,8 @@ private fun DashboardCard(
     onOpenInsights: () -> Unit,
     onCategoryClick: (Long?, String, String?) -> Unit,
     onMonthClick: (java.time.YearMonth) -> Unit,
+    onStartCashPot: () -> Unit,
+    onAdjustCash: (Long, String, Boolean) -> Unit,
 ) {
     when (widget) {
         DashboardWidget.ACCOUNT_ACTIVITY -> AccountActivityCard(state, onOpenAccounts)
@@ -308,6 +328,8 @@ private fun DashboardCard(
         DashboardWidget.RECENT_TRANSACTIONS ->
             RecentTransactionsCard(state, onOpenTransaction, onAddTransaction, onMonthClick)
         DashboardWidget.SAVINGS_AND_CASH -> SavingsAndCashCard(state, onOpenAccounts)
+        DashboardWidget.CASH_IN_HAND ->
+            CashInHandCard(state, onStartCashPot, onAdjustCash)
         DashboardWidget.SAVINGS_PROGRESS -> SavingsProgressCard(state, onOpenSavings)
         DashboardWidget.SPENDING_BY_CATEGORY ->
             SpendingByCategoryCard(state, onCategoryClick)

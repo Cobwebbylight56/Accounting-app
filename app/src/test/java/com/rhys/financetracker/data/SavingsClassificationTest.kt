@@ -108,8 +108,25 @@ class SavingsClassificationTest {
         )
         assertEquals(5_000L, summary.savingsNetMinor)
         assertEquals(3_000L, summary.cashNetMinor)
+        assertTrue(summary.hasSavingsActivity)
         assertTrue(summary.hasPotActivity)
         assertTrue(!FinancialSummary.EMPTY.hasPotActivity)
+        // Cash alone is not savings activity: the savings card must not open
+        // with three zeroes just because somebody visited a machine.
+        val cashOnly = FinancialSummary.EMPTY.copy(cashOutMinor = 4_000L)
+        assertTrue(!cashOnly.hasSavingsActivity)
+        assertTrue(cashOnly.hasPotActivity)
+    }
+
+    @Test
+    fun `cash in the house is spendable money, not savings`() {
+        // A cash pot is ordinary money you happen to be holding, so it counts
+        // in Available. The owner can still say otherwise — money kept in a
+        // tin for a purpose is savings — which is what the override is for.
+        val pot = account("Cash in the house", AccountType.CASH, balanceMinor = 4_000L)
+        assertTrue(!pot.isSavings)
+        assertTrue(!pot.isLiability)
+        assertTrue(account("Cash in the house", AccountType.CASH, countsAsSavings = true).isSavings)
     }
 
     @Test

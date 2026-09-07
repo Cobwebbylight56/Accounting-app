@@ -79,11 +79,15 @@ enum class CategoryKind(val displayName: String) {
     SAVING("Saving"),
 
     /**
-     * Money that became notes and coins, or notes and coins paid back in.
+     * Money that became notes and coins.
      *
-     * Taking £50 out of a machine spends nothing — the £50 is in a pocket
-     * instead of an account. Counted as spending it inflates the month twice
-     * over: once at the machine, and again when the cash is actually spent.
+     * Its own kind so the month can say how much of its spending left as
+     * cash, which is the part no statement can break down any further. It is
+     * still spending: £50 out of a machine is £50 gone from the account, and
+     * that is how it counts everywhere a total is taken.
+     *
+     * What is then physically held is a separate question, answered by a cash
+     * account rather than by this.
      */
     CASH("Cash"),
     TRANSFER("Transfer"),
@@ -154,7 +158,8 @@ enum class DashboardWidget(val key: String, val title: String, val defaultVisibl
     UPCOMING_BILLS("upcoming_bills", "Upcoming bills", true),
     OVERDUE_BILLS("overdue_bills", "Overdue", true),
     RECENT_TRANSACTIONS("recent_transactions", "This month's transactions", true),
-    SAVINGS_AND_CASH("savings_and_cash", "Savings and cash", true),
+    SAVINGS_AND_CASH("savings_and_cash", "Savings", true),
+    CASH_IN_HAND("cash_in_hand", "Cash in hand", true),
     SAVINGS_PROGRESS("savings_progress", "Savings goals", true),
     SPENDING_BY_CATEGORY("spending_by_category", "Spending by category", true),
     INSIGHTS("insights", "Advice", true),

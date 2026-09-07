@@ -227,21 +227,22 @@ with a button to jump straight there.
 
 ### Savings and cash
 
-Two kinds of payment are not spending, and counting them as spending makes a
-household that saves £200 a month look like one that spends it:
+**Savings** are money moved to where it is being kept, rather than spent —
+counting a £200 standing order to a saver as spending makes a household that
+saves look like one that spends.
 
-* **Savings** — money moved to where it is being kept.
-* **Cash** — money that became notes and coins. Taking £50 out of a machine
-  spends nothing; the £50 is in a pocket. What it then went on is only in the
-  app if you enter it.
-
-Both are recognised on import from the wording on the statement, **in both
+They are recognised on import from the wording on the statement, **in both
 directions**. The same words mean the payment either way and the statement
 already says which way the money went, so "Transfer to START TO SAVE" is money
 into savings and "Transfer from START TO SAVE" is money back out of it.
 
-The **Savings and cash** card on Home shows all four figures for the month:
-into savings, out of savings, what that nets to, and cash out and back in.
+The **Savings** card on Home shows the month both ways round: into savings, out
+of savings, and what that nets to.
+
+**Cash is spending.** £50 out of a machine is £50 gone from the account, and
+that is how it counts in Money out, in the reports and everywhere else. The
+Cash category exists so the month can say how much of its spending left as
+notes — the part no statement breaks down any further — not to excuse it.
 
 If your saver is at another bank there is no account here to hold its balance,
 so **Saved** on Home shows everything the app has watched move into savings
@@ -251,6 +252,22 @@ real balance is shown instead.
 You can also set either by hand on any entry: open it and pick **Savings** or
 **Cash** as the category. That works on income and expenses alike, and the app
 remembers the payee — correct one and every future import of it follows.
+
+### Cash in hand
+
+The notes in the house are the one balance no statement will ever tell you, so
+the app keeps them by hand.
+
+The **Cash in hand** card on Home starts empty with a **Start a cash pot**
+button. After that it shows what is in the pot, with a box and two buttons:
+**Put in** when notes go into the tin, **Spent** when they come out. The
+running total is what is left.
+
+It is an ordinary account underneath, so the total counts in **Available** and
+in net worth like any other, and every entry lands in the ledger where it can
+be found and corrected. Taking cash out of a machine has already been counted
+as spending on the bank account; putting the same amount into the pot records
+where the notes went, and leaves what you are worth unchanged.
 
 #### The wordings that are recognised
 
