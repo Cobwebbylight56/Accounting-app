@@ -40,6 +40,7 @@ import com.rhys.financetracker.ui.components.ChartLegend
 import com.rhys.financetracker.ui.components.ColorDot
 import com.rhys.financetracker.ui.components.DonutChart
 import com.rhys.financetracker.ui.components.GroupedBarChart
+import com.rhys.financetracker.ui.components.LabelledTextField
 import com.rhys.financetracker.ui.components.ProgressBarRow
 import com.rhys.financetracker.ui.components.SectionCard
 import com.rhys.financetracker.ui.components.StatEmphasis
@@ -465,8 +466,9 @@ internal fun SavingsAndCashCard(state: DashboardState, onOpenAccounts: () -> Uni
             Spacer(Modifier.height(12.dp))
             PotRow("Taken out as cash", summary.cashOutMinor, isGood = false)
             Text(
-                text = "Counted as spending, the same as any other payment. The cash card " +
-                    "below is for what is still in the house.",
+                text = "Counted as spending, the same as any other payment, and treated as " +
+                    "gone. The cash card below is separate: it is for cash that arrives — " +
+                    "money left over, something sold, a gift.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -491,11 +493,16 @@ internal fun SavingsAndCashCard(state: DashboardState, onOpenAccounts: () -> Uni
 /**
  * The notes and coins in the house.
  *
- * Cash out of a machine counts as spent, because that is what the bank shows
- * and what the month should say. But the money still exists — it is in a tin
- * or a wallet, and it is the one balance no statement anywhere will ever tell
- * you. So it is kept by hand: say what went in and what got spent, and the
- * running total is what is left.
+ * Deliberately, entirely by hand, and not fed by anything.
+ *
+ * Cash out of a machine is treated as spent and stops there. Guessing how much
+ * of a £50 withdrawal is still in a wallet three days later is a guess the app
+ * would be wrong about most days, and a cash total that is quietly wrong is
+ * worse than no cash total — you would stop checking it.
+ *
+ * So this holds only what a person puts in it: what was left over, what came
+ * from selling something, what somebody was given. Money in that the bank
+ * never saw, which is exactly the money no statement can ever supply.
  *
  * It is an ordinary account underneath, so the total counts in Available and
  * in net worth like everything else, and every entry is in the ledger where it
@@ -505,16 +512,16 @@ internal fun SavingsAndCashCard(state: DashboardState, onOpenAccounts: () -> Uni
 internal fun CashInHandCard(
     state: DashboardState,
     onStartCashPot: () -> Unit,
-    onAdjustCash: (Long, String, Boolean) -> Unit,
+    onAdjustCash: (Long, String, String, Boolean) -> Unit,
 ) {
     val pots = state.accounts.filter { it.account.type == AccountType.CASH }
 
     SectionCard(title = "Cash in hand", subtitle = "In the house") {
         if (pots.isEmpty()) {
             Text(
-                text = "Nothing set up yet. A cash pot is where the notes in the house are " +
-                    "counted — money out of a machine is already spending, and this is what " +
-                    "is left of it.",
+                text = "Nothing set up yet. A cash pot counts the notes in the house: cash " +
+                    "left over, cash from selling something, cash you were given. Money out " +
+                    "of a machine is already counted as spent and does not come here.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -533,10 +540,11 @@ internal fun CashInHandCard(
 @Composable
 private fun CashPotRow(
     pot: AccountWithBalance,
-    onAdjustCash: (Long, String, Boolean) -> Unit,
+    onAdjustCash: (Long, String, String, Boolean) -> Unit,
 ) {
     val colors = FinanceTheme.colors
     var amount by rememberSaveable(pot.account.id) { mutableStateOf("") }
+    var note by rememberSaveable(pot.account.id) { mutableStateOf("") }
 
     Column(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -559,6 +567,15 @@ private fun CashPotRow(
             )
         }
         Spacer(Modifier.height(8.dp))
+        // Optional, because a total nobody can account for is only half
+        // useful: "Sold the bike" three weeks later is worth the one line it
+        // takes to type, and blank still works.
+        LabelledTextField(
+            label = "What for? (optional)",
+            value = note,
+            onValueChange = { note = it },
+        )
+        Spacer(Modifier.height(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             AmountField(
                 label = "Amount",
@@ -569,14 +586,16 @@ private fun CashPotRow(
             Spacer(Modifier.width(8.dp))
             TextButton(
                 onClick = {
-                    onAdjustCash(pot.account.id, amount, false)
+                    onAdjustCash(pot.account.id, amount, note, false)
                     amount = ""
+                    note = ""
                 },
             ) { Text("Put in") }
             TextButton(
                 onClick = {
-                    onAdjustCash(pot.account.id, amount, true)
+                    onAdjustCash(pot.account.id, amount, note, true)
                     amount = ""
+                    note = ""
                 },
             ) { Text("Spent") }
         }

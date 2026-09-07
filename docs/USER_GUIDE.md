@@ -256,18 +256,32 @@ remembers the payee — correct one and every future import of it follows.
 ### Cash in hand
 
 The notes in the house are the one balance no statement will ever tell you, so
-the app keeps them by hand.
+the app keeps them by hand — and only by hand. Nothing feeds this pot
+automatically.
+
+**Money out of a machine does not come here.** It is already counted as spent
+on the bank account and it stops there. How much of a £50 withdrawal is still
+in a wallet three days later is a guess the app would be wrong about most days,
+and a cash total that is quietly wrong is worse than none — you stop checking
+it.
+
+What does come here is cash that arrives without the bank ever seeing it:
+
+* what was left over,
+* what something sold for,
+* what somebody gave you.
 
 The **Cash in hand** card on Home starts empty with a **Start a cash pot**
-button. After that it shows what is in the pot, with a box and two buttons:
-**Put in** when notes go into the tin, **Spent** when they come out. The
-running total is what is left.
+button. After that it shows what is in the pot, a box for what it was for, a
+box for the amount, and two buttons: **Put in** when notes arrive, **Spent**
+when they go. The running total is what is left.
+
+"What for?" is optional and worth the line it takes — "Sold the bike" is
+readable three weeks later in a way that "Cash put in" is not.
 
 It is an ordinary account underneath, so the total counts in **Available** and
 in net worth like any other, and every entry lands in the ledger where it can
-be found and corrected. Taking cash out of a machine has already been counted
-as spending on the bank account; putting the same amount into the pot records
-where the notes went, and leaves what you are worth unchanged.
+be found and corrected.
 
 #### The wordings that are recognised
 

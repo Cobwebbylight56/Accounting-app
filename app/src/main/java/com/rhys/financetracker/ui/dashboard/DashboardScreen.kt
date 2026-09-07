@@ -315,7 +315,7 @@ private fun DashboardCard(
     onCategoryClick: (Long?, String, String?) -> Unit,
     onMonthClick: (java.time.YearMonth) -> Unit,
     onStartCashPot: () -> Unit,
-    onAdjustCash: (Long, String, Boolean) -> Unit,
+    onAdjustCash: (Long, String, String, Boolean) -> Unit,
 ) {
     when (widget) {
         DashboardWidget.ACCOUNT_ACTIVITY -> AccountActivityCard(state, onOpenAccounts)

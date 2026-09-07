@@ -427,9 +427,11 @@ class DashboardViewModel @Inject constructor(
     /**
      * Starts a cash pot: an account standing for the notes in the house.
      *
-     * Cash leaving the bank counts as spent, which is what the month should
-     * say — but the notes still exist, and until there is somewhere to put
-     * them the app has nothing to count. One tap makes that somewhere.
+     * Cash leaving the bank counts as spent and stays that way. This is for
+     * the money that arrives without the bank ever seeing it — what was left
+     * over, what something sold for, what somebody was given — which is
+     * exactly the money no statement can supply. One tap makes somewhere to
+     * put it.
      */
     fun startCashPot() {
         viewModelScope.launch {
@@ -461,8 +463,18 @@ class DashboardViewModel @Inject constructor(
      * Money put in is income to the pot and money spent from it is an expense,
      * which is the same shape as every other account — so it flows through the
      * balances, the reports and the month's totals without a special case.
+     *
+     * Nothing feeds this automatically. A withdrawal at a machine is spending
+     * and stops there: how much of it is still in a wallet is not something
+     * the app can know, and a cash total that is quietly wrong is worse than
+     * none at all.
      */
-    fun adjustCash(accountId: Long, amountText: String, isSpending: Boolean) {
+    fun adjustCash(
+        accountId: Long,
+        amountText: String,
+        note: String,
+        isSpending: Boolean,
+    ) {
         val amount = Money.parseOrNull(amountText)
         if (amount == null || amount <= 0L) {
             message.value = "Enter an amount"
@@ -474,7 +486,9 @@ class DashboardViewModel @Inject constructor(
                     amountMinor = amount,
                     type = if (isSpending) TransactionType.EXPENSE else TransactionType.INCOME,
                     date = DateUtils.today(),
-                    description = if (isSpending) "Cash spent" else "Cash put in",
+                    description = note.trim().ifBlank {
+                        if (isSpending) "Cash spent" else "Cash put in"
+                    },
                     accountId = accountId,
                     source = RecordSource.MANUAL,
                 ),
