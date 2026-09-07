@@ -46,7 +46,9 @@ class SavingsClassificationTest {
         assertTrue(account("Saver", AccountType.SAVINGS).isSavings)
         assertTrue(account("Pension", AccountType.PENSION).isSavings)
         assertTrue(!account("Main account", AccountType.CURRENT).isSavings)
-        assertTrue(!account("cash", AccountType.CASH).isSavings)
+        // Cash too: the notes in the house are money being held, not money in
+        // the account you spend from.
+        assertTrue(account("cash", AccountType.CASH).isSavings)
     }
 
     @Test
@@ -137,7 +139,7 @@ class SavingsClassificationTest {
         val accounts = listOf(
             account("Main account", AccountType.CURRENT, balanceMinor = -9_382L),
             account("bank", AccountType.CURRENT, countsAsSavings = true, balanceMinor = 300_000L),
-            account("cash", AccountType.CASH, countsAsSavings = true, balanceMinor = 151_000L),
+            account("cash", AccountType.CASH, balanceMinor = 151_000L),
             account("saver mum", AccountType.SAVINGS, balanceMinor = 190_000L),
         )
         val saved = accounts.filter { it.isSavings }.sumOf { it.balanceMinor }
