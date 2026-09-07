@@ -181,8 +181,10 @@ touch is savings, and cash in a tin can be savings too. So each account decides
 for itself. Open the account and turn on **Money set aside** for anything you
 are not planning to spend, whatever kind of account it is.
 
-By default it follows the account's type: Savings, Investment and Pension count
-as set aside, everything else counts as available. Turning the switch on or off
+By default it follows the account's type: Savings, Investment, Pension and Cash
+count as set aside, everything else counts as available. Cash is there because
+the notes in the house are money you are holding, not money in the account you
+spend from. Turning the switch on or off
 overrides that for good; leaving it alone lets the account follow its type if
 you change it later.
 
@@ -196,6 +198,12 @@ month underneath the figure. Where there is no savings account at all, the
 month's payments in are the figure. Adding the saver as an account is still
 better — then the balance is shown too — but nothing has to be set up for the
 saving to be counted.
+
+### The person tabs
+
+The Everyone / name chips on Home appear once there is **more than one
+person**. With one person they say nothing — "Everyone" and the one name are
+the same screen — so they stay out of the way until a second person is added.
 
 ### Whose account is it
 
@@ -287,6 +295,11 @@ Every Put in and Spent is listed under the pot, newest first, as **Cash in and
 out** — five at a time with a **Show all** button. Tap any line to open it and
 change it. A running total on its own is a number you cannot check, and this is
 the only record there is: no statement holds any of it.
+
+**What is already in the tin is not income.** Entering the float with "Put in"
+records it as money earned this month, which it is not. Type the total and use
+**Or set the total to this** underneath instead — that moves the pot's starting
+figure and leaves the month alone. Use Put in and Spent for what happens after.
 
 The **Cash in hand** card on Home starts empty with a **Start a cash pot**
 button. After that it shows what is in the pot, a box for what it was for, a

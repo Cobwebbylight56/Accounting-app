@@ -167,6 +167,7 @@ fun DashboardScreen(
                         onMonthClick = viewModel::showMonth,
                         onStartCashPot = viewModel::startCashPot,
                         onAdjustCash = viewModel::adjustCash,
+                        onCorrectCashTotal = viewModel::correctCashTotal,
                     )
                 }
 
@@ -275,8 +276,15 @@ private fun ScopeSelector(
     // the only way back. There was then no way out of that person's view but
     // to kill the app. The unfiltered count is what this question was always
     // about.
+    // These chips only ever offer people, so one person is nothing to choose
+    // between: "Everyone" and the one name mean the same screen. They appear
+    // when a second person is added.
+    //
+    // Still shown while a filter is on, whatever the count. [accounts] is the
+    // filtered list, and hiding the chips there once took "Everyone" off the
+    // screen — the only way back — and left killing the app as the way out.
     val isFiltered = state.scope.personId != null || state.scope.accountId != null
-    if (!isFiltered && state.people.size <= 1 && state.accountsInTotal <= 1) return
+    if (!isFiltered && state.people.size <= 1) return
 
     androidx.compose.foundation.lazy.LazyRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -323,6 +331,7 @@ private fun DashboardCard(
     onMonthClick: (java.time.YearMonth) -> Unit,
     onStartCashPot: () -> Unit,
     onAdjustCash: (Long, String, String, Boolean) -> Unit,
+    onCorrectCashTotal: (Long, String) -> Unit,
 ) {
     when (widget) {
         DashboardWidget.ACCOUNT_ACTIVITY -> AccountActivityCard(state, onOpenAccounts)
@@ -336,7 +345,13 @@ private fun DashboardCard(
             RecentTransactionsCard(state, onOpenTransaction, onAddTransaction, onMonthClick)
         DashboardWidget.SAVINGS_AND_CASH -> SavingsAndCashCard(state, onOpenAccounts)
         DashboardWidget.CASH_IN_HAND ->
-            CashInHandCard(state, onStartCashPot, onAdjustCash, onOpenTransaction)
+            CashInHandCard(
+                state,
+                onStartCashPot,
+                onAdjustCash,
+                onCorrectCashTotal,
+                onOpenTransaction,
+            )
         DashboardWidget.SAVINGS_PROGRESS -> SavingsProgressCard(state, onOpenSavings)
         DashboardWidget.SPENDING_BY_CATEGORY ->
             SpendingByCategoryCard(state, onCategoryClick)

@@ -16,7 +16,10 @@ enum class AccountType(
 ) {
     CURRENT("Current account", isLiability = false, isSavings = false),
     SAVINGS("Savings account", isLiability = false, isSavings = true),
-    CASH("Cash", isLiability = false, isSavings = false),
+    // Set aside rather than spendable: the notes in the house are money you
+    // are holding, not money in the account you spend from, and counting them
+    // as available made "to spend" larger than anything you could spend.
+    CASH("Cash", isLiability = false, isSavings = true),
     CREDIT_CARD("Credit card", isLiability = true, isSavings = false),
     LOAN("Loan", isLiability = true, isSavings = false),
     MORTGAGE("Mortgage", isLiability = true, isSavings = false),

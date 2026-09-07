@@ -119,14 +119,17 @@ class SavingsClassificationTest {
     }
 
     @Test
-    fun `cash in the house is spendable money, not savings`() {
-        // A cash pot is ordinary money you happen to be holding, so it counts
-        // in Available. The owner can still say otherwise — money kept in a
-        // tin for a purpose is savings — which is what the override is for.
+    fun `cash in the house is money set aside`() {
+        // The notes in the house are money you are holding, not money in the
+        // account you spend from. Counted as available they made "to spend"
+        // larger than anything you could actually spend.
         val pot = account("Cash in the house", AccountType.CASH, balanceMinor = 4_000L)
-        assertTrue(!pot.isSavings)
+        assertTrue(pot.isSavings)
         assertTrue(!pot.isLiability)
-        assertTrue(account("Cash in the house", AccountType.CASH, countsAsSavings = true).isSavings)
+        // And the owner can still say otherwise, either way.
+        assertTrue(
+            !account("Cash in the house", AccountType.CASH, countsAsSavings = false).isSavings,
+        )
     }
 
     @Test

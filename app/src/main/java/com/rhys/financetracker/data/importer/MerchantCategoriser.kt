@@ -209,8 +209,8 @@ object MerchantCategoriser {
         rule(
             "Home",
             "dunelm", "the range home", "furniture", "carpetright", "sofology", "dfs ",
-            "oak furniture", "bensons for beds", "dreams ltd", "gardening", "garden centre",
-            "homeware", "cleaning", "window clean",
+            "oak furniture", "bensons for beds", "dreams ltd", "garden centre",
+            "homeware",
         ),
 
         // -- insurance ------------------------------------------------------
@@ -264,6 +264,22 @@ object MerchantCategoriser {
         ),
         rule("Gifts", "moonpig", "card factory", "clintons", "funky pigeon", "interflora"),
 
+        // -- somebody you pay --------------------------------------------
+        //
+        // Rent, a cleaner, a window cleaner, a babysitter: paid to a person by
+        // name, and a name matches nothing. Only the wordings that say it is a
+        // person rather than a shop are here — a bare name still comes through
+        // uncategorised, because guessing at one would be worse.
+        rule(
+            "People & services",
+            "cleaner", "window clean", "cleaning", "gardener", "gardening",
+            "babysitter", "childminder pay", "tutor", "lessons", "music lesson",
+            "driving lesson", "hairdresser", "barber", "therapist", "physio",
+            "osteopath", "chiropractor", "counselling", "decorator", "handyman",
+            // Deliberately not beauty or nails: both are shop names as often
+            // as services, and SAVERS HEALTH AND BEAUTY is a chemist.
+        ),
+
         // -- money owed -------------------------------------------------------
         rule(
             "Credit & loans",
@@ -278,6 +294,15 @@ object MerchantCategoriser {
             "Transfers & payments",
             "paypal", "revolut", "wise ", "transferwise", "western union", "moneygram",
             "gocardless", "sumup", "izettle", "square up", "stripe",
+        ),
+
+        // Last of all, because it says only that a card was used. It is
+        // spending — the bank simply never says on what — and leaving it as
+        // nothing at all was worse than saying that much.
+        rule(
+            "Card spending",
+            "contactless payment", "card payment", "chip and pin",
+            "debit card payment", "visa purchase", "mastercard purchase", "pos purchase",
         ),
     )
 

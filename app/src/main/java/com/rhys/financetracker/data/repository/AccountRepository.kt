@@ -126,6 +126,28 @@ class AccountRepository @Inject constructor(
             )
         }
 
+    /**
+     * Makes an account's balance equal [balanceMinor] by moving its starting
+     * figure, without inventing a transaction to do it.
+     *
+     * What is already in a cash tin is not income — it is money you had before
+     * the app knew about it. Recorded as a payment in, a £1,480 float shows up
+     * as £1,480 earned this month and the month's figures are nonsense. The
+     * starting balance is what that belongs in, and it is dated when the
+     * account started rather than today.
+     */
+    suspend fun setBalanceTo(accountId: Long, balanceMinor: Long): AppResult<Unit> =
+        runCatchingApp("Could not correct this balance") {
+            val account = accountDao.getById(accountId) ?: error("That account no longer exists")
+            val recorded = accountDao.getRecordedMovementMinor(accountId)
+            accountDao.update(
+                account.copy(
+                    openingBalanceMinor = balanceMinor - recorded,
+                    updatedAt = Instant.now().toEpochMilli(),
+                ),
+            )
+        }
+
     suspend fun setArchived(id: Long, archived: Boolean): AppResult<Unit> =
         runCatchingApp("Could not archive this account") {
             accountDao.setArchived(id, archived, Instant.now().toEpochMilli())

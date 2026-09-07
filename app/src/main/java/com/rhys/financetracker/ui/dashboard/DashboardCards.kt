@@ -513,6 +513,7 @@ internal fun CashInHandCard(
     state: DashboardState,
     onStartCashPot: () -> Unit,
     onAdjustCash: (Long, String, String, Boolean) -> Unit,
+    onCorrectTotal: (Long, String) -> Unit,
     onOpenTransaction: (Long) -> Unit,
 ) {
     val pots = state.accounts.filter { it.account.type == AccountType.CASH }
@@ -534,7 +535,7 @@ internal fun CashInHandCard(
             return@SectionCard
         }
 
-        pots.forEach { pot -> CashPotRow(pot, onAdjustCash) }
+        pots.forEach { pot -> CashPotRow(pot, onAdjustCash, onCorrectTotal) }
 
         // The log. A running total on its own is a number you cannot check —
         // where it came from and what it went on is the part worth keeping,
@@ -615,6 +616,7 @@ private const val CASH_LOG_SHOWN = 5
 private fun CashPotRow(
     pot: AccountWithBalance,
     onAdjustCash: (Long, String, String, Boolean) -> Unit,
+    onCorrectTotal: (Long, String) -> Unit,
 ) {
     val colors = FinanceTheme.colors
     var amount by rememberSaveable(pot.account.id) { mutableStateOf("") }
@@ -673,6 +675,16 @@ private fun CashPotRow(
                 },
             ) { Text("Spent") }
         }
+        // The float — what was in the tin before the app knew about it — is
+        // not income, and entering it as one puts it in the month's "money
+        // in". This sets the total without recording anything.
+        TextButton(
+            onClick = {
+                onCorrectTotal(pot.account.id, amount)
+                amount = ""
+                note = ""
+            },
+        ) { Text("Or set the total to this, without recording it") }
     }
 }
 

@@ -199,6 +199,26 @@ class MerchantCategoriserTest {
     }
 
     @Test
+    fun `a card payment is spending, even unnamed`() {
+        // The bank says only that a card was used. It is still spending, and
+        // saying that much beats leaving it as nothing at all — but it comes
+        // last, so anything that names a real payee wins first.
+        assertEquals("Card spending", categoryFor("Contactless Payment"))
+        assertEquals("Card spending", categoryFor("CARD PAYMENT"))
+        assertEquals("Groceries", categoryFor("CARD PAYMENT TESCO STORES"))
+    }
+
+    @Test
+    fun `paying a person for work is recognised by what the work is`() {
+        // A name matches nothing and never will. What can be read is the
+        // service beside it.
+        assertEquals("People & services", categoryFor("WINDOW CLEANER"))
+        assertEquals("People & services", categoryFor("Standing order HAIRDRESSER"))
+        // A bare name is still left alone — guessing at one is worse.
+        assertNull(categoryFor("PETER ROCHE"))
+    }
+
+    @Test
     fun `an unknown payee is left alone rather than guessed at`() {
         // An empty category is obvious and quick to fix; a wrong one is neither.
         assertNull(categoryFor("J SMITH"))

@@ -117,6 +117,9 @@ object DefaultData {
         SeedCategory("Holiday fund", CategoryKind.SAVING, "#00796B", "BeachAccess", parent = "Savings"),
         SeedCategory("Christmas fund", CategoryKind.SAVING, "#C62828", "Redeem", parent = "Savings"),
 
+        SeedCategory("People & services", CategoryKind.EXPENSE, "#8D6E63", "Payments"),
+        SeedCategory("Card spending", CategoryKind.EXPENSE, "#78909C", "Payments"),
+
         // ------------------------------------------------------------ cash
         SeedCategory("Cash", CategoryKind.CASH, "#6D4C41", "Payments", isSystem = true),
 

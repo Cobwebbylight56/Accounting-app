@@ -505,6 +505,26 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Sets the pot to what is actually in it, without recording a payment.
+     *
+     * The float — what was in the tin before the app knew about it — is not
+     * income, and entering it as one puts it in this month's "money in". This
+     * moves the starting balance instead, so the total is right and the month
+     * is untouched.
+     */
+    fun correctCashTotal(accountId: Long, amountText: String) {
+        val amount = Money.parseOrNull(amountText)
+        if (amount == null) {
+            message.value = "Enter what is in the pot"
+            return
+        }
+        viewModelScope.launch {
+            message.value = accountRepository.setBalanceTo(accountId, amount).errorMessageOrNull()
+                ?: "Cash pot set to ${Money.format(amount)}"
+        }
+    }
+
     fun clearMessage() {
         message.value = null
     }
