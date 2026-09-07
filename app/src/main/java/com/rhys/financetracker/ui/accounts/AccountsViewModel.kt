@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.rhys.financetracker.core.money.Money
 import com.rhys.financetracker.core.result.AppResult
 import com.rhys.financetracker.core.time.DateUtils
+import com.rhys.financetracker.data.importer.AccountNaming
 import com.rhys.financetracker.data.local.entity.AccountEntity
 import com.rhys.financetracker.data.local.entity.PersonEntity
 import com.rhys.financetracker.data.local.projection.AccountWithBalance
@@ -77,6 +78,22 @@ class AccountsViewModel @Inject constructor(
             groups
         } else {
             groups + AccountGroup("Not assigned", "#455A64", unassigned, isUnassigned = true)
+        }
+    }
+
+    /**
+     * Moves an account the name says is savings into savings.
+     *
+     * The whole of "my savings are showing as available" comes down to the
+     * type on the account, and until now the only way to change it was to open
+     * the account and find the picker.
+     */
+    fun moveToSavings(account: AccountWithBalance) {
+        viewModelScope.launch {
+            val type = AccountNaming.typeFor(account.account.name)
+            message.value = accountRepository.setType(account.account.id, type)
+                .errorMessageOrNull()
+                ?: "\"${account.account.name}\" is now set aside"
         }
     }
 

@@ -325,6 +325,21 @@ private fun DetectedStatementCard(state: ImportState, viewModel: ImportViewModel
                 color = MaterialTheme.colorScheme.primary,
             )
         }
+        // A name it read that belongs to nobody here. Saying nothing looked
+        // exactly like not having read the statement, and the answer — add
+        // them — is one tap.
+        state.unknownOwnerName?.let { printed ->
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "This statement is addressed to $printed, and nobody in the app " +
+                    "has that name. Adding them means their accounts can sit under " +
+                    "their own name.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            TextButton(onClick = viewModel::addPersonFromStatement) {
+                Text("Add them as a person")
+            }
+        }
         Spacer(Modifier.height(12.dp))
         DropdownField(
             label = if (preselected != null) "Adding to" else "Add these to",

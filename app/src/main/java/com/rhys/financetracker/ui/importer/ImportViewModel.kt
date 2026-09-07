@@ -15,7 +15,9 @@ import com.rhys.financetracker.data.importer.SheetData
 import com.rhys.financetracker.data.importer.SpreadsheetImporter
 import com.rhys.financetracker.data.importer.StatementOwner
 import com.rhys.financetracker.data.importer.WorkbookData
+import com.rhys.financetracker.data.local.entity.PersonEntity
 import com.rhys.financetracker.data.local.projection.AccountOption
+import com.rhys.financetracker.data.local.seed.DefaultData
 import com.rhys.financetracker.data.repository.AccountRepository
 import com.rhys.financetracker.data.repository.PeopleRepository
 import com.rhys.financetracker.domain.model.TransactionType
@@ -63,11 +65,22 @@ class ImportViewModel @Inject constructor(
     private fun findStatementOwner(uri: Uri) {
         viewModelScope.launch {
             val lines = importer.readPdfText(uri)?.lines() ?: return@launch
-            val owner = StatementOwner.detect(lines, peopleRepository.activePeople())
-                ?: return@launch
+            val people = peopleRepository.activePeople()
+            val owner = StatementOwner.detect(lines, people)
+            if (owner == null) {
+                // Nobody here is called that. Worth saying: staying quiet
+                // looked exactly like not having read the statement at all,
+                // and the answer — add them — is one the user can act on.
+                val printed = StatementOwner.nameOnStatement(lines) ?: return@launch
+                if (people.none { it.name.equals(printed, ignoreCase = true) }) {
+                    _state.value = _state.value.copy(unknownOwnerName = printed)
+                }
+                return@launch
+            }
             val theirs = accounts.value.filter { it.personName == owner.name }
             _state.value = _state.value.copy(
                 statementOwnerName = owner.name,
+                unknownOwnerName = null,
                 // Only when it is unambiguous. Picking the first of several
                 // would be filing a statement against a guess.
                 preselectedAccountId = _state.value.preselectedAccountId
@@ -400,6 +413,37 @@ class ImportViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Adds the person named on the statement.
+     *
+     * Offered rather than done, because the name on a statement is not always
+     * somebody who should appear in the app — post gets forwarded, and a joint
+     * account carries two names.
+     */
+    fun addPersonFromStatement() {
+        val name = _state.value.unknownOwnerName ?: return
+        viewModelScope.launch {
+            val tidied = name.split(' ')
+                .drop(1)
+                .filter { it.length > 1 }
+                .joinToString(" ") { part ->
+                    part.lowercase().replaceFirstChar { it.uppercase() }
+                }
+                .ifBlank { name }
+            val result = peopleRepository.save(
+                PersonEntity(
+                    name = tidied,
+                    colorHex = DefaultData.PALETTE.random(),
+                ),
+            )
+            _state.value = _state.value.copy(
+                unknownOwnerName = null,
+                statementOwnerName = tidied.takeIf { result is AppResult.Success },
+                error = (result as? AppResult.Failure)?.message,
+            )
+        }
+    }
+
     fun reset() {
         _state.value = ImportState()
     }
@@ -476,6 +520,9 @@ data class ImportState(
 
     /** Who the statement is addressed to, when the name on it settles it. */
     val statementOwnerName: String? = null,
+
+    /** A name read off the statement that belongs to nobody in the app yet. */
+    val unknownOwnerName: String? = null,
     /** Text pulled from a PDF whose layout was not recognised, for showing. */
     val unreadablePdfText: String? = null,
     val usingDetectedLayout: Boolean = false,

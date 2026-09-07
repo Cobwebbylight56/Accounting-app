@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rhys.financetracker.core.money.Money
+import com.rhys.financetracker.data.importer.AccountNaming
 import com.rhys.financetracker.data.local.entity.PersonEntity
 import com.rhys.financetracker.data.local.projection.AccountWithBalance
 import com.rhys.financetracker.data.local.seed.DefaultData
@@ -215,6 +216,22 @@ fun AccountsScreen(
                                         },
                                     )
                                 }
+                                // The name says savings and the app is
+                                // counting it as money to spend. Fixing how
+                                // the type is guessed only helps accounts made
+                                // afterwards; this is for the ones already
+                                // here, which are the ones that are wrong.
+                                if (
+                                    AccountNaming.looksMistyped(
+                                        name = account.account.name,
+                                        type = account.account.type,
+                                        countsAsSavings = account.account.countsAsSavings,
+                                    )
+                                ) {
+                                    MistypedSavingsNote {
+                                        viewModel.moveToSavings(account)
+                                    }
+                                }
                             }
                         }
                     }
@@ -252,6 +269,27 @@ fun AccountsScreen(
             onConfirm = { viewModel.delete(pendingDelete) },
             onDismiss = { pendingDelete = 0L },
         )
+    }
+}
+
+/**
+ * Says an account looks like savings and offers to make it so.
+ *
+ * Shown under the account it is about, because that is where the doubt is —
+ * a line at the top of the screen saying "some of your accounts may be wrong"
+ * leaves you to work out which.
+ */
+@Composable
+private fun MistypedSavingsNote(onMove: () -> Unit) {
+    Column(modifier = Modifier.padding(start = 36.dp, bottom = 8.dp)) {
+        Text(
+            text = "The name says savings, but this is being counted as money to spend.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+        )
+        TextButton(onClick = onMove, contentPadding = PaddingValues(0.dp)) {
+            Text("Move it to Saved")
+        }
     }
 }
 

@@ -838,27 +838,7 @@ class SpreadsheetImporter @Inject constructor(
      * current account is spendable, so a month's savings were counted as
      * money to spend.
      */
-    internal fun guessAccountType(name: String): AccountType {
-        val text = name.lowercase()
-        val padded = " ${TransactionFingerprint.normaliseDescription(name)} "
-        fun saysSavings() = PotWords.SAVINGS.any { padded.contains(" $it") }
-        return when {
-            text.contains("mortgage") -> AccountType.MORTGAGE
-            text.contains("loan") || text.contains("finance") -> AccountType.LOAN
-            text.contains("pension") -> AccountType.PENSION
-            // Savings before cash, because "Cash ISA" and "Cash savings" are
-            // savings products and only have the word in common with a tin of
-            // notes. Typed as cash they landed in the cash-in-hand card, where
-            // a saver has no business being.
-            text.contains("isa") || text.contains("invest") || text.contains("share") ->
-                AccountType.INVESTMENT
-            saysSavings() -> AccountType.SAVINGS
-            text.contains("cash") || text.contains("coin") || text.contains("wallet") ->
-                AccountType.CASH
-            text.contains("credit") || text.contains("card") -> AccountType.CREDIT_CARD
-            else -> AccountType.CURRENT
-        }
-    }
+    internal fun guessAccountType(name: String): AccountType = AccountNaming.typeFor(name)
 
     private companion object {
         /**

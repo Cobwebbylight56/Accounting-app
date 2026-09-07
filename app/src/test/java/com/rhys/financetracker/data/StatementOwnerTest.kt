@@ -81,6 +81,19 @@ class StatementOwnerTest {
     }
 
     @Test
+    fun `the name is reported even when nobody in the app has it`() {
+        // Staying quiet looked exactly like not having read the statement at
+        // all. The name is read either way, so the app can offer to add them.
+        assertEquals(
+            "MR R M W EVANS",
+            StatementOwner.nameOnStatement(nationwide("MR R M W EVANS")),
+        )
+        assertEquals("MRS J SMITH", StatementOwner.nameOnStatement(nationwide("MRS J SMITH")))
+        // The address and the bank's own name are not addressees.
+        assertNull(StatementOwner.nameOnStatement(nationwide("1 Somewhere Street")))
+    }
+
+    @Test
     fun `nothing to go on is no answer rather than a guess`() {
         assertNull(StatementOwner.detect(emptyList(), household))
         assertNull(StatementOwner.detect(nationwide("MR R M W EVANS"), emptyList()))

@@ -43,6 +43,30 @@ object StatementOwner {
      * @param lines the extracted text, in order.
      * @param people everybody the app knows about.
      */
+    /**
+     * The name the statement is addressed to, whether or not the app knows it.
+     *
+     * Reported separately from [detect] because "we read MR R M W EVANS and
+     * nobody here is called that" is worth saying. Silence looked exactly like
+     * not having read the statement at all.
+     */
+    fun nameOnStatement(lines: List<String>): String? =
+        lines.take(HEADING_LINES)
+            .map { it.trim() }
+            .firstOrNull { line ->
+                TITLE.containsMatchIn(line) && line.length <= LONGEST_NAME &&
+                    line.none { it.isDigit() }
+            }
+            ?.replace(WHITESPACE, " ")
+
+    /** How a statement addresses somebody, at the start of the line. */
+    private val TITLE = Regex("""^(mr|mrs|miss|ms|dr|mx|sir|prof)[. ]""", RegexOption.IGNORE_CASE)
+
+    /** Longer than this is an address line, not a name. */
+    private const val LONGEST_NAME = 48
+
+    private val WHITESPACE = Regex("\\s+")
+
     fun detect(lines: List<String>, people: List<PersonEntity>): PersonEntity? {
         if (people.isEmpty()) return null
         val heading = lines.take(HEADING_LINES)

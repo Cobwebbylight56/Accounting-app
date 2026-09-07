@@ -205,6 +205,25 @@ The Everyone / name chips on Home appear once there is **more than one
 person**. With one person they say nothing — "Everyone" and the one name are
 the same screen — so they stay out of the way until a second person is added.
 
+### Getting savings counted
+
+Whether an account is money set aside comes down to its **type**. The app
+guesses that from the name when the account is created — ISA, LISA, saver,
+instant access, limited access, triple access, fixed term, fixed rate, bond,
+notice account, premium bonds and plain "savings" all mean savings — but a
+guess made when the account was created cannot fix an account that already
+exists.
+
+So the **Accounts** screen now says so. Any account whose name says savings
+while the app is counting it as money to spend gets a line under it in red and
+a **Move it to Saved** button. One tap and it is set aside, along with its
+balance and its history.
+
+**The one it cannot read from the name**: a second current account holding a
+little money in case you lose access to your main one. That is set aside in
+practice and a current account by name, and nothing in the name says so. Open
+it and turn on **Money set aside**.
+
 ### Whose account is it
 
 Everything the app does per person — the Hannah / Rhys / Joint tabs on Home,

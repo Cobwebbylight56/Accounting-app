@@ -8,6 +8,7 @@ import com.rhys.financetracker.data.local.dao.PersonDao
 import com.rhys.financetracker.data.local.entity.AccountEntity
 import com.rhys.financetracker.data.local.projection.AccountOption
 import com.rhys.financetracker.data.local.projection.AccountWithBalance
+import com.rhys.financetracker.domain.model.AccountType
 import java.time.Instant
 import java.time.LocalDate
 import javax.inject.Inject
@@ -143,6 +144,28 @@ class AccountRepository @Inject constructor(
             accountDao.update(
                 account.copy(
                     openingBalanceMinor = balanceMinor - recorded,
+                    updatedAt = Instant.now().toEpochMilli(),
+                ),
+            )
+        }
+
+    /**
+     * Changes an account's type, and with it whether it counts as set aside.
+     *
+     * Offered from the list because fixing how the type is guessed only helps
+     * accounts made afterwards. The ones already in the app are exactly the
+     * ones that were guessed wrong, and hunting through a form to correct each
+     * is how they stay wrong.
+     */
+    suspend fun setType(accountId: Long, type: AccountType): AppResult<Unit> =
+        runCatchingApp("Could not change this account's type") {
+            val account = accountDao.getById(accountId) ?: error("That account no longer exists")
+            accountDao.update(
+                account.copy(
+                    type = type,
+                    // Any earlier override is cleared: having just said what
+                    // kind of account it is, the type should decide.
+                    countsAsSavings = null,
                     updatedAt = Instant.now().toEpochMilli(),
                 ),
             )
