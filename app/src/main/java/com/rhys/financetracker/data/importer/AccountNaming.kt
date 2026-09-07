@@ -65,6 +65,18 @@ object AccountNaming {
     private val LIABILITY = listOf("mortgage", "loan", "finance", "overdraft")
 
     /**
+     * Cards, named rather than matched on the word.
+     *
+     * Matching is at the start of a word, so "card" alone never reaches
+     * BARCLAYCARD — and loosening it to a plain substring would put every
+     * CARD PAYMENT and CASH ISA CARD here instead.
+     */
+    private val CARDS = listOf(
+        "credit", "card", "barclaycard", "mastercard", "visa", "amex",
+        "american express", "capital one", "vanquis", "aqua", "tymit",
+    )
+
+    /**
      * The type an account with this name most likely is.
      *
      * Liabilities first because they are unambiguous, then savings, because
@@ -82,7 +94,7 @@ object AccountNaming {
             says(INVESTMENT) -> AccountType.INVESTMENT
             says(SAVINGS) -> AccountType.SAVINGS
             says(listOf("cash", "coin", "wallet", "petty")) -> AccountType.CASH
-            says(listOf("credit", "card")) -> AccountType.CREDIT_CARD
+            says(CARDS) -> AccountType.CREDIT_CARD
             else -> AccountType.CURRENT
         }
     }

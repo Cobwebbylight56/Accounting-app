@@ -37,13 +37,6 @@ import com.rhys.financetracker.data.local.entity.PersonEntity
 object StatementOwner {
 
     /**
-     * The person this statement is addressed to, or null when the name on it
-     * settles nothing.
-     *
-     * @param lines the extracted text, in order.
-     * @param people everybody the app knows about.
-     */
-    /**
      * The name the statement is addressed to, whether or not the app knows it.
      *
      * Reported separately from [detect] because "we read MR R M W EVANS and
@@ -60,13 +53,20 @@ object StatementOwner {
             ?.replace(WHITESPACE, " ")
 
     /** How a statement addresses somebody, at the start of the line. */
-    private val TITLE = Regex("""^(mr|mrs|miss|ms|dr|mx|sir|prof)[. ]""", RegexOption.IGNORE_CASE)
+    private val TITLE = Regex("""^(mr|mrs|miss|ms|dr|mx|sir|prof)[. ]""", RegexOption.IGNORE_CASE)
 
     /** Longer than this is an address line, not a name. */
     private const val LONGEST_NAME = 48
 
     private val WHITESPACE = Regex("\\s+")
 
+    /**
+     * The person this statement is addressed to, or null when the name on it
+     * settles nothing.
+     *
+     * @param lines the extracted text, in order.
+     * @param people everybody the app knows about.
+     */
     fun detect(lines: List<String>, people: List<PersonEntity>): PersonEntity? {
         if (people.isEmpty()) return null
         val heading = lines.take(HEADING_LINES)
