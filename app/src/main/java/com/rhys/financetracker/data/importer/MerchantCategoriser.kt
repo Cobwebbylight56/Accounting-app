@@ -57,8 +57,27 @@ object MerchantCategoriser {
      * word start fixes that while still letting "sainsbury" match
      * "sainsburys", which is the whole reason for matching on fragments.
      */
-    private fun matches(text: String, keyword: String): Boolean =
-        " $text ".contains(" $keyword")
+    private fun matches(text: String, keyword: String): Boolean {
+        if (" $text ".contains(" $keyword")) return true
+        // Banks truncate to the width of the column: "SAMSUNGFINAN",
+        // "NCC COLLECTI", "DWR CYMRU WE". A word long enough to be
+        // distinctive, which is where the keyword starts once the spaces come
+        // out of both, is that same payee cut short.
+        val squashed = keyword.replace(" ", "")
+        return text.split(' ').any { word ->
+            word.length >= MIN_TRUNCATED && squashed.length > word.length &&
+                squashed.startsWith(word)
+        }
+    }
+
+    /**
+     * How much of a truncated word must survive before it is matched.
+     *
+     * Long enough that it identifies one payee. Eight was not: "transfer" is
+     * eight characters and the start of "transferwise", so every "Transfer
+     * from RHYS EVANS" was filed as a payment service.
+     */
+    private const val MIN_TRUNCATED = 9
 
     /** One category and the words that mean it. */
     private data class Rule(val category: String, val keywords: List<String>)
@@ -101,6 +120,9 @@ object MerchantCategoriser {
             "tesco", "sainsbury", "asda", "aldi", "lidl", "morrisons", "waitrose",
             "co op", "coop", "iceland", "ocado", "farmfoods", "spar", "budgens",
             "marks and spencer", "m and s", "booths", "costcutter", "nisa",
+            "costco", "makro", "bookers", "heron foods", "premier stores",
+            "one stop", "mccoll", "londis", "premier store", "food warehouse",
+            "grocer", "butcher", "greengrocer", "milk and more", "milkman",
         ),
 
         // -- eating out and takeaways --------------------------------------
@@ -118,10 +140,27 @@ object MerchantCategoriser {
             "shell", "bp ", "esso", "texaco", "gulf", "murco", "applegreen", "jet ",
             "petrol", "fuel", "filling station", "service station",
         ),
-        rule("Car insurance", "admiral", "hastings direct", "churchill", "direct line", "esure"),
-        rule("MOT & servicing", "kwik fit", "halfords", "national tyres", "mot ", "garage"),
-        rule("Road tax", "dvla", "road tax", "vehicle tax"),
-        rule("Car finance", "car finance", "motability", "vehicle finance"),
+        rule(
+            "Car insurance",
+            "admiral", "hastings direct", "churchill", "direct line", "esure",
+            "goskippy", "go skippy", "pc goskippy", "ageas", "swinton", "1st central",
+            "one call", "marmalade", "veygo", "by miles", "tempcover", "car insurance",
+            "motor insurance", "gladiator", "quotemehappy", "sheilas wheels",
+        ),
+        rule(
+            "MOT & servicing",
+            "kwik fit", "halfords", "national tyres", "mot ", "garage", "formula one autocentre",
+            "protyre", "tyres", "autocentre", "motor factors", "euro car parts",
+            "car parts", "servicing", "bodyshop", "vehicle repair",
+        ),
+        rule("Road tax", "dvla", "road tax", "vehicle tax", "vehicle licence"),
+        rule(
+            "Car finance",
+            "car finance", "motability", "vehicle finance", "black horse", "moneybarn",
+            "advantage finance", "close brothers motor", "blue motor",
+        ),
+        rule("Parking", "ringgo", "paybyphone", "parkingeye", "ncp ", "car park", "parking"),
+        rule("Breakdown cover", "the aa", "aa membership", "rac ", "green flag", "breakdown"),
         rule(
             "Public transport",
             "trainline", "national rail", "tfl", "oyster", "stagecoach", "arriva",
@@ -129,7 +168,7 @@ object MerchantCategoriser {
         ),
 
         // -- home and bills -------------------------------------------------
-        rule("Council tax", "council tax", "council"),
+        rule("Council tax", "council tax", "council", "ncc collect", "cbc collect"),
         rule(
             "Energy",
             "octopus energy", "british gas", "e on", "eon ", "edf", "ovo energy",
@@ -149,11 +188,23 @@ object MerchantCategoriser {
         rule(
             "Mobile",
             "vodafone", "giffgaff", "lebara", "lycamobile", "id mobile", "o2 ",
-            "three uk", "ee limited", "ee ltd", "mobile",
+            "three uk", "ee limited", "ee ltd", "mobile", "smarty", "voxi",
+            "talkmobile", "vectone", "phone bill", "airtime",
         ),
-        rule("Mortgage", "mortgage"),
-        rule("Rent", "rent "),
-        rule("Repairs", "screwfix", "toolstation", "plumber", "electrician"),
+        rule("Mortgage", "mortgage", "halifax mtg", "nationwide mtg"),
+        rule("Rent", "rent ", "letting", "lettings", "landlord", "housing assoc"),
+        rule(
+            "Repairs",
+            "screwfix", "toolstation", "plumber", "electrician", "builder",
+            "joiner", "roofer", "handyman", "locksmith", "boiler", "gas safe",
+            "travis perkins", "jewson", "selco", "buildbase",
+        ),
+        rule(
+            "Home",
+            "dunelm", "the range home", "furniture", "carpetright", "sofology", "dfs ",
+            "oak furniture", "bensons for beds", "dreams ltd", "gardening", "garden centre",
+            "homeware", "cleaning", "window clean",
+        ),
 
         // -- insurance ------------------------------------------------------
         rule("Home insurance", "home insurance", "buildings insurance", "contents insurance"),
@@ -185,13 +236,42 @@ object MerchantCategoriser {
         // -- health, pets, children ------------------------------------------
         rule("Health", "boots", "superdrug", "pharmacy", "dentist", "dental", "specsavers",
             "vision express", "optician", "bupa", "nuffield"),
-        rule("Pets", "pets at home", "veterinary", "vets", "jollyes"),
-        rule("Childcare", "nursery", "childcare", "playgroup"),
-        rule("School", "school", "college fees"),
+        rule("Pets", "pets at home", "veterinary", "vets", "jollyes", "pet shop", "petplan"),
+        rule("Childcare", "nursery", "childcare", "playgroup", "childminder", "after school"),
+        rule("School", "school", "college fees", "uniform", "parentpay", "school meals"),
+        rule(
+            "Fitness",
+            "puregym", "the gym group", "david lloyd", "nuffield health", "gym",
+            "leisure centre", "swimming", "everyone active", "better uk", "myprotein",
+        ),
+        rule(
+            "Charity",
+            "save the children", "cancer research", "oxfam", "barnardos", "rspca",
+            "british red cross", "macmillan", "air ambulance", "justgiving", "charity",
+        ),
+        rule(
+            "Holidays",
+            "ryanair", "easyjet", "jet2", "tui ", "booking com", "airbnb", "expedia",
+            "hotels com", "premier inn", "travelodge", "haven holidays", "center parcs",
+            "national express", "eurotunnel", "brittany ferries", "airport",
+        ),
+        rule("Gifts", "moonpig", "card factory", "clintons", "funky pigeon", "interflora"),
 
         // -- money owed -------------------------------------------------------
-        rule("Credit & loans", "klarna", "clearpay", "paypal credit", "credit card",
-            "loan", "finance ltd"),
+        rule(
+            "Credit & loans",
+            "klarna", "clearpay", "paypal credit", "credit card", "loan", "finance ltd",
+            "samsung finance", "samsungfinance", "apple finance", "very finance",
+            "zopa", "novuna", "barclaycard", "capital one", "vanquis", "aqua card",
+            "tymit", "laybuy", "zilch", "monzo flex", "credit union",
+        ),
+
+        // -- money moved to a person, which no rule can name --------------
+        rule(
+            "Transfers & payments",
+            "paypal", "revolut", "wise ", "transferwise", "western union", "moneygram",
+            "gocardless", "sumup", "izettle", "square up", "stripe",
+        ),
     )
 
     /** Income is far less varied: a wage, a refund, or interest. */
@@ -201,11 +281,17 @@ object MerchantCategoriser {
         // same words as on the way out; only the direction differs.
         Rule("Savings", PotWords.SAVINGS),
         Rule("Cash", PotWords.CASH),
-        rule("Salary", "salary", "wages", "payroll", "pay ref"),
-        rule("Child benefit", "child benefit", "hmrc chb"),
-        rule("Benefits", "dwp", "universal credit", "hmrc", "pension credit"),
-        rule("Interest", "interest", "gross int"),
-        rule("Refunds", "refund", "reversal", "chargeback"),
+        rule("Salary", "salary", "wages", "payroll", "pay ref", "bacs credit", "wage"),
+        rule("Child benefit", "child benefit", "hmrc chb", "chb "),
+        rule(
+            "Benefits",
+            "dwp", "universal credit", "hmrc", "pension credit", "pip ", "esa ",
+            "tax credit", "housing benefit", "carers allowance", "attendance allowance",
+        ),
+        rule("Pension", "pension", "annuity", "nest pension", "aviva pension"),
+        rule("Interest", "interest", "gross int", "credit interest"),
+        rule("Refunds", "refund", "reversal", "chargeback", "reimbursement", "rebate"),
+        rule("Selling", "vinted", "depop", "gumtree", "facebook mktp", "ebay payout"),
     )
 
     /**

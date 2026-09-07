@@ -9,6 +9,7 @@ import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 
 /**
  * People in the household.
@@ -30,6 +31,9 @@ class PeopleRepository @Inject constructor(
     fun observe(id: Long): Flow<PersonEntity?> = personDao.observeById(id)
 
     suspend fun get(id: Long): PersonEntity? = personDao.getById(id)
+
+    /** Everybody still in use, read once rather than watched. */
+    suspend fun activePeople(): List<PersonEntity> = personDao.observeActive().first()
 
     suspend fun save(person: PersonEntity): AppResult<Long> =
         runCatchingApp("Could not save this person") {

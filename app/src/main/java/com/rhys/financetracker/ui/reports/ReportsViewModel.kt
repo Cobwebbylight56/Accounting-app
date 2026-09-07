@@ -54,6 +54,10 @@ class ReportsViewModel @Inject constructor(
     private val exported = MutableStateFlow<ExportedFile?>(null)
     private val orientation = MutableStateFlow(PageOrientation.PORTRAIT)
 
+    /** A PDF waiting for the screen to hand it to the print system. */
+    private val pendingPrint = MutableStateFlow<PrintJob?>(null)
+    val printJob: StateFlow<PrintJob?> = pendingPrint
+
     val state: StateFlow<ReportsState> = combine(
         combine(reportType, period, scope) { type, currentPeriod, currentScope ->
             Triple(type, currentPeriod, currentScope)
@@ -147,7 +151,14 @@ class ReportsViewModel @Inject constructor(
         }
     }
 
-    /** Produces the PDF and hands it straight to Android's print system. */
+    /**
+     * Produces the PDF and offers it up to be printed.
+     *
+     * The printing itself happens on the screen rather than here, because
+     * Android will only open a print dialog for an activity's context and a
+     * view model must not hold one. This was printing from the application
+     * context, which is why the button did nothing at all.
+     */
     fun print() {
         val current = report.value ?: return
         viewModelScope.launch {
@@ -158,7 +169,7 @@ class ReportsViewModel @Inject constructor(
                     orientation.value,
                 )
             ) {
-                is AppResult.Success -> reportPrinter.print(
+                is AppResult.Success -> pendingPrint.value = PrintJob(
                     file = result.data.file,
                     jobName = "${current.title} — ${current.period.label}",
                     landscape = orientation.value == PageOrientation.LANDSCAPE,
@@ -166,6 +177,14 @@ class ReportsViewModel @Inject constructor(
                 is AppResult.Failure -> message.value = result.message
             }
         }
+    }
+
+    /** Hands the job to the print system using the screen's own context. */
+    fun startPrinting(context: android.content.Context) {
+        val job = pendingPrint.value ?: return
+        pendingPrint.value = null
+        reportPrinter.print(context, job.file, job.jobName, job.landscape)
+            ?.let { message.value = it }
     }
 
     fun consumeExportedFile() {
@@ -176,6 +195,13 @@ class ReportsViewModel @Inject constructor(
         message.value = null
     }
 }
+
+/** A produced PDF, waiting for a context that can open the print dialog. */
+data class PrintJob(
+    val file: java.io.File,
+    val jobName: String,
+    val landscape: Boolean,
+)
 
 data class ReportsState(
     val reportType: ReportType = ReportType.MONTHLY_SPENDING,

@@ -34,6 +34,10 @@ class TransactionRepository @Inject constructor(
     fun observeBetween(start: LocalDate, end: LocalDate): Flow<List<TransactionWithDetails>> =
         transactionDao.observeBetween(start, end)
 
+    /** Every entry on a cash account, newest first — the cash pot's log. */
+    fun observeCashEntries(limit: Int = 50): Flow<List<TransactionWithDetails>> =
+        transactionDao.observeCashEntries(limit)
+
     fun observeForAccount(accountId: Long): Flow<List<TransactionWithDetails>> =
         transactionDao.observeForAccount(accountId)
 

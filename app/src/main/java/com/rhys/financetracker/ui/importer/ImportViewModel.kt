@@ -13,9 +13,11 @@ import com.rhys.financetracker.data.importer.ImportOutcome
 import com.rhys.financetracker.data.importer.ImportTarget
 import com.rhys.financetracker.data.importer.SheetData
 import com.rhys.financetracker.data.importer.SpreadsheetImporter
+import com.rhys.financetracker.data.importer.StatementOwner
 import com.rhys.financetracker.data.importer.WorkbookData
 import com.rhys.financetracker.data.local.projection.AccountOption
 import com.rhys.financetracker.data.repository.AccountRepository
+import com.rhys.financetracker.data.repository.PeopleRepository
 import com.rhys.financetracker.domain.model.TransactionType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -35,6 +37,7 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class ImportViewModel @Inject constructor(
     private val importer: SpreadsheetImporter,
+    private val peopleRepository: PeopleRepository,
     accountRepository: AccountRepository,
 ) : ViewModel() {
 
@@ -44,6 +47,34 @@ class ImportViewModel @Inject constructor(
     /** Offered when filing a statement, so the rows land on the right account. */
     val accounts: StateFlow<List<AccountOption>> = accountRepository.observeActiveOptions()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /**
+     * Reads the name printed at the top of a statement and says whose it is.
+     *
+     * The account holder is on every statement and is the one part of the file
+     * that says which person's money this is. Not reading it means being asked
+     * on every import, which is how a statement ends up filed against the
+     * wrong person — or against nobody, which is worse, since an account under
+     * nobody's name is invisible to every per-person view in the app.
+     *
+     * Never acted on by itself: it fills in the account picker's starting
+     * point and says what it found, and the choice stays with the user.
+     */
+    private fun findStatementOwner(uri: Uri) {
+        viewModelScope.launch {
+            val lines = importer.readPdfText(uri)?.lines() ?: return@launch
+            val owner = StatementOwner.detect(lines, peopleRepository.activePeople())
+                ?: return@launch
+            val theirs = accounts.value.filter { it.personName == owner.name }
+            _state.value = _state.value.copy(
+                statementOwnerName = owner.name,
+                // Only when it is unambiguous. Picking the first of several
+                // would be filing a statement against a guess.
+                preselectedAccountId = _state.value.preselectedAccountId
+                    ?: theirs.singleOrNull()?.id,
+            )
+        }
+    }
 
     /**
      * Step 1: read the file the user picked.
@@ -83,7 +114,10 @@ class ImportViewModel @Inject constructor(
                                 },
                             )
                         },
-                    ).also { newState -> refreshCandidates(newState) }
+                    ).also { newState ->
+                        refreshCandidates(newState)
+                        if (statement != null) findStatementOwner(uri)
+                    }
                 }
                 is AppResult.Failure -> _state.value = _state.value.copy(
                     isBusy = false,
@@ -439,6 +473,9 @@ data class ImportState(
     val accountFit: AccountFitCheck.Verdict? = null,
     /** The account this import was started from, when it began on one. */
     val preselectedAccountId: Long? = null,
+
+    /** Who the statement is addressed to, when the name on it settles it. */
+    val statementOwnerName: String? = null,
     /** Text pulled from a PDF whose layout was not recognised, for showing. */
     val unreadablePdfText: String? = null,
     val usingDetectedLayout: Boolean = false,

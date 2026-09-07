@@ -269,7 +269,14 @@ private fun ScopeSelector(
     state: DashboardState,
     onScopeChange: (DashboardScope) -> Unit,
 ) {
-    if (state.people.size <= 1 && state.accounts.size <= 1) return
+    // Never hidden once a person is picked. [accounts] is the *filtered* list,
+    // so choosing somebody with one account or none could satisfy this and
+    // take the chips off the screen — including the "Everyone" chip, which is
+    // the only way back. There was then no way out of that person's view but
+    // to kill the app. The unfiltered count is what this question was always
+    // about.
+    val isFiltered = state.scope.personId != null || state.scope.accountId != null
+    if (!isFiltered && state.people.size <= 1 && state.accountsInTotal <= 1) return
 
     androidx.compose.foundation.lazy.LazyRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -329,7 +336,7 @@ private fun DashboardCard(
             RecentTransactionsCard(state, onOpenTransaction, onAddTransaction, onMonthClick)
         DashboardWidget.SAVINGS_AND_CASH -> SavingsAndCashCard(state, onOpenAccounts)
         DashboardWidget.CASH_IN_HAND ->
-            CashInHandCard(state, onStartCashPot, onAdjustCash)
+            CashInHandCard(state, onStartCashPot, onAdjustCash, onOpenTransaction)
         DashboardWidget.SAVINGS_PROGRESS -> SavingsProgressCard(state, onOpenSavings)
         DashboardWidget.SPENDING_BY_CATEGORY ->
             SpendingByCategoryCard(state, onCategoryClick)

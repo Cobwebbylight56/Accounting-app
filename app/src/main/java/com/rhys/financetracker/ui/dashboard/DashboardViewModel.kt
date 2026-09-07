@@ -255,6 +255,7 @@ class DashboardViewModel @Inject constructor(
             savingsThisMonth,
             cashThisMonth,
             savingsEverMoved,
+            transactionRepository.observeCashEntries(CASH_LOG_LENGTH),
             // Only for saying where the money is when the month on screen is
             // empty. Opening on today's month and finding nothing looks like a
             // broken app when the entries are simply in an earlier month.
@@ -286,7 +287,8 @@ class DashboardViewModel @Inject constructor(
         val savings = values[16] as PotFlow
         val cash = values[17] as PotFlow
         val savingsEver = values[18] as PotFlow
-        val latest = (values[19] as List<TransactionWithDetails>)
+        val cashLog = values[19] as List<TransactionWithDetails>
+        val latest = (values[20] as List<TransactionWithDetails>)
             .firstOrNull()?.transaction?.date
 
         val inScope = accountList.filter { currentScope.matches(it) }
@@ -327,6 +329,7 @@ class DashboardViewModel @Inject constructor(
             insightCount = insights.insights.size,
             accountActivity = activity,
             widgets = mergeWidgets(widgets),
+            cashLog = cashLog,
             accountsInTotal = accountList.size,
             unassignedAccounts = unassigned,
             latestEntryDate = latest,
@@ -552,6 +555,9 @@ class DashboardViewModel @Inject constructor(
         val FIRST_POSSIBLE_DATE: LocalDate = LocalDate.of(1900, 1, 1)
         const val CASH_POT_NAME = "Cash in the house"
         const val CASH_POT_COLOUR = "#6D4C41"
+
+        /** How much of the cash pot's history the card can show. */
+        const val CASH_LOG_LENGTH = 50
         const val MONTHS_ON_CHART = 6
         const val UPCOMING_DAYS = 30L
     }
@@ -591,6 +597,9 @@ data class DashboardState(
     val upcomingBills: List<RecurringRuleWithDetails> = emptyList(),
     val overdueBills: List<RecurringRuleWithDetails> = emptyList(),
     val monthTransactions: List<TransactionWithDetails> = emptyList(),
+    /** What has gone into and out of the cash pot, newest first. */
+    val cashLog: List<TransactionWithDetails> = emptyList(),
+
     /** Every account, whoever it belongs to — the person filter narrows [accounts]. */
     val accountsInTotal: Int = 0,
     /** Accounts nobody owns, which no person filter can ever show. */

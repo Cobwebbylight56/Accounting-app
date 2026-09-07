@@ -111,6 +111,25 @@ class MerchantCategoriserTest {
     }
 
     @Test
+    fun `a payee cut short by the bank is still recognised`() {
+        // Statements truncate to the width of the column, and every one of
+        // these came through uncategorised because the full name never
+        // appeared: "SAMSUNGFINAN", "DWR CYMRU WE", "NCC COLLECTI".
+        assertEquals("Credit & loans", categoryFor("Direct debit SAMSUNGFINAN"))
+        assertEquals("Water", categoryFor("Direct debit DWR CYMRU WE"))
+        assertEquals("Car insurance", categoryFor("Direct debit PC/GOSKIPPY INS"))
+        assertEquals("Groceries", categoryFor("COSTCO WHOLESALE #120"))
+    }
+
+    @Test
+    fun `a short word is never treated as a truncation`() {
+        // The tolerance only applies to words long enough to name one payee.
+        // At five characters a cut-off word is half the alphabet.
+        assertNull(categoryFor("SAMS"))
+        assertNull(categoryFor("COST"))
+    }
+
+    @Test
     fun `recognises the everyday shops`() {
         assertEquals("Groceries", categoryFor("TESCO STORES 3294"))
         assertEquals("Groceries", categoryFor("ALDI 812 CARDIFF"))

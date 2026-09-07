@@ -253,6 +253,18 @@ You can also set either by hand on any entry: open it and pick **Savings** or
 **Cash** as the category. That works on income and expenses alike, and the app
 remembers the payee — correct one and every future import of it follows.
 
+### Whose statement is it
+
+Every statement carries the account holder at the top — "MR R M W EVANS" — and
+the importer now reads it. When the name matches somebody in the app and only
+one person fits, it says so on the import card and starts the account picker on
+that person's account. It never decides alone: a joint account carries both
+names and post gets forwarded, so two matches means it asks rather than guesses.
+
+Matching is on the **surname plus a first initial**, because statements almost
+never print a full first name — and a surname alone would name everybody in the
+household and settle nothing.
+
 ### Cash in hand
 
 The notes in the house are the one balance no statement will ever tell you, so
@@ -270,6 +282,11 @@ What does come here is cash that arrives without the bank ever seeing it:
 * what was left over,
 * what something sold for,
 * what somebody gave you.
+
+Every Put in and Spent is listed under the pot, newest first, as **Cash in and
+out** — five at a time with a **Show all** button. Tap any line to open it and
+change it. A running total on its own is a number you cannot check, and this is
+the only record there is: no statement holds any of it.
 
 The **Cash in hand** card on Home starts empty with a **Start a cash pot**
 button. After that it shows what is in the pot, a box for what it was for, a

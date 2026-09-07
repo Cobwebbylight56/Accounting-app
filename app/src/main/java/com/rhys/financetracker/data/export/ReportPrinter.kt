@@ -23,18 +23,28 @@ import javax.inject.Singleton
  * The PDF is generated first and simply streamed to the printer, rather than
  * being re-laid-out for each print job.  That guarantees the printed page is
  * byte-for-byte what the user previewed and shared.
+ *
+ * ## Why the context is a parameter
+ *
+ * Printing puts a window on the screen, and Android will only do that for a
+ * context that belongs to an activity. This class was injected with the
+ * application context, so every print either threw or did nothing at all —
+ * the button worked, and no printer dialog ever appeared. The caller passes
+ * the context it is drawn in instead, which is the activity's.
  */
 @Singleton
-class ReportPrinter @Inject constructor(
-    private val context: Context,
-) {
+class ReportPrinter @Inject constructor() {
 
     /**
+     * @param context must come from an activity — `LocalContext.current` in a
+     *   composable is one. An application context silently prints nothing.
      * @param file a PDF produced by [PdfReportGenerator].
      * @param jobName shown in the print queue.
+     * @return null on success, or a message to show the user.
      */
-    fun print(file: File, jobName: String, landscape: Boolean) {
-        val printManager = context.getSystemService<PrintManager>() ?: return
+    fun print(context: Context, file: File, jobName: String, landscape: Boolean): String? {
+        val printManager = context.getSystemService<PrintManager>()
+            ?: return "This device has no printing service."
         val attributes = PrintAttributes.Builder()
             .setMediaSize(
                 if (landscape) PrintAttributes.MediaSize.ISO_A4.asLandscape()
@@ -46,7 +56,14 @@ class ReportPrinter @Inject constructor(
             .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
             .build()
 
-        printManager.print(jobName, FilePrintAdapter(file, jobName), attributes)
+        // Printing needs an activity to put its dialog on. Reaching here with
+        // anything else throws, and the throw used to take the app down rather
+        // than say what went wrong.
+        return runCatching {
+            printManager.print(jobName, FilePrintAdapter(file, jobName), attributes)
+        }.exceptionOrNull()?.let {
+            "Android would not open the print dialog. Export as PDF and print that instead."
+        }
     }
 
     /** Streams an existing PDF file to the print framework. */

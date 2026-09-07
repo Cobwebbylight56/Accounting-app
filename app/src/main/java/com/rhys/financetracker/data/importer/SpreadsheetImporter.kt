@@ -828,19 +828,32 @@ class SpreadsheetImporter @Inject constructor(
         }
     }
 
-    /** Picks a sensible account type from the name the sheet uses. */
+    /**
+     * Picks a sensible account type from the name the sheet uses.
+     *
+     * The savings test is the whole [PotWords.SAVINGS] list rather than a
+     * couple of words, because "saver" and "saving" between them miss most of
+     * what the banks actually call these accounts. "START TO SAVE" contains
+     * neither, so a Nationwide saver came out as a current account — and a
+     * current account is spendable, so a month's savings were counted as
+     * money to spend.
+     */
     internal fun guessAccountType(name: String): AccountType {
         val text = name.lowercase()
+        val padded = " ${TransactionFingerprint.normaliseDescription(name)} "
+        fun saysSavings() = PotWords.SAVINGS.any { padded.contains(" $it") }
         return when {
+            // Before savings: a cash tin is not a saver, whatever it is for.
             text.contains("cash") || text.contains("coin") || text.contains("wallet") ->
                 AccountType.CASH
-            text.contains("credit") || text.contains("card") -> AccountType.CREDIT_CARD
             text.contains("mortgage") -> AccountType.MORTGAGE
             text.contains("loan") || text.contains("finance") -> AccountType.LOAN
+            text.contains("pension") -> AccountType.PENSION
+            // Before the card test, or "CASH ISA CARD" lands on a credit card.
             text.contains("isa") || text.contains("invest") || text.contains("share") ->
                 AccountType.INVESTMENT
-            text.contains("pension") -> AccountType.PENSION
-            text.contains("saver") || text.contains("saving") -> AccountType.SAVINGS
+            saysSavings() -> AccountType.SAVINGS
+            text.contains("credit") || text.contains("card") -> AccountType.CREDIT_CARD
             else -> AccountType.CURRENT
         }
     }

@@ -91,6 +91,14 @@ fun ReportsScreen(
         }
     }
 
+    // Printing has to start from the screen: Android opens its dialog on an
+    // activity, and a view model has no business holding one.
+    val printContext = androidx.compose.ui.platform.LocalContext.current
+    val printJob by viewModel.printJob.collectAsStateWithLifecycle()
+    LaunchedEffect(printJob) {
+        if (printJob != null) viewModel.startPrinting(printContext)
+    }
+
     LaunchedEffect(state.exportedFile) {
         state.exportedFile?.let {
             onShareFile(it)

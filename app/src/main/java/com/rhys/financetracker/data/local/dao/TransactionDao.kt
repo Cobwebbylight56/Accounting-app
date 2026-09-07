@@ -75,6 +75,20 @@ interface TransactionDao {
     )
     fun observeBetween(start: LocalDate, end: LocalDate): Flow<List<TransactionWithDetails>>
 
+    /**
+     * The cash pot's history: every entry on a cash account, newest first.
+     *
+     * A running total on its own is a number you cannot check. Where it came
+     * from and what it went on is the part worth keeping, and it is the only
+     * record of it — no statement anywhere holds these.
+     */
+    @Query(
+        "SELECT $DETAIL_COLUMNS $DETAIL_JOINS " +
+            "WHERE t.is_archived = 0 AND a.type = 'CASH' " +
+            "ORDER BY t.date DESC, t.id DESC LIMIT :limit",
+    )
+    fun observeCashEntries(limit: Int): Flow<List<TransactionWithDetails>>
+
     @Query(
         "SELECT $DETAIL_COLUMNS $DETAIL_JOINS " +
             "WHERE t.is_archived = 0 AND (t.account_id = :accountId OR t.transfer_account_id = :accountId) " +

@@ -313,6 +313,18 @@ private fun DetectedStatementCard(state: ImportState, viewModel: ImportViewModel
                 "the app are skipped, so importing overlapping statements is safe.",
             style = MaterialTheme.typography.bodyMedium,
         )
+        // The name at the top of the statement, when it settles whose it is.
+        // Said rather than acted on: a joint account carries both names, and
+        // post gets forwarded.
+        state.statementOwnerName?.let { owner ->
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "The name on this statement is $owner's" +
+                    if (preselected != null) ", so their account is chosen below." else ".",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
         Spacer(Modifier.height(12.dp))
         DropdownField(
             label = if (preselected != null) "Adding to" else "Add these to",

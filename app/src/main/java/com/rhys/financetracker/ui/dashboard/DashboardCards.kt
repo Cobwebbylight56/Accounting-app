@@ -513,8 +513,10 @@ internal fun CashInHandCard(
     state: DashboardState,
     onStartCashPot: () -> Unit,
     onAdjustCash: (Long, String, String, Boolean) -> Unit,
+    onOpenTransaction: (Long) -> Unit,
 ) {
     val pots = state.accounts.filter { it.account.type == AccountType.CASH }
+    var showWholeLog by rememberSaveable { mutableStateOf(false) }
 
     SectionCard(title = "Cash in hand", subtitle = "In the house") {
         if (pots.isEmpty()) {
@@ -533,8 +535,80 @@ internal fun CashInHandCard(
         }
 
         pots.forEach { pot -> CashPotRow(pot, onAdjustCash) }
+
+        // The log. A running total on its own is a number you cannot check —
+        // where it came from and what it went on is the part worth keeping,
+        // and no statement anywhere holds any of it.
+        if (state.cashLog.isNotEmpty()) {
+            Spacer(Modifier.height(4.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(10.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Cash in and out",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.weight(1f),
+                )
+                if (state.cashLog.size > CASH_LOG_SHOWN) {
+                    TextButton(onClick = { showWholeLog = !showWholeLog }) {
+                        Text(if (showWholeLog) "Show less" else "Show all ${state.cashLog.size}")
+                    }
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+            val shown = if (showWholeLog) {
+                state.cashLog
+            } else {
+                state.cashLog.take(CASH_LOG_SHOWN)
+            }
+            shown.forEach { entry -> CashLogRow(entry, onOpenTransaction) }
+        }
     }
 }
+
+/** One line of the cash log: when, what for, and which way it went. */
+@Composable
+private fun CashLogRow(item: TransactionWithDetails, onOpenTransaction: (Long) -> Unit) {
+    val colors = FinanceTheme.colors
+    val entry = item.transaction
+    val isIn = entry.type == TransactionType.INCOME
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onOpenTransaction(entry.id) }
+            .padding(vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = entry.description,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = listOfNotNull(DateUtils.formatShort(entry.date), item.categoryName)
+                    .joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Text(
+            text = if (isIn) {
+                "+${Money.format(entry.amountMinor)}"
+            } else {
+                "−${Money.format(entry.amountMinor)}"
+            },
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (isIn) colors.positive else colors.negative,
+        )
+    }
+}
+
+/** How much of the cash log the card shows before it is opened out. */
+private const val CASH_LOG_SHOWN = 5
 
 /** One cash pot, with the two things ever done to it. */
 @Composable
