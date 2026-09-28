@@ -1,29 +1,29 @@
 package com.rhys.financetracker.data
 
 import com.rhys.financetracker.data.local.entity.AccountEntity
+import com.rhys.financetracker.data.local.entity.CashPotEntryEntity
 import com.rhys.financetracker.data.local.projection.AccountWithBalance
 import com.rhys.financetracker.data.local.projection.PotFlow
-import com.rhys.financetracker.domain.report.FinancialSummary
 import com.rhys.financetracker.domain.model.AccountType
+import com.rhys.financetracker.domain.model.Holding
+import com.rhys.financetracker.domain.report.FinancialSummary
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
 
 /**
- * Which accounts count as "Saved" rather than "Available".
+ * Which money counts as Available, Saved and Owed.
  *
- * The type alone cannot decide it. A current account nobody touches is savings
- * to the person who owns it, and an account called "cash" can be the money set
- * aside rather than the money to hand — so the owner can say, and the type is
- * only the default.
+ * One stored answer per account — its [Holding] — and nothing else. The type
+ * only suggests it when the account is made.
  */
 class SavingsClassificationTest {
 
     private fun account(
         name: String,
         type: AccountType,
-        countsAsSavings: Boolean? = null,
+        holding: Holding = type.defaultHolding,
         balanceMinor: Long = 100_000L,
         personId: Long? = null,
     ) = AccountWithBalance(
@@ -31,44 +31,48 @@ class SavingsClassificationTest {
             id = 1L,
             name = name,
             type = type,
+            holding = holding,
             personId = personId,
             openingBalanceMinor = 0L,
             openingBalanceDate = LocalDate.of(2026, 1, 1),
             colorHex = "#455A64",
-            countsAsSavings = countsAsSavings,
         ),
         balanceMinor = balanceMinor,
         personName = null,
     )
 
     @Test
-    fun `the type decides when nobody has said otherwise`() {
+    fun `the type suggests where an account counts`() {
         assertTrue(account("Saver", AccountType.SAVINGS).isSavings)
         assertTrue(account("Pension", AccountType.PENSION).isSavings)
         assertTrue(!account("Main account", AccountType.CURRENT).isSavings)
-        // Cash too: the notes in the house are money being held, not money in
-        // the account you spend from.
-        assertTrue(account("cash", AccountType.CASH).isSavings)
+        assertTrue(account("Barclaycard", AccountType.CREDIT_CARD).isLiability)
     }
 
     @Test
-    fun `saying so overrides the type in both directions`() {
-        // The case this was built for: money kept in an ordinary account or in
-        // cash, which the app was counting as spendable.
-        assertTrue(account("bank", AccountType.CURRENT, countsAsSavings = true).isSavings)
-        assertTrue(account("cash", AccountType.CASH, countsAsSavings = true).isSavings)
+    fun `the holding is the answer, whatever the type`() {
+        // The case this was built for: a saver typed as a current account,
+        // which sat in Available while Saved said there was nothing saved.
+        val saver = account("saver", AccountType.CURRENT, holding = Holding.SET_ASIDE)
+        assertTrue(saver.isSavings)
+        assertTrue(!saver.isLiability)
+        // A current account kept untouched in case the main one is lost.
+        assertTrue(account("Spare", AccountType.CURRENT, holding = Holding.SET_ASIDE).isSavings)
         // And the other way, for a savings account being spent down.
-        assertTrue(!account("Saver", AccountType.SAVINGS, countsAsSavings = false).isSavings)
+        assertTrue(!account("Saver", AccountType.SAVINGS, holding = Holding.SPEND).isSavings)
+    }
+
+    @Test
+    fun `cash is not an account type`() {
+        // Notes in the house are the cash pot, which belongs to nobody's
+        // account; there is nothing to pick when making an account.
+        assertTrue(AccountType.entries.none { it.name == "CASH" })
     }
 
     @Test
     fun `an account nobody owns belongs to no person's view`() {
-        // The fault behind "when I select Rhys it just wants me to add an
-        // account": an imported account with no owner is filtered out of every
-        // person's slice of the app while still holding all of the money, and
-        // nothing on either screen said the two were connected.
         val owned = account("Main account", AccountType.CURRENT, personId = 1L)
-        val nobodys = account("Rhys Evans", AccountType.CURRENT, personId = null)
+        val nobodys = account("Main account", AccountType.CURRENT, personId = null)
         val all = listOf(owned, nobodys)
 
         assertEquals(listOf(owned), all.filter { it.account.personId == 1L })
@@ -78,107 +82,63 @@ class SavingsClassificationTest {
 
     @Test
     fun `a month is judged on both directions, not only what went in`() {
-        // The fault: only payments into a saver were counted. A month that put
-        // £200 in and took £500 back out was reported as having saved £200,
-        // when it had drawn its savings down by £300.
         val month = PotFlow(intoPotMinor = 20_000L, outOfPotMinor = 50_000L)
         assertEquals(-30_000L, month.netMinor)
-
-        val saving = PotFlow(intoPotMinor = 25_000L, outOfPotMinor = 0L)
-        assertEquals(25_000L, saving.netMinor)
+        assertEquals(25_000L, PotFlow(intoPotMinor = 25_000L, outOfPotMinor = 0L).netMinor)
         assertEquals(0L, PotFlow.EMPTY.netMinor)
     }
 
     @Test
-    fun `what the app has watched move stands in for a saver it cannot see`() {
-        // With no savings account in the app there is no balance to show, and
-        // £0.00 was a lie about a household saving every month. The movements
-        // it has seen are the honest answer.
-        val summary = FinancialSummary(
-            totalBalanceMinor = 553_424L,
-            totalSavingsMinor = 0L,
-            totalLiabilitiesMinor = 0L,
-            netWorthMinor = 553_424L,
-            monthIncomeMinor = 0L,
-            monthExpenseMinor = 0L,
-            committedRecurringMinor = 0L,
-            savingsInMinor = 5_000L,
-            savingsOutMinor = 0L,
-            savingsEverMovedMinor = 15_000L,
-            cashOutMinor = 4_000L,
-            cashInMinor = 1_000L,
+    fun `money put aside is not spending, but it is not left to spend either`() {
+        // Income and spending totals leave savings out entirely, so the
+        // month's figures are what was earned and spent. What was put aside
+        // is taken off what is left to spend instead.
+        val summary = FinancialSummary.EMPTY.copy(
+            monthIncomeMinor = 200_000L,
+            monthExpenseMinor = 120_000L,
+            committedRecurringMinor = 30_000L,
+            savingsInMinor = 25_000L,
+            savingsOutMinor = 5_000L,
         )
-        assertEquals(5_000L, summary.savingsNetMinor)
-        assertEquals(3_000L, summary.cashNetMinor)
-        assertTrue(summary.hasSavingsActivity)
-        assertTrue(summary.hasPotActivity)
-        assertTrue(!FinancialSummary.EMPTY.hasPotActivity)
-        // Cash alone is not savings activity: the savings card must not open
-        // with three zeroes just because somebody visited a machine.
+        assertEquals(80_000L, summary.monthNetMinor)
+        assertEquals(20_000L, summary.savingsNetMinor)
+        assertEquals(30_000L, summary.disposableMinor)
+    }
+
+    @Test
+    fun `cash alone is not savings activity`() {
         val cashOnly = FinancialSummary.EMPTY.copy(cashOutMinor = 4_000L)
         assertTrue(!cashOnly.hasSavingsActivity)
         assertTrue(cashOnly.hasPotActivity)
+        assertTrue(!FinancialSummary.EMPTY.hasPotActivity)
     }
 
     @Test
-    fun `cash in the house is money set aside`() {
-        // The notes in the house are money you are holding, not money in the
-        // account you spend from. Counted as available they made "to spend"
-        // larger than anything you could actually spend.
-        val pot = account("Cash in the house", AccountType.CASH, balanceMinor = 4_000L)
-        assertTrue(pot.isSavings)
-        assertTrue(!pot.isLiability)
-        // And the owner can still say otherwise, either way.
-        assertTrue(
-            !account("Cash in the house", AccountType.CASH, countsAsSavings = false).isSavings,
+    fun `the cash pot total is what went in less what came out`() {
+        val entries = listOf(
+            CashPotEntryEntity(date = LocalDate.of(2026, 9, 1), amountMinor = 151_000L, isIn = true),
+            CashPotEntryEntity(date = LocalDate.of(2026, 9, 3), amountMinor = 2_500L, isIn = false),
+            CashPotEntryEntity(date = LocalDate.of(2026, 9, 9), amountMinor = 4_000L, isIn = true),
         )
+        assertEquals(152_500L, entries.sumOf { it.signedMinor })
     }
 
     @Test
-    fun `money seen leaving a saver is never shown as a negative balance`() {
-        // What "Saved -£200.00" was: with no savings account in the app, the
-        // tile stands in the movements it has watched — and a month that only
-        // saw £200 come out of a saver makes that figure negative. A movement
-        // wearing a balance's label reads as money owed.
-        val onlyWentOut = FinancialSummary.EMPTY.copy(savingsEverMovedMinor = -20_000L)
-        assertEquals(-20_000L, onlyWentOut.savingsEverMovedMinor)
-        // The tile shows nothing rather than a negative, because there is no
-        // savings account for it to be the balance of.
-        assertEquals(0L, savedTile(onlyWentOut))
-
-        // Money in, and it stands in for the balance it has no account for.
-        assertEquals(15_000L, savedTile(FinancialSummary.EMPTY.copy(savingsEverMovedMinor = 15_000L)))
-
-        // A real savings account always wins, whatever the movements said.
-        val withAccount = FinancialSummary.EMPTY.copy(
-            totalSavingsMinor = 300_000L,
-            savingsEverMovedMinor = -20_000L,
-        )
-        assertEquals(300_000L, savedTile(withAccount))
-    }
-
-    /** The Saved tile's rule, kept here so it can be checked without a screen. */
-    private fun savedTile(summary: FinancialSummary): Long = when {
-        summary.totalSavingsMinor != 0L -> summary.totalSavingsMinor
-        summary.savingsEverMovedMinor > 0L -> summary.savingsEverMovedMinor
-        else -> 0L
-    }
-
-    @Test
-    fun `the two totals split the money without dropping or double counting it`() {
+    fun `the three totals split the money without dropping or double counting it`() {
         val accounts = listOf(
             account("Main account", AccountType.CURRENT, balanceMinor = -9_382L),
-            account("bank", AccountType.CURRENT, countsAsSavings = true, balanceMinor = 300_000L),
-            account("cash", AccountType.CASH, balanceMinor = 151_000L),
+            account("bank", AccountType.CURRENT, holding = Holding.SET_ASIDE, balanceMinor = 300_000L),
             account("saver mum", AccountType.SAVINGS, balanceMinor = 190_000L),
+            account("Barclaycard", AccountType.CREDIT_CARD, balanceMinor = -45_000L),
         )
         val saved = accounts.filter { it.isSavings }.sumOf { it.balanceMinor }
+        val owed = accounts.filter { it.isLiability }.sumOf { it.balanceMinor }
         val available = accounts.filterNot { it.isSavings || it.isLiability }
             .sumOf { it.balanceMinor }
 
-        assertEquals(641_000L, saved)
+        assertEquals(490_000L, saved)
+        assertEquals(-45_000L, owed)
         assertEquals(-9_382L, available)
-        // Every pound is in exactly one of the two.
-        assertEquals(accounts.sumOf { it.balanceMinor }, saved + available)
+        assertEquals(accounts.sumOf { it.balanceMinor }, saved + owed + available)
     }
 }

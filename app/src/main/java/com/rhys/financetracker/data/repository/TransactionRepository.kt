@@ -11,6 +11,7 @@ import com.rhys.financetracker.data.local.projection.AccountActivity
 import com.rhys.financetracker.data.local.projection.CategoryTotal
 import com.rhys.financetracker.data.local.projection.IncomeExpenseTotals
 import com.rhys.financetracker.data.local.projection.MonthTotals
+import com.rhys.financetracker.data.local.projection.PersonPotFlow
 import com.rhys.financetracker.data.local.projection.PersonTotals
 import com.rhys.financetracker.data.local.projection.PotFlow
 import com.rhys.financetracker.data.local.projection.TransactionWithDetails
@@ -33,10 +34,6 @@ class TransactionRepository @Inject constructor(
 
     fun observeBetween(start: LocalDate, end: LocalDate): Flow<List<TransactionWithDetails>> =
         transactionDao.observeBetween(start, end)
-
-    /** Every entry on a cash account, newest first — the cash pot's log. */
-    fun observeCashEntries(limit: Int = 50): Flow<List<TransactionWithDetails>> =
-        transactionDao.observeCashEntries(limit)
 
     fun observeForAccount(accountId: Long): Flow<List<TransactionWithDetails>> =
         transactionDao.observeForAccount(accountId)
@@ -95,6 +92,12 @@ class TransactionRepository @Inject constructor(
         personId: Long? = null,
     ): Flow<List<MonthTotals>> =
         transactionDao.observeMonthlyTotals(start, end, accountId, personId)
+
+    fun observePotFlowByPerson(
+        kind: CategoryKind,
+        start: LocalDate,
+        end: LocalDate,
+    ): Flow<List<PersonPotFlow>> = transactionDao.observePotFlowByPerson(kind.name, start, end)
 
     fun observePersonTotals(start: LocalDate, end: LocalDate): Flow<List<PersonTotals>> =
         transactionDao.observePersonTotals(start, end)

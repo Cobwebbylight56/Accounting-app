@@ -13,13 +13,16 @@ import com.rhys.financetracker.data.importer.ImportOutcome
 import com.rhys.financetracker.data.importer.ImportTarget
 import com.rhys.financetracker.data.importer.SheetData
 import com.rhys.financetracker.data.importer.SpreadsheetImporter
+import com.rhys.financetracker.data.importer.StatementKind
 import com.rhys.financetracker.data.importer.StatementOwner
 import com.rhys.financetracker.data.importer.WorkbookData
+import com.rhys.financetracker.data.local.entity.AccountEntity
 import com.rhys.financetracker.data.local.entity.PersonEntity
 import com.rhys.financetracker.data.local.projection.AccountOption
 import com.rhys.financetracker.data.local.seed.DefaultData
 import com.rhys.financetracker.data.repository.AccountRepository
 import com.rhys.financetracker.data.repository.PeopleRepository
+import com.rhys.financetracker.domain.model.Holding
 import com.rhys.financetracker.domain.model.TransactionType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -40,7 +43,7 @@ import kotlinx.coroutines.launch
 class ImportViewModel @Inject constructor(
     private val importer: SpreadsheetImporter,
     private val peopleRepository: PeopleRepository,
-    accountRepository: AccountRepository,
+    private val accountRepository: AccountRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ImportState())
@@ -62,22 +65,35 @@ class ImportViewModel @Inject constructor(
      * Never acted on by itself: it fills in the account picker's starting
      * point and says what it found, and the choice stays with the user.
      */
-    private fun findStatementOwner(uri: Uri) {
+    private fun findStatementOwner(uri: Uri, fileName: String?) {
         viewModelScope.launch {
-            val lines = importer.readPdfText(uri)?.lines() ?: return@launch
+            val lines = importer.readPdfText(uri)?.lines().orEmpty()
+            // What kind of account this is a statement for, from its heading
+            // (or a CSV's file name). It narrows the account picker to
+            // accounts of the same kind, which is what stops a saver's
+            // statement being filed against a current account.
+            val kind = StatementKind.detect(lines, fileName)
+            _state.value = _state.value.copy(statementKind = kind)
             val people = peopleRepository.activePeople()
-            val owner = StatementOwner.detect(lines, people)
+            val owner = if (lines.isEmpty()) null else StatementOwner.detect(lines, people)
             if (owner == null) {
                 // Nobody here is called that. Worth saying: staying quiet
                 // looked exactly like not having read the statement at all,
                 // and the answer — add them — is one the user can act on.
-                val printed = StatementOwner.nameOnStatement(lines) ?: return@launch
-                if (people.none { it.name.equals(printed, ignoreCase = true) }) {
+                val printed = StatementOwner.nameOnStatement(lines)
+                if (printed != null && people.none { it.name.equals(printed, ignoreCase = true) }) {
                     _state.value = _state.value.copy(unknownOwnerName = printed)
                 }
+                val matching = accounts.value.filter { kind == null || it.holding == kind.kind.holding }
+                _state.value = _state.value.copy(
+                    preselectedAccountId = _state.value.preselectedAccountId
+                        ?: matching.singleOrNull()?.id,
+                )
                 return@launch
             }
-            val theirs = accounts.value.filter { it.personName == owner.name }
+            val theirs = accounts.value.filter {
+                it.personName == owner.name && (kind == null || it.holding == kind.kind.holding)
+            }
             _state.value = _state.value.copy(
                 statementOwnerName = owner.name,
                 unknownOwnerName = null,
@@ -86,6 +102,48 @@ class ImportViewModel @Inject constructor(
                 preselectedAccountId = _state.value.preselectedAccountId
                     ?: theirs.singleOrNull()?.id,
             )
+        }
+    }
+
+    /**
+     * Makes the account this statement is for, under the person it is
+     * addressed to, and chooses it.
+     *
+     * For the first statement from a saver the app has never seen: rather than
+     * leaving it to be filed against whatever account exists, the statement
+     * says what it is — "Start to Save", a savings account — and that is what
+     * is made, already set aside.
+     */
+    fun createAccountForStatement() {
+        val found = _state.value.statementKind ?: return
+        viewModelScope.launch {
+            val ownerName = _state.value.statementOwnerName
+            val owner = peopleRepository.activePeople()
+                .firstOrNull { it.name == ownerName }
+                ?: peopleRepository.activePeople().singleOrNull()
+            val name = found.productName ?: found.kind.accountType.displayName
+            val existing = accounts.value.firstOrNull {
+                it.name.equals(name, ignoreCase = true) && it.personName == owner?.name
+            }
+            if (existing != null) {
+                _state.value = _state.value.copy(preselectedAccountId = existing.id)
+                return@launch
+            }
+            when (
+                val made = accountRepository.save(
+                    AccountEntity(
+                        name = name,
+                        type = found.kind.accountType,
+                        holding = found.kind.holding,
+                        personId = owner?.id,
+                        colorHex = DefaultData.PALETTE.random(),
+                    ),
+                )
+            ) {
+                is AppResult.Success ->
+                    _state.value = _state.value.copy(preselectedAccountId = made.data)
+                is AppResult.Failure -> _state.value = _state.value.copy(error = made.message)
+            }
         }
     }
 
@@ -129,7 +187,7 @@ class ImportViewModel @Inject constructor(
                         },
                     ).also { newState ->
                         refreshCandidates(newState)
-                        if (statement != null) findStatementOwner(uri)
+                        if (statement != null) findStatementOwner(uri, workbook.fileName)
                     }
                 }
                 is AppResult.Failure -> _state.value = _state.value.copy(
@@ -178,7 +236,20 @@ class ImportViewModel @Inject constructor(
         }
         viewModelScope.launch {
             _state.value = current.copy(isBusy = true)
-            val candidates = importer.buildCandidatesWithDuplicates(sheet, mapping)
+            val read = importer.buildCandidatesWithDuplicates(sheet, mapping)
+            // On a set-aside account every movement is money moved to or from
+            // savings, other than interest. Filed any other way, the £200
+            // arriving in a saver was counted as £200 earned.
+            val candidates = if (account?.holding == Holding.SET_ASIDE) {
+                read.map { candidate ->
+                    val isInterest = candidate.categoryName
+                        ?.contains("interest", ignoreCase = true) == true ||
+                        candidate.name.contains("interest", ignoreCase = true)
+                    if (isInterest) candidate else candidate.copy(categoryName = SAVINGS_CATEGORY)
+                }
+            } else {
+                read
+            }
             _state.value = _state.value.copy(
                 mapping = mapping,
                 candidates = candidates,
@@ -496,6 +567,11 @@ class ImportViewModel @Inject constructor(
             )
         }
     }
+
+    private companion object {
+        /** The seeded savings category; see `DefaultData`. */
+        const val SAVINGS_CATEGORY = "Savings"
+    }
 }
 
 enum class ImportStep { CHOOSE_FILE, MAP, REVIEW, DONE }
@@ -517,6 +593,9 @@ data class ImportState(
     val accountFit: AccountFitCheck.Verdict? = null,
     /** The account this import was started from, when it began on one. */
     val preselectedAccountId: Long? = null,
+
+    /** What kind of account the statement is for, when its heading says. */
+    val statementKind: StatementKind.Found? = null,
 
     /** Who the statement is addressed to, when the name on it settles it. */
     val statementOwnerName: String? = null,

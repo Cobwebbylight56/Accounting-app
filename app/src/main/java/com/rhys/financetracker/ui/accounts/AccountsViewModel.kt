@@ -14,6 +14,7 @@ import com.rhys.financetracker.data.local.seed.DefaultData
 import com.rhys.financetracker.data.repository.AccountRepository
 import com.rhys.financetracker.data.repository.PeopleRepository
 import com.rhys.financetracker.domain.model.AccountType
+import com.rhys.financetracker.domain.model.Holding
 import com.rhys.financetracker.ui.navigation.Routes
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.LocalDate
@@ -82,18 +83,17 @@ class AccountsViewModel @Inject constructor(
     }
 
     /**
-     * Moves an account the name says is savings into savings.
+     * Says where an account's money counts, straight from the list.
      *
-     * The whole of "my savings are showing as available" comes down to the
-     * type on the account, and until now the only way to change it was to open
-     * the account and find the picker.
+     * One tap, because the accounts that need it are the ones already here,
+     * guessed wrong — and "my saver is showing as available" is exactly this
+     * one setting.
      */
-    fun moveToSavings(account: AccountWithBalance) {
+    fun setHolding(account: AccountWithBalance, holding: Holding) {
         viewModelScope.launch {
-            val type = AccountNaming.typeFor(account.account.name)
-            message.value = accountRepository.setType(account.account.id, type)
+            message.value = accountRepository.setHolding(account.account.id, holding)
                 .errorMessageOrNull()
-                ?: "\"${account.account.name}\" is now set aside"
+                ?: "\"${account.account.name}\" now counts as ${holding.displayName.lowercase()}"
         }
     }
 
@@ -170,6 +170,9 @@ class AccountEditViewModel @Inject constructor(
     private val form = MutableStateFlow(AccountForm())
     private val saved = MutableStateFlow(false)
 
+    /** The name the account had when opened, so an unchanged one is not re-checked. */
+    private var originalName: String? = null
+
     val state: StateFlow<AccountEditState> = combine(
         form,
         peopleRepository.observeActive(),
@@ -186,13 +189,23 @@ class AccountEditViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             if (accountId == Routes.NEW_ID) {
-                form.value = AccountForm(colorHex = DefaultData.PALETTE.random())
+                form.value = AccountForm(
+                    name = AccountType.CURRENT.displayName,
+                    colorHex = DefaultData.PALETTE.random(),
+                )
                 return@launch
             }
             accountRepository.get(accountId)?.let { account ->
+                originalName = account.name
                 form.value = AccountForm(
                     name = account.name,
                     type = account.type,
+                    holding = account.holding,
+                    // An existing account's settings are its owner's, so
+                    // nothing is changed on their behalf as they edit.
+                    nameTouched = true,
+                    typeTouched = true,
+                    holdingTouched = true,
                     personId = account.personId,
                     openingBalanceText = Money.formatPlain(account.openingBalanceMinor),
                     openingBalanceDate = account.openingBalanceDate,
@@ -204,7 +217,6 @@ class AccountEditViewModel @Inject constructor(
                     interestRateText = account.interestRatePercent?.toString().orEmpty(),
                     colorHex = account.colorHex,
                     includeInNetWorth = account.includeInNetWorth,
-                    countsAsSavings = account.countsAsSavings ?: account.type.isSavings,
                     isShared = account.isShared,
                     notes = account.notes.orEmpty(),
                 )
@@ -216,13 +228,65 @@ class AccountEditViewModel @Inject constructor(
         form.value = transform(form.value)
     }
 
+    /**
+     * The name, and — until the type has been chosen by hand — the type and
+     * where it counts, read from it. Typing "Start to Save" sets the account
+     * aside there and then, which is the step that used to be forgotten.
+     */
+    fun setName(name: String) {
+        form.value = form.value.let { current ->
+            val type = if (current.typeTouched) current.type else AccountNaming.typeFor(name)
+            current.copy(
+                name = name,
+                nameTouched = true,
+                type = type,
+                holding = if (current.holdingTouched) current.holding else type.defaultHolding,
+            )
+        }
+    }
+
+    /** The type, and with it a suggested name and where it counts, unless those were set. */
+    fun setType(type: AccountType) {
+        form.value = form.value.let { current ->
+            current.copy(
+                type = type,
+                typeTouched = true,
+                name = if (current.nameTouched) current.name else type.displayName,
+                holding = if (current.holdingTouched) current.holding else type.defaultHolding,
+            )
+        }
+    }
+
+    fun setHolding(holding: Holding) {
+        form.value = form.value.copy(holding = holding, holdingTouched = true)
+    }
+
     fun save() {
         viewModelScope.launch {
             val current = form.value
+            val people = peopleRepository.activePeople()
+            val name = current.name.trim()
+            // "Account name: Rhys Evans, Belongs to: Rhys Evans" says the same
+            // thing twice and nothing about the account. The owner is its own
+            // field; the name is what the bank calls it.
+            val isAPersonsName = people.any { it.name.equals(name, ignoreCase = true) } ||
+                (current.newPersonName.isNotBlank() &&
+                    name.equals(current.newPersonName.trim(), ignoreCase = true))
+            if (name.isNotEmpty() && name != originalName && isAPersonsName) {
+                form.value = current.copy(
+                    errorSummary = "\"$name\" is a person's name. Call the account what the " +
+                        "bank calls it — e.g. \"Nationwide current\" or \"Start to Save\" — " +
+                        "and pick whose it is under Belongs to.",
+                )
+                return@launch
+            }
             // A name typed here becomes a person, and the account goes under
             // it. Without this the account is saved owned by nobody, which is
-            // invisible to every per-person view in the app.
-            val ownerId = current.personId ?: current.newPersonName.trim()
+            // invisible to every per-person view in the app. With only one
+            // person there is nobody else it could be.
+            val ownerId = current.personId
+                ?: people.singleOrNull()?.id?.takeIf { current.newPersonName.isBlank() }
+                ?: current.newPersonName.trim()
                 .takeIf { it.isNotEmpty() }
                 ?.let { name ->
                     when (val made = peopleRepository.save(
@@ -237,8 +301,9 @@ class AccountEditViewModel @Inject constructor(
                 }
             val entity = AccountEntity(
                 id = if (accountId == Routes.NEW_ID) 0L else accountId,
-                name = current.name.trim(),
+                name = name,
                 type = current.type,
+                holding = current.holding,
                 personId = ownerId,
                 openingBalanceMinor = Money.parseOrNull(current.openingBalanceText) ?: 0L,
                 openingBalanceDate = current.openingBalanceDate,
@@ -248,11 +313,6 @@ class AccountEditViewModel @Inject constructor(
                 interestRatePercent = current.interestRateText.toDoubleOrNull(),
                 colorHex = current.colorHex,
                 includeInNetWorth = current.includeInNetWorth,
-                // Only stored when it actually disagrees with the type, so
-                // changing the type later still moves the account with it
-                // rather than being quietly outvoted by a stale override.
-                countsAsSavings = current.countsAsSavings
-                    .takeIf { it != current.type.isSavings },
                 isShared = current.isShared,
                 notes = current.notes.trim().takeIf { it.isNotEmpty() },
             )
@@ -299,7 +359,13 @@ class AccountEditViewModel @Inject constructor(
 data class AccountForm(
     val name: String = "",
     val type: AccountType = AccountType.CURRENT,
+    /** Where the money counts; suggested by the type and name until set by hand. */
+    val holding: Holding = AccountType.CURRENT.defaultHolding,
     val personId: Long? = null,
+    /** Set once the field has been changed by hand, after which it is left alone. */
+    val nameTouched: Boolean = false,
+    val typeTouched: Boolean = false,
+    val holdingTouched: Boolean = false,
 
     /**
      * A person to create along with the account.
@@ -324,7 +390,6 @@ data class AccountForm(
     val interestRateText: String = "",
     val colorHex: String = DefaultData.PALETTE.first(),
     val includeInNetWorth: Boolean = true,
-    val countsAsSavings: Boolean = false,
     val isShared: Boolean = false,
     val notes: String = "",
     val errorSummary: String? = null,

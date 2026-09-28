@@ -2,6 +2,7 @@ package com.rhys.financetracker.data
 
 import com.rhys.financetracker.data.importer.AccountNaming
 import com.rhys.financetracker.domain.model.AccountType
+import com.rhys.financetracker.domain.model.Holding
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -23,17 +24,18 @@ class AccountNamingTest {
             "Easy Access Savings", "Notice Account", "Premium Bonds",
             "Christmas Saver", "Help to Save", "Online Saver", "Savings",
         ).forEach { name ->
-            assertTrue(name, AccountNaming.typeFor(name).isSavings)
+            assertEquals(name, Holding.SET_ASIDE, AccountNaming.holdingFor(name))
         }
     }
 
     @Test
-    fun `a cash ISA is savings, not a tin of notes`() {
-        // The fault that put a saver inside the cash-in-hand card: the word
-        // "cash" was tested before anything else.
+    fun `a cash ISA is savings, and a tin of notes is the cash pot`() {
         assertEquals(AccountType.SAVINGS, AccountNaming.typeFor("Cash ISA"))
         assertEquals(AccountType.SAVINGS, AccountNaming.typeFor("Cash Savings"))
-        assertEquals(AccountType.CASH, AccountNaming.typeFor("Cash in the house"))
+        assertTrue(!AccountNaming.isCashPot("Cash ISA"))
+        assertTrue(AccountNaming.isCashPot("Cash"))
+        assertTrue(AccountNaming.isCashPot("£1 coins"))
+        assertTrue(!AccountNaming.isCashPot("Main account"))
     }
 
     @Test
@@ -51,32 +53,20 @@ class AccountNamingTest {
         // Fixing the guess only helps accounts made afterwards. The ones
         // already in the app are the ones that are wrong, so the list offers
         // to put them right.
-        assertTrue(
-            AccountNaming.looksMistyped("Start to Save", AccountType.CURRENT, null),
-        )
-        // Already savings: nothing to say.
-        assertTrue(
-            !AccountNaming.looksMistyped("Start to Save", AccountType.SAVINGS, null),
-        )
-        // The owner has said either way, so they are not second-guessed.
-        assertTrue(
-            !AccountNaming.looksMistyped("Start to Save", AccountType.CURRENT, false),
-        )
-        assertTrue(
-            !AccountNaming.looksMistyped("Start to Save", AccountType.CURRENT, true),
-        )
+        assertTrue(AccountNaming.looksMistyped("Start to Save", Holding.SPEND))
+        assertTrue(AccountNaming.looksMistyped("saver", Holding.SPEND))
+        // Already set aside: nothing to say.
+        assertTrue(!AccountNaming.looksMistyped("Start to Save", Holding.SET_ASIDE))
         // And an ordinary current account is left alone.
-        assertTrue(
-            !AccountNaming.looksMistyped("Current account", AccountType.CURRENT, null),
-        )
+        assertTrue(!AccountNaming.looksMistyped("Current account", Holding.SPEND))
     }
 
     @Test
     fun `a dormant current account cannot be read from its name`() {
         // Money kept in a second current account in case the main one is lost
         // is set aside in practice and a current account by name. Nothing here
-        // can know that, which is what the per-account switch is for.
+        // can know that, which is what each account's "Counts as" setting is for.
         assertEquals(AccountType.CURRENT, AccountNaming.typeFor("Spare account"))
-        assertTrue(!AccountNaming.looksMistyped("Spare account", AccountType.CURRENT, null))
+        assertTrue(!AccountNaming.looksMistyped("Spare account", Holding.SPEND))
     }
 }

@@ -31,6 +31,16 @@ object SampleData {
     data class SamplePerson(
         val name: String,
         val colorHex: String,
+        /** Yearly pay before tax, from the sheet. */
+        val grossYearlyMajor: Double? = null,
+        /** Yearly take-home: the monthly salary on the sheet, twelve times. */
+        val netYearlyMajor: Double? = null,
+    )
+
+    /** Notes and coins, which go in the household cash pot rather than an account. */
+    data class SampleCash(
+        val note: String,
+        val amountMajor: Double,
     )
 
     data class SampleAccount(
@@ -67,18 +77,17 @@ object SampleData {
     )
 
     val people: List<SamplePerson> = listOf(
-        SamplePerson(PERSON_RHYS, "#1565C0"),
-        SamplePerson(PERSON_HANNAH, "#AD1457"),
+        SamplePerson(PERSON_RHYS, "#1565C0", 27_455.76, 1_862.23 * 12),
+        SamplePerson(PERSON_HANNAH, "#AD1457", 16_692.48, 1_447.00 * 12),
     )
 
     /**
-     * The "savings &" block of the spreadsheet.  Together these come to
-     * £11,418.37, the sheet's ALL SAVINGS figure.
+     * The "savings &" block of the spreadsheet.  Together with [cashPot]
+     * these come to £11,418.37, the sheet's ALL SAVINGS figure.
      */
     val accounts: List<SampleAccount> = listOf(
         SampleAccount("Rhys bank", AccountType.CURRENT, PERSON_RHYS, 3_508.37, "#1565C0"),
         SampleAccount("Hannah bank", AccountType.CURRENT, PERSON_HANNAH, 3_000.00, "#AD1457"),
-        SampleAccount("Cash", AccountType.CASH, PERSON_RHYS, 1_510.00, "#558B2F"),
         SampleAccount(
             "Overflow bank", AccountType.SAVINGS, PERSON_RHYS, 0.00, "#00796B",
             notes = "The sheet's \"over bank\" row.",
@@ -88,13 +97,15 @@ object SampleData {
             notes = "The sheet's \"saver mum\" row.",
         ),
         SampleAccount(
-            "£1 coins", AccountType.CASH, PERSON_RHYS, 500.00, "#F9A825",
-            notes = "Coin jar.",
-        ),
-        SampleAccount(
             "Main account", AccountType.CURRENT, DefaultData.SHARED_PERSON_NAME, 1_000.00, "#455A64",
             notes = "Shared household account.",
         ),
+    )
+
+    /** The sheet's "cash" and "£1 coins" rows: the notes and coins in the house. */
+    val cashPot: List<SampleCash> = listOf(
+        SampleCash("Cash in the house", 1_510.00),
+        SampleCash("£1 coins jar", 500.00),
     )
 
     /** Income. Salaries are paid on the 28th, the usual UK pay date. */

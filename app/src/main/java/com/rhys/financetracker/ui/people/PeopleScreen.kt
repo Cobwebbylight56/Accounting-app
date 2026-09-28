@@ -47,13 +47,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rhys.financetracker.core.money.Money
 import com.rhys.financetracker.data.local.seed.DefaultData
+import com.rhys.financetracker.ui.components.AmountField
 import com.rhys.financetracker.ui.components.ColorDot
 import com.rhys.financetracker.ui.components.ColorPicker
 import com.rhys.financetracker.ui.components.ConfirmDialog
 import com.rhys.financetracker.ui.components.EmptyState
 import com.rhys.financetracker.ui.components.ErrorBanner
 import com.rhys.financetracker.ui.components.LabelledTextField
+import com.rhys.financetracker.ui.components.SectionCard
 import com.rhys.financetracker.ui.components.colorFromHex
 
 /**
@@ -117,6 +120,7 @@ fun PeopleScreen(
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 96.dp),
         ) {
+            item { HouseholdIncomeCard(state) }
             items(state.people, key = { it.person.id }) { item ->
                 var showMenu by remember { mutableStateOf(false) }
                 Box {
@@ -141,6 +145,13 @@ fun PeopleScreen(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
+                            incomeLine(item)?.let { line ->
+                                Text(
+                                    text = line,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
                         IconButton(onClick = { showMenu = true }) {
                             Icon(Icons.Default.MoreVert, contentDescription = "Actions")
@@ -193,6 +204,84 @@ fun PeopleScreen(
     }
 }
 
+/**
+ * One line of what a person's yearly pay means for their month, or null when
+ * they have not given it.
+ */
+private fun incomeLine(item: PersonSummary): String? {
+    val income = item.income
+    val monthly = income.netMonthlyMinor ?: return income.grossYearlyMinor
+        ?.let { "${Money.format(it)} a year before tax — add take-home for more" }
+    val parts = mutableListOf("${Money.format(monthly)} take-home a month")
+    income.deductionPercent?.let { parts += "$it% taken in tax and deductions" }
+    income.shareOfMonthlyTakeHome(item.spentThisMonthMinor)?.let {
+        parts += "$it% spent this month"
+    }
+    if (item.savedThisMonthMinor > 0L) {
+        income.shareOfMonthlyTakeHome(item.savedThisMonthMinor)?.let {
+            parts += "$it% put aside"
+        }
+    }
+    return parts.joinToString(" · ")
+}
+
+/**
+ * The household's pay, and this month measured against it.
+ *
+ * Statements show what arrived; this shows what that is out of, and what
+ * share of it the month has spent and put aside. Without yearly pay entered
+ * it says how to get it.
+ */
+@Composable
+private fun HouseholdIncomeCard(state: PeopleState) {
+    val income = state.household
+    SectionCard(title = "Yearly pay", subtitle = "Everyone together") {
+        if (!income.hasAny) {
+            Text(
+                text = "Add each person's yearly pay — before and after tax — to see " +
+                    "take-home a month, how much goes in tax, and what share of it " +
+                    "each month is spent and saved. Tap a person to add theirs.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            return@SectionCard
+        }
+        income.grossYearlyMinor?.let { StatLine("Before tax, a year", Money.format(it)) }
+        income.netYearlyMinor?.let { StatLine("Take-home, a year", Money.format(it)) }
+        income.netMonthlyMinor?.let { StatLine("Take-home, a month", Money.format(it)) }
+        income.deductionsYearlyMinor?.let { deductions ->
+            StatLine(
+                "Tax and deductions",
+                Money.format(deductions) +
+                    (income.deductionPercent?.let { " ($it%)" } ?: ""),
+            )
+        }
+        income.shareOfMonthlyTakeHome(state.householdSpentMinor)?.let {
+            StatLine("Spent this month", "${Money.format(state.householdSpentMinor)} ($it%)")
+        }
+        income.shareOfMonthlyTakeHome(state.householdSavedMinor)?.let {
+            StatLine("Put aside this month", "${Money.format(state.householdSavedMinor)} ($it%)")
+        }
+    }
+    Spacer(Modifier.height(12.dp))
+}
+
+@Composable
+private fun StatLine(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        Text(text = value, style = MaterialTheme.typography.bodyLarge)
+    }
+}
+
 /** Add or edit one person. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -239,6 +328,19 @@ fun PersonEditScreen(
                 colors = DefaultData.PERSON_COLORS + DefaultData.PALETTE,
                 selected = state.colorHex,
                 onSelect = viewModel::setColor,
+            )
+
+            // Used for statistics only: take-home a month, how much goes in
+            // tax, and what share of pay is spent and saved.
+            AmountField(
+                label = "Yearly pay before tax (optional)",
+                value = state.grossYearlyText,
+                onValueChange = viewModel::setGrossYearly,
+            )
+            AmountField(
+                label = "Yearly take-home after tax (optional)",
+                value = state.netYearlyText,
+                onValueChange = viewModel::setNetYearly,
             )
 
             LabelledTextField(

@@ -10,6 +10,7 @@ import com.rhys.financetracker.domain.insight.CategoryTrend
 import com.rhys.financetracker.domain.insight.Forecaster
 import com.rhys.financetracker.domain.insight.InsightEngine
 import com.rhys.financetracker.domain.insight.InsightReport
+import com.rhys.financetracker.domain.model.CategoryKind
 import com.rhys.financetracker.domain.model.TransactionType
 import kotlinx.coroutines.flow.first
 import java.time.YearMonth
@@ -79,11 +80,12 @@ class InsightRepository @Inject constructor(
         val rules = recurringRuleDao.getAllActive()
         val goals = savingsGoalDao.observeActiveWithProgress().first()
 
-        // Money moved into savings accounts this month, which is what "saved"
-        // means here — not simply income less spending.
-        val savedThisMonth = inScope
-            .filter { it.isSavings }
-            .sumOf { transactionDao.getTransfersIn(it.account.id, range.start, range.endInclusive) }
+        // Money moved from the spending accounts into savings this month, less
+        // what came back — the same figure as the Savings card on Home, so
+        // the advice and the screen never disagree about what was saved.
+        val savedThisMonth = transactionDao.getPotFlow(
+            CategoryKind.SAVING.name, range.start, range.endInclusive, accountId, personId,
+        )?.netMinor ?: 0L
 
         val forecast = forecaster.forecast(
             openingBalanceMinor = spendable,

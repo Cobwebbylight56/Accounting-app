@@ -9,6 +9,7 @@ import com.rhys.financetracker.core.result.AppResult
 import com.rhys.financetracker.core.result.runCatchingApp
 import com.rhys.financetracker.data.local.AppDatabase
 import com.rhys.financetracker.data.repository.SeedRepository
+import com.rhys.financetracker.domain.model.CategoryKind
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
@@ -85,6 +86,13 @@ class BackupManager @Inject constructor(
                 serializer.writeArray(
                     database.monthlySnapshotDao().getAll(),
                     serializer::snapshotToJson,
+                ),
+            )
+            put(
+                BackupFormat.KEY_CASH_POT,
+                serializer.writeArray(
+                    database.cashPotDao().getAll(),
+                    serializer::cashPotEntryToJson,
                 ),
             )
             put(
@@ -186,29 +194,46 @@ class BackupManager @Inject constructor(
                 json.optJSONArray(BackupFormat.KEY_PEOPLE),
                 serializer::personFromJson,
             )
-            val accounts = serializer.readArray(
-                json.optJSONArray(BackupFormat.KEY_ACCOUNTS),
-                serializer::accountFromJson,
-            )
+            val accountsJson = json.optJSONArray(BackupFormat.KEY_ACCOUNTS)
+            val storedAccounts = serializer.readArray(accountsJson, serializer::accountFromJson)
+            val legacyCashIds = serializer.readArray(accountsJson) { item ->
+                item.optLong("id", 0L).takeIf { serializer.isLegacyCashAccount(item) }
+            }.filterNotNull().toSet()
             val categories = serializer.readArray(
                 json.optJSONArray(BackupFormat.KEY_CATEGORIES),
                 serializer::categoryFromJson,
             )
-            val transactions = serializer.readArray(
-                json.optJSONArray(BackupFormat.KEY_TRANSACTIONS),
-                serializer::transactionFromJson,
+            // A backup from before the cash pot stored it as accounts; those
+            // are turned into pot entries the same way upgrading does.
+            val converted = LegacyCashConversion.convert(
+                cashAccountIds = legacyCashIds,
+                accounts = storedAccounts,
+                transactions = serializer.readArray(
+                    json.optJSONArray(BackupFormat.KEY_TRANSACTIONS),
+                    serializer::transactionFromJson,
+                ),
+                rules = serializer.readArray(
+                    json.optJSONArray(BackupFormat.KEY_RECURRING),
+                    serializer::recurringFromJson,
+                ),
+                goals = serializer.readArray(
+                    json.optJSONArray(BackupFormat.KEY_GOALS),
+                    serializer::goalFromJson,
+                ),
+                snapshots = serializer.readArray(
+                    json.optJSONArray(BackupFormat.KEY_SNAPSHOTS),
+                    serializer::snapshotFromJson,
+                ),
+                cashCategoryId = categories.firstOrNull { it.kind == CategoryKind.CASH }?.id,
             )
-            val rules = serializer.readArray(
-                json.optJSONArray(BackupFormat.KEY_RECURRING),
-                serializer::recurringFromJson,
-            )
-            val goals = serializer.readArray(
-                json.optJSONArray(BackupFormat.KEY_GOALS),
-                serializer::goalFromJson,
-            )
-            val snapshots = serializer.readArray(
-                json.optJSONArray(BackupFormat.KEY_SNAPSHOTS),
-                serializer::snapshotFromJson,
+            val accounts = converted.accounts
+            val transactions = converted.transactions
+            val rules = converted.rules
+            val goals = converted.goals
+            val snapshots = converted.snapshots
+            val cashPot = converted.potEntries + serializer.readArray(
+                json.optJSONArray(BackupFormat.KEY_CASH_POT),
+                serializer::cashPotEntryFromJson,
             )
             val external = serializer.readArray(
                 json.optJSONArray(BackupFormat.KEY_EXTERNAL_DATA),
@@ -234,6 +259,7 @@ class BackupManager @Inject constructor(
                 database.categoryDao().deleteAll()
                 database.personDao().deleteAll()
                 database.externalDataDao().deleteAll()
+                database.cashPotDao().deleteAll()
 
                 database.personDao().insertAll(people)
                 database.categoryDao().insertAll(categories)
@@ -243,6 +269,7 @@ class BackupManager @Inject constructor(
                 database.transactionDao().insertAll(transactions)
                 database.monthlySnapshotDao().insertAll(snapshots)
                 database.externalDataDao().upsertAll(external)
+                database.cashPotDao().insertAll(cashPot)
             }
 
             // A backup from before categories existed would leave the app

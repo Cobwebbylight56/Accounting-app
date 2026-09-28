@@ -3,7 +3,7 @@
 SQLite via Room. The schema is exported to `app/schemas/` on every build, so
 every change is reviewable and every migration is testable.
 
-Current version: **4**.
+Current version: **5**.
 
 | Version | Change |
 |---|---|
@@ -11,6 +11,7 @@ Current version: **4**.
 | 2 | `transactions.import_hash` — the fingerprint that stops a re-imported bank statement being counted twice. Additive and indexed; existing rows are left null, which simply never matches. |
 | 3 | `transactions.source` — where a record came from, so a bank statement can correct a remembered entry rather than sit beside it. Existing rows become `UNKNOWN`, the weakest source, because a stored hash says a row was imported but not from what; labelling a hand-built spreadsheet as bank-authoritative would shield it from the very correction this allows. |
 | 4 | `accounts.counts_as_savings` — whether an account counts under Saved rather than Available, overriding its type. Nullable on purpose: null means "follow the type", which is true of every account that existed before there was a way to say otherwise. |
+| 5 | The savings redesign. `accounts.counts_as_savings` is replaced by `accounts.holding` (`SPEND`, `SET_ASIDE`, `OWED`) — the one answer to where an account's money counts; the table is rebuilt, since older SQLite cannot drop a column. Each account keeps the answer it was effectively giving, and one whose name says savings is set aside. `AccountType.CASH` is removed: cash accounts become rows in the new `cash_pot_entries` table, and transfers between them and bank accounts become cash withdrawals or paying-ins on the bank side, so no bank balance moves. Rows the old importer filed under an ordinary category called "Savings" or "Cash" are pointed at the real one, and movements on set-aside accounts other than interest are filed as savings. `people` gains `gross_yearly_income_minor` and `net_yearly_income_minor`. |
 
 ---
 
@@ -67,6 +68,8 @@ Everyone whose money is being tracked, plus a shared "Joint" record.
 | `is_shared` | INTEGER | True for the household record, which cannot be deleted |
 | `sort_order` | INTEGER | Display order |
 | `notes` | TEXT? | |
+| `gross_yearly_income_minor` | INTEGER? | Yearly pay before tax, for statistics |
+| `net_yearly_income_minor` | INTEGER? | Yearly take-home after tax |
 | `is_archived` | INTEGER | Hidden from pickers, kept in history |
 | `created_at`, `updated_at` | INTEGER | Epoch milliseconds |
 
@@ -89,7 +92,7 @@ Where money sits.
 | `interest_rate_percent` | REAL? | |
 | `color_hex` | TEXT | |
 | `include_in_net_worth` | INTEGER | |
-| `counts_as_savings` | INTEGER? | Overrides the type for the Saved/Available split. Null follows the type |
+| `holding` | TEXT | `SPEND`, `SET_ASIDE` or `OWED`: whether the balance counts as Available, Saved or Owed. The only thing consulted; the type merely suggests it when the account is made |
 | `is_shared` | INTEGER | |
 | `sort_order` | INTEGER | |
 | `notes` | TEXT? | |
@@ -99,6 +102,20 @@ Where money sits.
 Deleting a person leaves their accounts in place, unassigned. Deleting an
 account **cascades** to its transactions — which is why the UI recommends
 archiving.
+
+### `cash_pot_entries`
+
+The household cash pot — notes and coins, belonging to nobody's account. Its
+total is every `is_in` entry less every other.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | INTEGER PK | |
+| `date` | TEXT | Indexed |
+| `amount_minor` | INTEGER | Never negative |
+| `is_in` | INTEGER | 1 for money put in, 0 for money spent |
+| `note` | TEXT? | What it was for |
+| `created_at` | INTEGER | |
 
 ### `categories`
 

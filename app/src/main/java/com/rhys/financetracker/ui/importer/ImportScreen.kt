@@ -43,6 +43,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,6 +61,7 @@ import com.rhys.financetracker.data.importer.ImportCandidate
 import com.rhys.financetracker.data.importer.ImportTarget
 import com.rhys.financetracker.domain.model.TransactionType
 import com.rhys.financetracker.data.local.projection.labelFor
+import com.rhys.financetracker.domain.model.Holding
 import com.rhys.financetracker.ui.components.DropdownField
 import com.rhys.financetracker.ui.components.EmptyState
 import com.rhys.financetracker.ui.components.ErrorBanner
@@ -298,10 +300,24 @@ private fun ChooseFileStep(onChoose: () -> Unit) {
 @Composable
 private fun DetectedStatementCard(state: ImportState, viewModel: ImportViewModel) {
     if (!state.canImportStatement) return
-    val accounts by viewModel.accounts.collectAsStateWithLifecycle()
-    val preselected = accounts.firstOrNull { it.id == state.preselectedAccountId }
+    val allAccounts by viewModel.accounts.collectAsStateWithLifecycle()
+    val found = state.statementKind
+    var showEveryAccount by rememberSaveable { mutableStateOf(false) }
+    // Only accounts of the statement's own kind, and the named person's first.
+    // The picker used to list every account in the household, which is how a
+    // saver's statement ended up on a current account.
+    val ofThisKind = allAccounts.filter { found == null || it.holding == found.kind.holding }
+    val theirs = ofThisKind.filter {
+        state.statementOwnerName == null || it.personName == state.statementOwnerName
+    }
+    val accounts = when {
+        showEveryAccount -> allAccounts
+        theirs.isNotEmpty() -> theirs
+        else -> ofThisKind
+    }
+    val preselected = allAccounts.firstOrNull { it.id == state.preselectedAccountId }
     var chosen by remember(accounts, preselected) {
-        mutableStateOf(preselected ?: accounts.firstOrNull())
+        mutableStateOf(preselected?.takeIf { it in accounts } ?: accounts.firstOrNull())
     }
 
     SectionCard(
@@ -340,6 +356,34 @@ private fun DetectedStatementCard(state: ImportState, viewModel: ImportViewModel
                 Text("Add them as a person")
             }
         }
+        found?.let { kind ->
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "It's a ${kind.kind.displayName} statement" +
+                    (kind.productName?.let { " ($it)" } ?: "") +
+                    ", so only ${kind.kind.displayName}s are offered below.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+        // Nothing of the right kind to put it in: offer to make exactly that,
+        // under the person it is addressed to, rather than letting it be
+        // filed against whatever account happens to exist.
+        if (found != null && ofThisKind.isEmpty() && !showEveryAccount) {
+            Spacer(Modifier.height(8.dp))
+            val whose = state.statementOwnerName?.let { "$it's " }.orEmpty()
+            Text(
+                text = "There's no ${whose}${found.kind.displayName} in the app yet.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
+            Button(
+                onClick = viewModel::createAccountForStatement,
+                enabled = !state.isBusy,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Add ${found.productName ?: found.kind.accountType.displayName}")
+            }
+        }
         Spacer(Modifier.height(12.dp))
         DropdownField(
             label = if (preselected != null) "Adding to" else "Add these to",
@@ -348,8 +392,21 @@ private fun DetectedStatementCard(state: ImportState, viewModel: ImportViewModel
             onSelect = { chosen = it },
             optionLabel = { accounts.labelFor(it) },
             optionColor = { colorFromHex(it.colorHex) },
-            placeholder = if (accounts.isEmpty()) "No accounts yet" else "Choose an account",
+            placeholder = if (accounts.isEmpty()) "No accounts of this kind" else "Choose an account",
         )
+        if (found != null || state.statementOwnerName != null) {
+            TextButton(onClick = { showEveryAccount = !showEveryAccount }) {
+                Text(if (showEveryAccount) "Only matching accounts" else "Show every account")
+            }
+        }
+        chosen?.takeIf { it.holding == Holding.SET_ASIDE }?.let {
+            Text(
+                text = "This account is set aside, so money in and out of it is filed as " +
+                    "savings (interest apart) — not as income or spending.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         Spacer(Modifier.height(14.dp))
         Button(
             onClick = { viewModel.useDetectedStatement(chosen) },
@@ -454,21 +511,26 @@ private fun MappingStep(state: ImportState, viewModel: ImportViewModel) {
             }
         }
 
-        item {
-            DropdownField(
-                label = "What should these rows become?",
-                options = ImportTarget.entries,
-                selected = mapping.target,
-                onSelect = viewModel::setTarget,
-                optionLabel = { it.displayName },
-            )
-        }
-        item {
-            Text(
-                text = mapping.target.description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        // A bank statement's rows are always things that happened, so there
+        // is nothing to choose; asking only invited every payment to become a
+        // repeating bill.
+        if (!state.canImportStatement) {
+            item {
+                DropdownField(
+                    label = "What should these rows become?",
+                    options = ImportTarget.entries,
+                    selected = mapping.target,
+                    onSelect = viewModel::setTarget,
+                    optionLabel = { it.displayName },
+                )
+            }
+            item {
+                Text(
+                    text = mapping.target.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
 
         item { SheetPreview(state = state) }

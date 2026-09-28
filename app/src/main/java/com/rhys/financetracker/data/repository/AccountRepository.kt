@@ -4,11 +4,14 @@ import com.rhys.financetracker.core.result.AppResult
 import com.rhys.financetracker.core.result.runCatchingApp
 import com.rhys.financetracker.core.validation.Validators
 import com.rhys.financetracker.data.local.dao.AccountDao
+import com.rhys.financetracker.data.local.dao.CategoryDao
 import com.rhys.financetracker.data.local.dao.PersonDao
+import com.rhys.financetracker.data.local.dao.TransactionDao
 import com.rhys.financetracker.data.local.entity.AccountEntity
 import com.rhys.financetracker.data.local.projection.AccountOption
 import com.rhys.financetracker.data.local.projection.AccountWithBalance
-import com.rhys.financetracker.domain.model.AccountType
+import com.rhys.financetracker.domain.model.CategoryKind
+import com.rhys.financetracker.domain.model.Holding
 import java.time.Instant
 import java.time.LocalDate
 import javax.inject.Inject
@@ -20,6 +23,8 @@ import kotlinx.coroutines.flow.map
 class AccountRepository @Inject constructor(
     private val accountDao: AccountDao,
     private val personDao: PersonDao,
+    private val categoryDao: CategoryDao,
+    private val transactionDao: TransactionDao,
 ) {
 
     fun observeWithBalances(): Flow<List<AccountWithBalance>> =
@@ -74,7 +79,11 @@ class AccountRepository @Inject constructor(
             if (account.id == 0L) {
                 accountDao.insert(account)
             } else {
+                val before = accountDao.getById(account.id)
                 accountDao.update(account.copy(updatedAt = Instant.now().toEpochMilli()))
+                if (account.holding == Holding.SET_ASIDE && before?.holding != Holding.SET_ASIDE) {
+                    fileAsSavings(account.id)
+                }
                 account.id
             }
         }
@@ -131,9 +140,9 @@ class AccountRepository @Inject constructor(
      * Makes an account's balance equal [balanceMinor] by moving its starting
      * figure, without inventing a transaction to do it.
      *
-     * What is already in a cash tin is not income — it is money you had before
-     * the app knew about it. Recorded as a payment in, a £1,480 float shows up
-     * as £1,480 earned this month and the month's figures are nonsense. The
+     * What is already in an account is not income — it is money you had before
+     * the app knew about it. Recorded as a payment in, a £1,480 balance shows
+     * up as £1,480 earned this month and the month's figures are nonsense. The
      * starting balance is what that belongs in, and it is dated when the
      * account started rather than today.
      */
@@ -150,26 +159,29 @@ class AccountRepository @Inject constructor(
         }
 
     /**
-     * Changes an account's type, and with it whether it counts as set aside.
+     * Says where an account's money counts — to spend, set aside, or owed.
      *
-     * Offered from the list because fixing how the type is guessed only helps
-     * accounts made afterwards. The ones already in the app are exactly the
-     * ones that were guessed wrong, and hunting through a form to correct each
-     * is how they stay wrong.
+     * Offered from the list as one tap because the accounts that need it are
+     * the ones already there, guessed wrong. Setting an account aside also
+     * files what is already on it as savings (interest apart), so the money
+     * that arrived in a saver stops being counted as income the moment the
+     * saver is recognised as one.
      */
-    suspend fun setType(accountId: Long, type: AccountType): AppResult<Unit> =
-        runCatchingApp("Could not change this account's type") {
+    suspend fun setHolding(accountId: Long, holding: Holding): AppResult<Unit> =
+        runCatchingApp("Could not change where this account counts") {
             val account = accountDao.getById(accountId) ?: error("That account no longer exists")
             accountDao.update(
-                account.copy(
-                    type = type,
-                    // Any earlier override is cleared: having just said what
-                    // kind of account it is, the type should decide.
-                    countsAsSavings = null,
-                    updatedAt = Instant.now().toEpochMilli(),
-                ),
+                account.copy(holding = holding, updatedAt = Instant.now().toEpochMilli()),
             )
+            if (holding == Holding.SET_ASIDE) fileAsSavings(accountId)
         }
+
+    /** See [TransactionDao.fileAsSavings]. */
+    suspend fun fileAsSavings(accountId: Long) {
+        val savings = categoryDao.getByNameAndKind(SAVINGS_CATEGORY, CategoryKind.SAVING)
+            ?: return
+        transactionDao.fileAsSavings(accountId, savings.id, Instant.now().toEpochMilli())
+    }
 
     suspend fun setArchived(id: Long, archived: Boolean): AppResult<Unit> =
         runCatchingApp("Could not archive this account") {
@@ -185,6 +197,11 @@ class AccountRepository @Inject constructor(
         runCatchingApp("Could not delete this account") {
             accountDao.delete(account)
         }
+
+    private companion object {
+        /** The seeded savings category; see `DefaultData`. */
+        const val SAVINGS_CATEGORY = "Savings"
+    }
 
     private suspend fun uniqueName(base: String, personId: Long?): String {
         var candidate = "$base (copy)"

@@ -34,6 +34,18 @@ of. There is already a "Joint" person for shared money.
 Give each person a colour — it is used on charts and lists to tell your figures
 apart at a glance.
 
+**Yearly pay** (optional): each person can have their pay **before tax** and
+their **take-home after tax** for the year. A statement only ever shows what
+arrived, so these are what the rest is measured against. They are used for:
+
+* **People screen** — a *Yearly pay* card for everyone together: before tax,
+  take-home a year and a month, tax and deductions (and what percentage of pay
+  that is), and what share of a month's take-home has been spent and put aside
+  so far this month. Each person's line says the same for them.
+* **Left to spend** on Home — take-home a month from yearly pay, and what
+  percentage of it this month has spent and put aside, for whoever is on
+  screen.
+
 ### 2. Add the accounts
 
 **More → Accounts → +**
@@ -173,31 +185,28 @@ If a card you expected is missing, that is where to switch it on.
 
 ### Available and Saved
 
-Home splits your money in two. **Available** is what there is to spend;
-**Saved** is what is set aside.
+Home splits your money three ways: **Available** is what there is to spend,
+**Saved** is what is set aside, and **Owed** is cards, loans and mortgages.
 
-The app cannot work out which is which on its own — a current account you never
-touch is savings, and cash in a tin can be savings too. So each account decides
-for itself. Open the account and turn on **Money set aside** for anything you
-are not planning to spend, whatever kind of account it is.
+Which one an account lands in is one setting on the account, **Counts as**:
+**To spend**, **Set aside** or **Owed**. Nothing else decides it. It is shown
+as three buttons under every account on the Accounts screen, so moving a saver
+into Saved is one tap, and on the account form under **Where this money
+counts**.
 
-By default it follows the account's type: Savings, Investment, Pension and Cash
-count as set aside, everything else counts as available. Cash is there because
-the notes in the house are money you are holding, not money in the account you
-spend from. Turning the switch on or off
-overrides that for good; leaving it alone lets the account follow its type if
-you change it later.
+When an account is made, the setting is suggested from its type and name — a
+savings account, ISA, "saver" or "Start to Save" is set aside; a card or loan
+is owed; everything else is to spend. After that it is yours: change the type
+or the name and the setting stays as you left it.
 
-Nothing is counted twice, and nothing is left out: every account is in exactly
-one of the two.
+**Saved** is only balances: every set-aside account, plus the cash pot when
+you are looking at the whole household. Every account is in exactly one of
+the three, and nothing is counted twice.
 
-**If your saver is with another bank** there is no account here to hold its
-balance, and every payment into it used to look like ordinary spending. Those
-payments are now filed under Savings, and the Saved tile says what went in this
-month underneath the figure. Where there is no savings account at all, the
-month's payments in are the figure. Adding the saver as an account is still
-better — then the balance is shown too — but nothing has to be set up for the
-saving to be counted.
+**Money moved into savings is not spending, and money back out is not income.**
+The month's Money in and Money out leave savings movements out entirely. They
+appear on the **Savings** card instead, and are taken off **Left to spend** —
+£200 in a saver has not been spent, but it is not there to spend either.
 
 ### The person tabs
 
@@ -209,33 +218,34 @@ the same screen — so they stay out of the way until a second person is added.
 
 Adding an account is the whole of setting up. On the add-account form:
 
-* **Belongs to** picks an existing person, or **type a new name** underneath
-  and that person is created with the account already under them. No separate
-  trip to the People screen and back.
+* **Whose it is** comes first. With nobody set up yet it asks for your name
+  and makes you as a person. With one person it simply says "Belongs to …" —
+  there is nobody else it could be. With two or more you pick, or tap
+  **Someone new**.
+* **Type of account** fills in a name ("Current account") until you type your
+  own. The name is what the bank calls it — "Nationwide current", "Start to
+  Save" — never the person's name; the app says so if you try.
+* **Where this money counts** — To spend, Set aside or Owed — follows the type
+  and the name until you choose.
 * **Also add a savings account** makes a second account called Savings under
-  the same name at the same time, counted as money set aside.
+  the same name at the same time, set aside.
 
 So a current account, a savings account and the person who owns them are one
 form and one Save.
 
 ### Getting savings counted
 
-Whether an account is money set aside comes down to its **type**. The app
-guesses that from the name when the account is created — ISA, LISA, saver,
-instant access, limited access, triple access, fixed term, fixed rate, bond,
-notice account, premium bonds and plain "savings" all mean savings — but a
-guess made when the account was created cannot fix an account that already
-exists.
+If a saver is showing under Available, go to **Accounts** and tap **Set aside**
+under it. That is all. Everything already on it — the money that arrived from
+your current account — is filed as savings at the same time, other than
+interest, so it stops being counted as income.
 
-So the **Accounts** screen now says so. Any account whose name says savings
-while the app is counting it as money to spend gets a line under it in red and
-a **Move it to Saved** button. One tap and it is set aside, along with its
-balance and its history.
+Any account whose name says savings while it is counted as money to spend also
+gets a red line under it with a **Count it as set aside** button.
 
 **The one it cannot read from the name**: a second current account holding a
-little money in case you lose access to your main one. That is set aside in
-practice and a current account by name, and nothing in the name says so. Open
-it and turn on **Money set aside**.
+little money in case you lose access to your main one. Tap **Set aside** under
+it the same way.
 
 ### Whose account is it
 
@@ -267,105 +277,89 @@ with a button to jump straight there.
 
 ### Savings and cash
 
-**Savings** are money moved to where it is being kept, rather than spent —
-counting a £200 standing order to a saver as spending makes a household that
-saves look like one that spends.
+**Savings** are money moved to where it is being kept, rather than spent. They
+are recognised on import from the wording on the statement, **in both
+directions**: "Transfer to START TO SAVE" is money into savings and "Transfer
+from START TO SAVE" is money back out of it.
 
-They are recognised on import from the wording on the statement, **in both
-directions**. The same words mean the payment either way and the statement
-already says which way the money went, so "Transfer to START TO SAVE" is money
-into savings and "Transfer from START TO SAVE" is money back out of it.
+The **Savings** card on Home has two halves:
 
-The **Savings** card on Home shows the month both ways round: into savings, out
-of savings, and what that nets to.
+* **Where it is kept** — every set-aside account with its balance and how much
+  it changed this month, plus the cash pot for the whole household. These add
+  up to exactly the Saved tile.
+* **This month** — what left your spending accounts for savings, what came
+  back, and what that nets to. This is read from the spending side only, so a
+  saver at another bank still counts, and a saver whose statement you have also
+  imported is not counted twice.
 
 **Cash is spending.** £50 out of a machine is £50 gone from the account, and
-that is how it counts in Money out, in the reports and everywhere else. The
-Cash category exists so the month can say how much of its spending left as
-notes — the part no statement breaks down any further — not to excuse it.
-
-If your saver is at another bank there is no account here to hold its balance,
-so **Saved** on Home shows everything the app has watched move into savings
-less what came back out. Add the saver as an account under your name and its
-real balance is shown instead.
+that is how it counts everywhere. The Cash category exists so the month can say
+how much of its spending left as notes.
 
 You can also set either by hand on any entry: open it and pick **Savings** or
-**Cash** as the category. That works on income and expenses alike, and the app
-remembers the payee — correct one and every future import of it follows.
+**Cash** as the category.
 
 ### Whose statement is it
 
 Every statement carries the account holder at the top — "MR R M W EVANS" — and
-the importer now reads it. When the name matches somebody in the app and only
+the importer reads it. When the name matches somebody in the app and only
 one person fits, it says so on the import card and starts the account picker on
 that person's account. It never decides alone: a joint account carries both
 names and post gets forwarded, so two matches means it asks rather than guesses.
 
 Matching is on the **surname plus a first initial**, because statements almost
-never print a full first name — and a surname alone would name everybody in the
-household and settle nothing.
+never print a full first name.
+
+### What kind of statement is it
+
+The importer also reads **what kind of account** the statement is for, from
+its heading — "Start to Save", "Cash ISA", "FlexDirect", "Credit card
+statement" — or, for a CSV, from the file name. The **Adding to** list then
+offers only accounts of that kind (and that person's first): a savings
+statement only offers set-aside accounts, a current account statement only
+accounts to spend from. **Show every account** is there if it gets it wrong.
+
+If there is no account of that kind yet, it offers to add one — "Add Start to
+Save" — under the person on the statement, already set aside.
+
+Rows imported into a set-aside account are filed as **Savings**, other than
+interest, so money arriving in a saver is never counted as income.
+
+For a bank statement there is no "What should these rows become?" question any
+more: a statement's rows are always transactions.
 
 ### Cash in hand
 
-The notes in the house are the one balance no statement will ever tell you, so
-the app keeps them by hand — and only by hand. Nothing feeds this pot
-automatically.
+The **cash pot** is the notes and coins in the house. It is not an account and
+belongs to nobody: it is the household's, it is never offered when importing a
+statement, and it is only ever changed by hand.
 
-**Money out of a machine does not come here.** It is already counted as spent
-on the bank account and it stops there. How much of a £50 withdrawal is still
-in a wallet three days later is a guess the app would be wrong about most days,
-and a cash total that is quietly wrong is worse than none — you stop checking
-it.
+**Money out of a machine does not come here.** Cash taken out of any account is
+counted as spent on that account and stops there. The pot's card shows how much
+was taken out as cash across all accounts this month, so you can see it, but
+only what is actually left goes in the pot.
 
-What does come here is cash that arrives without the bank ever seeing it:
+What does come here:
 
 * what was left over,
 * what something sold for,
 * what somebody gave you.
 
-Every Put in and Spent is listed under the pot, newest first, as **Cash in and
-out** — five at a time with a **Show all** button. Tap any line to open it and
-change it. A running total on its own is a number you cannot check, and this is
-the only record there is: no statement holds any of it.
+On the **Cash pot** card on Home: type what it was for (optional) and the
+amount, then **Put in** or **Spent**. **I counted it** sets the total to what
+you counted, recording the difference as a correction so the log still adds up.
 
-**What is already in the tin is not income.** Entering the float with "Put in"
-records it as money earned this month, which it is not. Type the total and use
-**Or set the total to this** underneath instead — that moves the pot's starting
-figure and leaves the month alone. Use Put in and Spent for what happens after.
+Every entry is listed under **Cash in and out**, newest first. Tap one to
+remove it.
 
-The **Cash in hand** card on Home starts empty with a **Start a cash pot**
-button. After that it shows what is in the pot, a box for what it was for, a
-box for the amount, and two buttons: **Put in** when notes arrive, **Spent**
-when they go. The running total is what is left.
+The pot counts in **Saved** and net worth when you are looking at the whole
+household. On one person's tab it is left out of their total, because it is
+everybody's.
 
-"What for?" is optional and worth the line it takes — "Sold the bike" is
-readable three weeks later in a way that "Cash put in" is not.
-
-It is an ordinary account underneath, so the total counts in **Available** and
-in net worth like any other, and every entry lands in the ledger where it can
-be found and corrected.
-
-#### The wordings that are recognised
-
-Savings (88 of them):
-
-```
-aj bell, bonus saver, cash isa, child saver, chip financial, chip invest, christmas saver, digital saver, dodl, double access, e saver, easy access, easy saver, emergency fund, esaver, first saver, fixed bond, fixed rate bond, flex saver, flexi saver, freetrade, from savings, future saver, goal saver, guaranteed growth, guaranteed income, hargreaves, help to buy isa, help to save, holiday saver, income bonds, instant saver, interactive investor, into savings, investec, investing, investment, isa, jisa, junior isa, junior saver, lifetime isa, limited access, loyalty saver, matured, maturity, member saver, money box, moneybox, moneyfarm, monthly saver, monzo pot, national savings, nest egg, ns and i, nsandi, nutmeg, online saver, pension contribution, plum, premium bonds, put away, rainy day, regular saver, round up, roundup, save into, saver, savings, savings account, savings bond, savings goal, savings pot, savings transfer, set aside, sinking fund, sipp, smart saver, starling space, start to save, stocks and shares, to save, to savings, trading 212, triple access, vanguard, wealthify, young saver
-```
-
-Cash (24):
-
-```
-atm, atm withdrawal, branch deposit, branch withdrawal, cardtronics, cash advance, cash at, cash deposit, cash in at, cash machine, cash paid in, cash point, cash withdrawal, cashpoint, counter deposit, counter withdrawal, link atm, link cash, note machine, notemachine, paying in, post office cash, withdrawal, withdrawn
-```
-
-A word matches at the start of a word in the description, so "saver" finds
-"SAVER 12345678". Some are written with a trailing space in the app so they
-match a whole word only — otherwise "isa" reaches ISABELLAS and "saver"
-reaches SAVERS, the high-street shop.
-
-If a payment of yours is not on this list, tell me what the bank calls it and
-it can be added.
+If you had a cash account before this version, it has been turned into the
+pot: its starting balance and every entry on it are in the log, and any
+transfer between it and a bank account is now a cash withdrawal (or paying-in)
+on the bank account — so no bank balance changed.
 
 ### The monthly rollover
 

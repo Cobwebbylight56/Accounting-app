@@ -7,12 +7,16 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.rhys.financetracker.core.money.Money
 import com.rhys.financetracker.domain.model.AccountType
+import com.rhys.financetracker.domain.model.Holding
 import java.time.Instant
 import java.time.LocalDate
 
 /**
- * A pot of money belonging to a person (or to the household when
+ * A bank account belonging to a person (or to the household when
  * [personId] points at the shared person).
+ *
+ * Cash is not one of these: the notes in the house are the cash pot,
+ * [CashPotEntryEntity], which belongs to nobody's account.
  *
  * The running balance is **derived**, never stored: it is [openingBalanceMinor]
  * plus every transaction against the account.  Storing a balance invites drift
@@ -49,15 +53,14 @@ data class AccountEntity(
     @ColumnInfo(name = "color_hex") val colorHex: String,
     @ColumnInfo(name = "include_in_net_worth") val includeInNetWorth: Boolean = true,
     /**
-     * Whether this account counts as money set aside on the home screen,
-     * overriding what its type would say. Null follows the type.
+     * Where this account's money counts — Available, Saved or Owed.
      *
-     * The type cannot answer this on its own. A current account somebody never
-     * touches is savings to them; a "Savings" account being spent down this
-     * month is not. Only the person whose money it is knows which, so they can
-     * say, and the type remains the sensible default rather than the verdict.
+     * The single answer to "is this savings?": nothing else is consulted.
+     * Defaults to what the type suggests, which is only ever a starting point;
+     * a current account somebody keeps untouched in case they lose their main
+     * one is set aside, and saying so is one tap.
      */
-    @ColumnInfo(name = "counts_as_savings") val countsAsSavings: Boolean? = null,
+    val holding: Holding = type.defaultHolding,
     /** Visible to every person rather than just its owner. */
     @ColumnInfo(name = "is_shared") val isShared: Boolean = false,
     @ColumnInfo(name = "sort_order") val sortOrder: Int = 0,

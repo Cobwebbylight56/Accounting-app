@@ -165,9 +165,9 @@ fun DashboardScreen(
                         onOpenInsights = onOpenInsights,
                         onCategoryClick = viewModel::showCategoryDetail,
                         onMonthClick = viewModel::showMonth,
-                        onStartCashPot = viewModel::startCashPot,
-                        onAdjustCash = viewModel::adjustCash,
-                        onCorrectCashTotal = viewModel::correctCashTotal,
+                        onRecordCash = viewModel::recordCash,
+                        onCountCash = viewModel::countCash,
+                        onRemoveCash = viewModel::removeCashEntry,
                     )
                 }
 
@@ -329,9 +329,9 @@ private fun DashboardCard(
     onOpenInsights: () -> Unit,
     onCategoryClick: (Long?, String, String?) -> Unit,
     onMonthClick: (java.time.YearMonth) -> Unit,
-    onStartCashPot: () -> Unit,
-    onAdjustCash: (Long, String, String, Boolean) -> Unit,
-    onCorrectCashTotal: (Long, String) -> Unit,
+    onRecordCash: (String, String, Boolean) -> Unit,
+    onCountCash: (String) -> Unit,
+    onRemoveCash: (com.rhys.financetracker.data.local.entity.CashPotEntryEntity) -> Unit,
 ) {
     when (widget) {
         DashboardWidget.ACCOUNT_ACTIVITY -> AccountActivityCard(state, onOpenAccounts)
@@ -345,13 +345,7 @@ private fun DashboardCard(
             RecentTransactionsCard(state, onOpenTransaction, onAddTransaction, onMonthClick)
         DashboardWidget.SAVINGS_AND_CASH -> SavingsAndCashCard(state, onOpenAccounts)
         DashboardWidget.CASH_IN_HAND ->
-            CashInHandCard(
-                state,
-                onStartCashPot,
-                onAdjustCash,
-                onCorrectCashTotal,
-                onOpenTransaction,
-            )
+            CashInHandCard(state, onRecordCash, onCountCash, onRemoveCash)
         DashboardWidget.SAVINGS_PROGRESS -> SavingsProgressCard(state, onOpenSavings)
         DashboardWidget.SPENDING_BY_CATEGORY ->
             SpendingByCategoryCard(state, onCategoryClick)
@@ -369,10 +363,8 @@ private fun BalanceSummaryCard(state: DashboardState, onOpenAccounts: () -> Unit
     val summary = state.summary
     Column {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            // Which accounts land in which tile is a judgement the app cannot
-            // make alone — a current account nobody touches is savings, and a
-            // savings account being spent down is not. So each says what it
-            // counts, and the account screen has the switch that decides.
+            // Which tile an account lands in is its "Counts as" setting — To
+            // spend, Set aside or Owed — and nothing else.
             StatTile(
                 label = "Available",
                 caption = "To spend",
@@ -385,37 +377,30 @@ private fun BalanceSummaryCard(state: DashboardState, onOpenAccounts: () -> Unit
                 modifier = Modifier.weight(1f),
                 onClick = onOpenAccounts,
             )
-            // Two different things are true of savings and only one of them
-            // is a balance. Somebody whose saver is at another bank has no
-            // account here to hold it, so the tile read nothing saved while
-            // money left for the saver every month. The caption says what the
-            // month put in, and where there is no savings account at all that
-            // is the only savings figure there is.
-            // A savings account, where there is one, is the real answer.
-            // Where there is not, what the app has watched move in stands in
-            // for it — but only while that is a positive number. Showing
-            // "-£200 set aside" because it saw £200 leave a saver it has no
-            // account for is not a balance, it is a movement wearing the
-            // wrong label, and it reads as money owed.
-            val hasSavingsAccount = summary.totalSavingsMinor != 0L
-            val watched = summary.savingsEverMovedMinor
-            val savedMinor = when {
-                hasSavingsAccount -> summary.totalSavingsMinor
-                watched > 0L -> watched
-                else -> 0L
-            }
+            // Saved is a balance and only a balance: every set-aside account,
+            // plus the cash pot when the whole household is on screen. It
+            // once stood in a total of savings payments where there was no
+            // savings account, which showed movements as if they were money
+            // held and could go negative; what the month put in is the
+            // caption's job, never the figure's.
+            val hasSomewhereSetAside = state.accounts.any { it.isSavings } ||
+                summary.cashPotMinor != 0L
             StatTile(
                 label = "Saved",
                 caption = when {
-                    !hasSavingsAccount && watched <= 0L -> "No savings account yet"
+                    !hasSomewhereSetAside -> "Nothing set aside yet"
                     summary.savingsNetMinor > 0L ->
-                        "${Money.format(summary.savingsNetMinor)} in this month"
+                        "${Money.format(summary.savingsNetMinor)} put aside this month"
                     summary.savingsNetMinor < 0L ->
-                        "${Money.format(-summary.savingsNetMinor)} out this month"
+                        "${Money.format(-summary.savingsNetMinor)} taken out this month"
                     else -> "Set aside"
                 },
-                value = Money.format(savedMinor),
-                emphasis = if (savedMinor < 0L) StatEmphasis.NEGATIVE else StatEmphasis.POSITIVE,
+                value = Money.format(summary.totalSavingsMinor),
+                emphasis = if (summary.totalSavingsMinor < 0L) {
+                    StatEmphasis.NEGATIVE
+                } else {
+                    StatEmphasis.POSITIVE
+                },
                 modifier = Modifier.weight(1f),
                 onClick = onOpenAccounts,
             )

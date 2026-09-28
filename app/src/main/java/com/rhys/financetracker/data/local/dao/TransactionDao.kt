@@ -20,6 +20,7 @@ import com.rhys.financetracker.data.local.projection.ExistingEntry
 import com.rhys.financetracker.data.local.projection.FingerprintCount
 import com.rhys.financetracker.data.local.projection.IncomeExpenseTotals
 import com.rhys.financetracker.data.local.projection.MonthTotals
+import com.rhys.financetracker.data.local.projection.PersonPotFlow
 import com.rhys.financetracker.data.local.projection.PersonTotals
 import com.rhys.financetracker.data.local.projection.PotFlow
 import com.rhys.financetracker.data.local.projection.TransactionWithDetails
@@ -74,20 +75,6 @@ interface TransactionDao {
             "ORDER BY t.date DESC, t.id DESC",
     )
     fun observeBetween(start: LocalDate, end: LocalDate): Flow<List<TransactionWithDetails>>
-
-    /**
-     * The cash pot's history: every entry on a cash account, newest first.
-     *
-     * A running total on its own is a number you cannot check. Where it came
-     * from and what it went on is the part worth keeping, and it is the only
-     * record of it — no statement anywhere holds these.
-     */
-    @Query(
-        "SELECT $DETAIL_COLUMNS $DETAIL_JOINS " +
-            "WHERE t.is_archived = 0 AND a.type = 'CASH' " +
-            "ORDER BY t.date DESC, t.id DESC LIMIT :limit",
-    )
-    fun observeCashEntries(limit: Int): Flow<List<TransactionWithDetails>>
 
     @Query(
         "SELECT $DETAIL_COLUMNS $DETAIL_JOINS " +
@@ -252,6 +239,12 @@ interface TransactionDao {
     suspend fun searchRawOnce(query: SupportSQLiteQuery): List<TransactionWithDetails>
 
     // ----------------------------------------------------------- aggregates
+    //
+    // Every income and spending total leaves out money filed as savings. £200
+    // moved to a saver is not £200 spent, and £200 back out of it is not £200
+    // earned; counted as either, savings were "in with everything else" and a
+    // month that saved looked like a month that overspent. Where that money
+    // went is the Savings card's business, via observePotFlow.
 
     @Query(
         """
@@ -260,7 +253,9 @@ interface TransactionDao {
             IFNULL(SUM(CASE WHEN t.type = 'EXPENSE' THEN t.amount_minor ELSE 0 END), 0) AS expense_minor
         FROM transactions t
         LEFT JOIN accounts a ON a.id = t.account_id
+        LEFT JOIN categories c ON c.id = t.category_id
         WHERE t.is_archived = 0
+          AND (c.kind IS NULL OR c.kind <> 'SAVING')
           AND t.date BETWEEN :start AND :end
           AND (:accountId IS NULL OR t.account_id = :accountId)
           AND (:personId IS NULL OR COALESCE(t.person_id, a.person_id) = :personId)
@@ -280,7 +275,9 @@ interface TransactionDao {
             IFNULL(SUM(CASE WHEN t.type = 'EXPENSE' THEN t.amount_minor ELSE 0 END), 0) AS expense_minor
         FROM transactions t
         LEFT JOIN accounts a ON a.id = t.account_id
+        LEFT JOIN categories c ON c.id = t.category_id
         WHERE t.is_archived = 0
+          AND (c.kind IS NULL OR c.kind <> 'SAVING')
           AND t.date BETWEEN :start AND :end
           AND (:accountId IS NULL OR t.account_id = :accountId)
           AND (:personId IS NULL OR COALESCE(t.person_id, a.person_id) = :personId)
@@ -304,6 +301,7 @@ interface TransactionDao {
         LEFT JOIN categories c ON c.id = t.category_id
         LEFT JOIN accounts a ON a.id = t.account_id
         WHERE t.is_archived = 0
+          AND (c.kind IS NULL OR c.kind <> 'SAVING')
           AND t.type = :type
           AND t.date BETWEEN :start AND :end
           AND (:accountId IS NULL OR t.account_id = :accountId)
@@ -321,20 +319,15 @@ interface TransactionDao {
     ): Flow<List<CategoryTotal>>
 
     /**
-     * Money moved into and out of a pot — savings, or cash — over a period.
+     * Money moved from spending accounts into savings (or out as cash) over a
+     * period, and what came back.
      *
-     * Savings are not only an account balance. Somebody whose saver is with
-     * another bank has nothing in this app to hold that balance, and every
-     * standing order into it looked like ordinary spending — so the app showed
-     * nothing saved by a household that was saving every month.
-     *
-     * What it can see is the payment moving, and the category on it says where
-     * it went. Both directions are counted: money out of the account is money
-     * into the pot, money back in is money out of it. Counting only the first
-     * would report a month that emptied its saver as a month that saved.
-     *
-     * Cash works the same way and is the same query — taking £50 out of a
-     * machine is not spending £50, it is £50 in a pocket.
+     * Read from the spending side only — accounts whose money is to spend or
+     * owed — by the category on the payment. That makes it the same answer
+     * whether or not the saver it went to is in the app: a standing order to
+     * another bank's ISA counts, and a saver whose statement has also been
+     * imported is not counted a second time from its own end. What a saver in
+     * the app holds is its balance; this is only how much was put aside.
      */
     @Query(
         """
@@ -347,6 +340,7 @@ interface TransactionDao {
         LEFT JOIN accounts a ON a.id = t.account_id
         WHERE t.is_archived = 0
           AND c.kind = :kind
+          AND IFNULL(a.holding, 'SPEND') <> 'SET_ASIDE'
           AND t.date BETWEEN :start AND :end
           AND (:accountId IS NULL OR t.account_id = :accountId)
           AND (:personId IS NULL OR COALESCE(t.person_id, a.person_id) = :personId)
@@ -360,6 +354,56 @@ interface TransactionDao {
         personId: Long?,
     ): Flow<PotFlow?>
 
+    /** [observePotFlow] for every person at once. */
+    @Query(
+        """
+        SELECT COALESCE(t.person_id, a.person_id) AS person_id,
+               IFNULL(SUM(CASE WHEN t.type = 'EXPENSE' THEN t.amount_minor ELSE 0 END), 0)
+                   AS into_pot_minor,
+               IFNULL(SUM(CASE WHEN t.type = 'INCOME' THEN t.amount_minor ELSE 0 END), 0)
+                   AS out_of_pot_minor
+        FROM transactions t
+        JOIN categories c ON c.id = t.category_id
+        LEFT JOIN accounts a ON a.id = t.account_id
+        WHERE t.is_archived = 0
+          AND c.kind = :kind
+          AND IFNULL(a.holding, 'SPEND') <> 'SET_ASIDE'
+          AND t.date BETWEEN :start AND :end
+        GROUP BY COALESCE(t.person_id, a.person_id)
+        """,
+    )
+    fun observePotFlowByPerson(
+        kind: String,
+        start: LocalDate,
+        end: LocalDate,
+    ): Flow<List<PersonPotFlow>>
+
+    /** [observePotFlow], once. */
+    @Query(
+        """
+        SELECT IFNULL(SUM(CASE WHEN t.type = 'EXPENSE' THEN t.amount_minor ELSE 0 END), 0)
+                   AS into_pot_minor,
+               IFNULL(SUM(CASE WHEN t.type = 'INCOME' THEN t.amount_minor ELSE 0 END), 0)
+                   AS out_of_pot_minor
+        FROM transactions t
+        JOIN categories c ON c.id = t.category_id
+        LEFT JOIN accounts a ON a.id = t.account_id
+        WHERE t.is_archived = 0
+          AND c.kind = :kind
+          AND IFNULL(a.holding, 'SPEND') <> 'SET_ASIDE'
+          AND t.date BETWEEN :start AND :end
+          AND (:accountId IS NULL OR t.account_id = :accountId)
+          AND (:personId IS NULL OR COALESCE(t.person_id, a.person_id) = :personId)
+        """,
+    )
+    suspend fun getPotFlow(
+        kind: String,
+        start: LocalDate,
+        end: LocalDate,
+        accountId: Long?,
+        personId: Long?,
+    ): PotFlow?
+
     @Query(
         """
         SELECT t.category_id AS category_id,
@@ -371,6 +415,7 @@ interface TransactionDao {
         LEFT JOIN categories c ON c.id = t.category_id
         LEFT JOIN accounts a ON a.id = t.account_id
         WHERE t.is_archived = 0
+          AND (c.kind IS NULL OR c.kind <> 'SAVING')
           AND t.type = :type
           AND t.date BETWEEN :start AND :end
           AND (:accountId IS NULL OR t.account_id = :accountId)
@@ -394,7 +439,9 @@ interface TransactionDao {
                IFNULL(SUM(CASE WHEN t.type = 'EXPENSE' THEN t.amount_minor ELSE 0 END), 0) AS expense_minor
         FROM transactions t
         LEFT JOIN accounts a ON a.id = t.account_id
+        LEFT JOIN categories c ON c.id = t.category_id
         WHERE t.is_archived = 0
+          AND (c.kind IS NULL OR c.kind <> 'SAVING')
           AND t.date BETWEEN :start AND :end
           AND (:accountId IS NULL OR t.account_id = :accountId)
           AND (:personId IS NULL OR COALESCE(t.person_id, a.person_id) = :personId)
@@ -416,7 +463,9 @@ interface TransactionDao {
                IFNULL(SUM(CASE WHEN t.type = 'EXPENSE' THEN t.amount_minor ELSE 0 END), 0) AS expense_minor
         FROM transactions t
         LEFT JOIN accounts a ON a.id = t.account_id
+        LEFT JOIN categories c ON c.id = t.category_id
         WHERE t.is_archived = 0
+          AND (c.kind IS NULL OR c.kind <> 'SAVING')
           AND t.date BETWEEN :start AND :end
           AND (:accountId IS NULL OR t.account_id = :accountId)
           AND (:personId IS NULL OR COALESCE(t.person_id, a.person_id) = :personId)
@@ -441,7 +490,9 @@ interface TransactionDao {
         FROM transactions t
         LEFT JOIN accounts a ON a.id = t.account_id
         LEFT JOIN people p ON p.id = COALESCE(t.person_id, a.person_id)
+        LEFT JOIN categories c ON c.id = t.category_id
         WHERE t.is_archived = 0 AND t.date BETWEEN :start AND :end
+          AND (c.kind IS NULL OR c.kind <> 'SAVING')
         -- Grouped on the whole expression, not the output alias: both
         -- `transactions` and `accounts` carry a `person_id`, so a bare
         -- `GROUP BY person_id` is ambiguous to SQLite.
@@ -526,6 +577,26 @@ interface TransactionDao {
     suspend fun existsForRuleOnDate(ruleId: Long, date: LocalDate): Boolean
 
     // --------------------------------------------------------------- writes
+
+    /**
+     * Files every movement on a set-aside account as savings, other than
+     * interest and anything already filed as savings.
+     *
+     * On a saver, money arriving is money moved there and money leaving is
+     * money moved back; neither is income or spending. Returns how many
+     * entries changed.
+     */
+    @Query(
+        """
+        UPDATE transactions SET category_id = :savingsCategoryId, updated_at = :updatedAt
+        WHERE account_id = :accountId
+          AND type IN ('INCOME', 'EXPENSE')
+          AND (category_id IS NULL OR category_id NOT IN (
+                SELECT id FROM categories
+                WHERE kind = 'SAVING' OR LOWER(name) LIKE '%interest%'))
+        """,
+    )
+    suspend fun fileAsSavings(accountId: Long, savingsCategoryId: Long, updatedAt: Long): Int
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(transaction: TransactionEntity): Long

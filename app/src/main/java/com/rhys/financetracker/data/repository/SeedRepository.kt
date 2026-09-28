@@ -6,6 +6,7 @@ import com.rhys.financetracker.core.result.runCatchingApp
 import com.rhys.financetracker.core.time.DateUtils
 import com.rhys.financetracker.data.local.AppDatabase
 import com.rhys.financetracker.data.local.entity.AccountEntity
+import com.rhys.financetracker.data.local.entity.CashPotEntryEntity
 import com.rhys.financetracker.data.local.entity.PersonEntity
 import com.rhys.financetracker.data.local.entity.RecurringRuleEntity
 import com.rhys.financetracker.data.local.entity.SavingsGoalEntity
@@ -135,6 +136,8 @@ class SeedRepository @Inject constructor(
                     name = person.name,
                     colorHex = person.colorHex,
                     sortOrder = index,
+                    grossYearlyIncomeMinor = person.grossYearlyMajor?.let { Money.fromMajor(it) },
+                    netYearlyIncomeMinor = person.netYearlyMajor?.let { Money.fromMajor(it) },
                 ),
             ).also { created++ }
         }
@@ -155,6 +158,20 @@ class SeedRepository @Inject constructor(
                     notes = account.notes,
                 ),
             ).also { created++ }
+        }
+
+        // --- cash pot ----------------------------------------------------
+        if (database.cashPotDao().getAll().isEmpty()) {
+            SampleData.cashPot.forEach { cash ->
+                database.cashPotDao().insert(
+                    CashPotEntryEntity(
+                        date = startFrom,
+                        amountMinor = Money.fromMajor(cash.amountMajor),
+                        isIn = true,
+                        note = cash.note,
+                    ),
+                )
+            }
         }
 
         // --- recurring income, bills and savings transfers ----------------

@@ -7,10 +7,9 @@ import com.rhys.financetracker.core.time.DateUtils
 import com.rhys.financetracker.data.local.dao.DashboardWidgetDao
 import com.rhys.financetracker.data.local.dao.TransactionFilter
 import com.rhys.financetracker.data.local.dao.TransactionSort
-import com.rhys.financetracker.data.local.entity.AccountEntity
+import com.rhys.financetracker.data.local.entity.CashPotEntryEntity
 import com.rhys.financetracker.data.local.entity.DashboardWidgetEntity
 import com.rhys.financetracker.data.local.entity.PersonEntity
-import com.rhys.financetracker.data.local.entity.TransactionEntity
 import com.rhys.financetracker.data.local.projection.AccountActivity
 import com.rhys.financetracker.data.local.projection.AccountWithBalance
 import com.rhys.financetracker.data.local.projection.CategoryTotal
@@ -22,17 +21,17 @@ import com.rhys.financetracker.data.local.projection.TransactionWithDetails
 import com.rhys.financetracker.data.remote.ExternalDataRepository
 import com.rhys.financetracker.data.remote.ExternalDataSnapshot
 import com.rhys.financetracker.data.repository.AccountRepository
+import com.rhys.financetracker.data.repository.CashPotRepository
 import com.rhys.financetracker.data.repository.InsightRepository
 import com.rhys.financetracker.data.repository.PeopleRepository
 import com.rhys.financetracker.data.repository.RecurringRepository
 import com.rhys.financetracker.data.repository.SavingsRepository
 import com.rhys.financetracker.data.repository.TransactionRepository
+import com.rhys.financetracker.domain.income.IncomeStats
 import com.rhys.financetracker.domain.insight.Insight
 import com.rhys.financetracker.domain.insight.InsightReport
-import com.rhys.financetracker.domain.model.AccountType
 import com.rhys.financetracker.domain.model.CategoryKind
 import com.rhys.financetracker.domain.model.DashboardWidget
-import com.rhys.financetracker.domain.model.RecordSource
 import com.rhys.financetracker.domain.model.TransactionType
 import com.rhys.financetracker.domain.report.FinancialSummary
 import com.rhys.financetracker.domain.report.MonthPoint
@@ -75,6 +74,7 @@ class DashboardViewModel @Inject constructor(
     private val externalDataRepository: ExternalDataRepository,
     private val widgetDao: DashboardWidgetDao,
     private val insightRepository: InsightRepository,
+    private val cashPotRepository: CashPotRepository,
 ) : ViewModel() {
 
     private val scope = MutableStateFlow(DashboardScope())
@@ -136,23 +136,6 @@ class DashboardViewModel @Inject constructor(
 
     /** The same for cash: out of a machine, and back in at a counter. */
     private val cashThisMonth = potFlow(CategoryKind.CASH)
-
-    /**
-     * Everything the app has ever seen move into savings, less what came back.
-     *
-     * This is the closest thing to a balance for a saver held at another bank,
-     * which the app has no account for. It only knows about the movements it
-     * has been shown, so it is never called a balance.
-     */
-    private val savingsEverMoved = scope.flatMapLatest { currentScope ->
-        transactionRepository.observePotFlow(
-            kind = CategoryKind.SAVING,
-            start = FIRST_POSSIBLE_DATE,
-            end = DateUtils.today(),
-            accountId = currentScope.accountId,
-            personId = currentScope.personId,
-        )
-    }
 
     private fun potFlow(kind: CategoryKind) = monthFlow.flatMapLatest { (month, currentScope) ->
         val range = DateUtils.monthRange(month)
@@ -254,8 +237,8 @@ class DashboardViewModel @Inject constructor(
             accountActivity,
             savingsThisMonth,
             cashThisMonth,
-            savingsEverMoved,
-            transactionRepository.observeCashEntries(CASH_LOG_LENGTH),
+            cashPotRepository.observeTotal(),
+            cashPotRepository.observeRecent(CASH_LOG_LENGTH),
             // Only for saying where the money is when the month on screen is
             // empty. Opening on today's month and finding nothing looks like a
             // broken app when the entries are simply in an earlier month.
@@ -286,14 +269,20 @@ class DashboardViewModel @Inject constructor(
         val activity = values[15] as List<AccountActivity>
         val savings = values[16] as PotFlow
         val cash = values[17] as PotFlow
-        val savingsEver = values[18] as PotFlow
-        val cashLog = values[19] as List<TransactionWithDetails>
+        val cashPot = values[18] as Long
+        val cashLog = values[19] as List<CashPotEntryEntity>
         val latest = (values[20] as List<TransactionWithDetails>)
             .firstOrNull()?.transaction?.date
 
         val inScope = accountList.filter { currentScope.matches(it) }
         val unassigned = accountList.count { it.account.personId == null }
-        val savingsTotal = inScope.filter { it.isSavings }.sumOf { it.balanceMinor }
+        // The cash pot is the household's, not anybody's account, so it is
+        // counted when the whole household is on screen and not otherwise —
+        // adding it to one person's savings would give them money that is
+        // everybody's.
+        val potCounts = currentScope.personId == null && currentScope.accountId == null
+        val savingsTotal = inScope.filter { it.isSavings }.sumOf { it.balanceMinor } +
+            if (potCounts) cashPot else 0L
         val liabilities = inScope.filter { it.isLiability }.sumOf { it.balanceMinor }
         val spendable = inScope.filterNot { it.isSavings || it.isLiability }
             .sumOf { it.balanceMinor }
@@ -308,13 +297,14 @@ class DashboardViewModel @Inject constructor(
                 totalBalanceMinor = spendable,
                 totalSavingsMinor = savingsTotal,
                 totalLiabilitiesMinor = liabilities,
-                netWorthMinor = inScope.sumOf { it.netWorthContributionMinor },
+                netWorthMinor = inScope.sumOf { it.netWorthContributionMinor } +
+                    if (potCounts) cashPot else 0L,
                 monthIncomeMinor = monthTotals.incomeMinor,
                 monthExpenseMinor = monthTotals.expenseMinor,
                 committedRecurringMinor = committed,
                 savingsInMinor = savings.intoPotMinor,
                 savingsOutMinor = savings.outOfPotMinor,
-                savingsEverMovedMinor = savingsEver.netMinor,
+                cashPotMinor = cashPot,
                 cashOutMinor = cash.intoPotMinor,
                 cashInMinor = cash.outOfPotMinor,
             ),
@@ -426,102 +416,52 @@ class DashboardViewModel @Inject constructor(
         selectedCategory.value = null
     }
 
-    /** Jumps to the month behind a tapped bar. */
     /**
-     * Starts a cash pot: an account standing for the notes in the house.
+     * Records notes and coins going into the cash pot ([isIn]) or being spent
+     * from it.
      *
-     * Cash leaving the bank counts as spent and stays that way. This is for
-     * the money that arrives without the bank ever seeing it — what was left
-     * over, what something sold for, what somebody was given — which is
-     * exactly the money no statement can supply. One tap makes somewhere to
-     * put it.
+     * Nothing feeds the pot automatically. Cash taken out of any account is
+     * spent where it was taken out; how much of it is still in a wallet is
+     * not something the app can know, and a cash total that is quietly wrong
+     * is worse than none at all.
      */
-    fun startCashPot() {
-        viewModelScope.launch {
-            val owner = scope.value.personId
-            val existing = accountRepository.getAll()
-                .firstOrNull { it.type == AccountType.CASH && it.personId == owner }
-            if (existing != null) {
-                message.value = "\"${existing.name}\" is already your cash pot"
-                return@launch
-            }
-            val result = accountRepository.save(
-                AccountEntity(
-                    name = CASH_POT_NAME,
-                    type = AccountType.CASH,
-                    personId = owner,
-                    openingBalanceMinor = 0L,
-                    openingBalanceDate = DateUtils.today(),
-                    colorHex = CASH_POT_COLOUR,
-                    notes = "The notes and coins in the house.",
-                ),
-            )
-            message.value = result.errorMessageOrNull() ?: "Cash pot ready"
-        }
-    }
-
-    /**
-     * Records cash going into or out of the house.
-     *
-     * Money put in is income to the pot and money spent from it is an expense,
-     * which is the same shape as every other account — so it flows through the
-     * balances, the reports and the month's totals without a special case.
-     *
-     * Nothing feeds this automatically. A withdrawal at a machine is spending
-     * and stops there: how much of it is still in a wallet is not something
-     * the app can know, and a cash total that is quietly wrong is worse than
-     * none at all.
-     */
-    fun adjustCash(
-        accountId: Long,
-        amountText: String,
-        note: String,
-        isSpending: Boolean,
-    ) {
+    fun recordCash(amountText: String, note: String, isIn: Boolean) {
         val amount = Money.parseOrNull(amountText)
         if (amount == null || amount <= 0L) {
             message.value = "Enter an amount"
             return
         }
         viewModelScope.launch {
-            val result = transactionRepository.save(
-                TransactionEntity(
-                    amountMinor = amount,
-                    type = if (isSpending) TransactionType.EXPENSE else TransactionType.INCOME,
-                    date = DateUtils.today(),
-                    description = note.trim().ifBlank {
-                        if (isSpending) "Cash spent" else "Cash put in"
-                    },
-                    accountId = accountId,
-                    source = RecordSource.MANUAL,
-                ),
+            val result = cashPotRepository.record(
+                amountMinor = amount,
+                isIn = isIn,
+                note = note.ifBlank { if (isIn) "Put in" else "Spent" },
             )
             message.value = result.errorMessageOrNull()
-                ?: if (isSpending) {
-                    "${Money.format(amount)} spent from the cash pot"
+                ?: if (isIn) {
+                    "${Money.format(amount)} put in the cash pot"
                 } else {
-                    "${Money.format(amount)} added to the cash pot"
+                    "${Money.format(amount)} spent from the cash pot"
                 }
         }
     }
 
-    /**
-     * Sets the pot to what is actually in it, without recording a payment.
-     *
-     * The float — what was in the tin before the app knew about it — is not
-     * income, and entering it as one puts it in this month's "money in". This
-     * moves the starting balance instead, so the total is right and the month
-     * is untouched.
-     */
-    fun correctCashTotal(accountId: Long, amountText: String) {
+    /** Sets the pot to what was counted in it; see [CashPotRepository.setTotalTo]. */
+    fun countCash(amountText: String) {
         val amount = Money.parseOrNull(amountText)
-        if (amount == null) {
+        if (amount == null || amount < 0L) {
             message.value = "Enter what is in the pot"
             return
         }
         viewModelScope.launch {
-            message.value = accountRepository.setBalanceTo(accountId, amount).errorMessageOrNull()
+            message.value = cashPotRepository.setTotalTo(amount).errorMessageOrNull()
                 ?: "Cash pot set to ${Money.format(amount)}"
+        }
+    }
+
+    fun removeCashEntry(entry: CashPotEntryEntity) {
+        viewModelScope.launch {
+            message.value = cashPotRepository.delete(entry).errorMessageOrNull() ?: "Entry removed"
         }
     }
 
@@ -529,6 +469,7 @@ class DashboardViewModel @Inject constructor(
         message.value = null
     }
 
+    /** Jumps to the month behind a tapped bar. */
     fun showMonth(month: YearMonth) {
         if (!month.isAfter(DateUtils.currentYearMonth())) visibleMonth.value = month
     }
@@ -571,11 +512,6 @@ class DashboardViewModel @Inject constructor(
     }
 
     private companion object {
-        /** Early enough to be "everything", without pretending to be a date. */
-        val FIRST_POSSIBLE_DATE: LocalDate = LocalDate.of(1900, 1, 1)
-        const val CASH_POT_NAME = "Cash in the house"
-        const val CASH_POT_COLOUR = "#6D4C41"
-
         /** How much of the cash pot's history the card can show. */
         const val CASH_LOG_LENGTH = 50
         const val MONTHS_ON_CHART = 6
@@ -618,7 +554,7 @@ data class DashboardState(
     val overdueBills: List<RecurringRuleWithDetails> = emptyList(),
     val monthTransactions: List<TransactionWithDetails> = emptyList(),
     /** What has gone into and out of the cash pot, newest first. */
-    val cashLog: List<TransactionWithDetails> = emptyList(),
+    val cashLog: List<CashPotEntryEntity> = emptyList(),
 
     /** Every account, whoever it belongs to — the person filter narrows [accounts]. */
     val accountsInTotal: Int = 0,
@@ -645,6 +581,21 @@ data class DashboardState(
      */
     val scopeHasNothingButAppDoes: Boolean
         get() = accounts.isEmpty() && accountsInTotal > 0
+
+    /**
+     * Yearly pay for whoever is on screen: one person, or everybody together.
+     * Empty when looking at a single account, which has no pay of its own.
+     */
+    val incomeInScope: IncomeStats
+        get() = when {
+            scope.accountId != null -> IncomeStats.NONE
+            scope.personId != null -> people.firstOrNull { it.id == scope.personId }
+                ?.let { IncomeStats(it.grossYearlyIncomeMinor, it.netYearlyIncomeMinor) }
+                ?: IncomeStats.NONE
+            else -> people.fold(IncomeStats.NONE) { total, person ->
+                total + IncomeStats(person.grossYearlyIncomeMinor, person.netYearlyIncomeMinor)
+            }
+        }
     fun isVisible(widget: DashboardWidget): Boolean =
         widgets.firstOrNull { it.widget == widget }?.isVisible ?: widget.defaultVisible
 }

@@ -1,6 +1,7 @@
 package com.rhys.financetracker.data.importer
 
 import com.rhys.financetracker.domain.model.AccountType
+import com.rhys.financetracker.domain.model.Holding
 
 /**
  * What the banks call an account, and what that makes it.
@@ -21,16 +22,16 @@ import com.rhys.financetracker.domain.model.AccountType
  *
  * A current account somebody keeps a little money in, in case they lose access
  * to their main one, is a current account by name and a stagnant pot in
- * practice. Nothing in its name says so. That is what the per-account "Money
- * set aside" switch is for, and why nothing here is ever forced.
+ * practice. Nothing in its name says so. That is what each account's
+ * [Holding] is for, and why nothing here is more than a suggestion.
  */
 object AccountNaming {
 
     /**
      * Money you have put somewhere you are not going to spend from.
      *
-     * Ordered longest-first where phrases overlap, so "cash isa" is read
-     * before "cash" ever gets a chance to make it a tin of notes.
+     * Matched at the start of a word, so "saver" finds FLEX SAVER and "isa"
+     * finds CASH ISA without either reaching inside another word.
      */
     val SAVINGS: List<String> = listOf(
         // -- said plainly ------------------------------------------------
@@ -81,8 +82,10 @@ object AccountNaming {
      *
      * Liabilities first because they are unambiguous, then savings, because
      * everything else in the list is a word a savings product can also
-     * contain: a cash ISA holds the word cash, and a savings card holds the
-     * word card.
+     * contain: a savings card holds the word card.
+     *
+     * There is no cash type to guess: notes and coins are the cash pot, not
+     * an account.
      */
     fun typeFor(name: String): AccountType {
         val text = " ${TransactionFingerprint.normaliseDescription(name)} "
@@ -93,24 +96,36 @@ object AccountNaming {
             text.contains(" pension") -> AccountType.PENSION
             says(INVESTMENT) -> AccountType.INVESTMENT
             says(SAVINGS) -> AccountType.SAVINGS
-            says(listOf("cash", "coin", "wallet", "petty")) -> AccountType.CASH
             says(CARDS) -> AccountType.CREDIT_CARD
             else -> AccountType.CURRENT
         }
     }
 
     /**
-     * True when the name says savings but the account is not being counted as
-     * money set aside.
+     * True when this "account" is really notes and coins — a spreadsheet row
+     * called Cash, or £1 coins — which belong in the cash pot rather than
+     * being made into an account.
      *
-     * The reason the Accounts screen can offer to put it right: fixing how the
-     * type is guessed only ever helps accounts made afterwards, and the ones
-     * already there are exactly the ones that are wrong.
+     * Only when nothing else claims the name: a Cash ISA is savings.
      */
-    fun looksMistyped(name: String, type: AccountType, countsAsSavings: Boolean?): Boolean {
-        // Somebody who has already said either way is not being second-guessed.
-        if (countsAsSavings != null) return false
-        if (type.isSavings || type.isLiability) return false
-        return typeFor(name).isSavings
+    fun isCashPot(name: String): Boolean {
+        val text = " ${TransactionFingerprint.normaliseDescription(name)} "
+        return CASH_WORDS.any { text.contains(" $it") } && typeFor(name) == AccountType.CURRENT
     }
+
+    private val CASH_WORDS = listOf("cash", "coin", "£1 coin", "wallet", "petty", "tin ")
+
+    /** Where an account with this name most likely counts. */
+    fun holdingFor(name: String): Holding = typeFor(name).defaultHolding
+
+    /**
+     * True when the name says savings but the account is counted as money
+     * to spend.
+     *
+     * The reason the Accounts screen can offer to put it right. It asks the
+     * account's one stored answer, so unlike the old override there is no
+     * earlier choice that can quietly silence it.
+     */
+    fun looksMistyped(name: String, holding: Holding): Boolean =
+        holding == Holding.SPEND && holdingFor(name) == Holding.SET_ASIDE
 }

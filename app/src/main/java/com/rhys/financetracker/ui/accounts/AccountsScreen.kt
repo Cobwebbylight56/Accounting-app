@@ -36,6 +36,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -43,6 +44,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -58,6 +60,7 @@ import com.rhys.financetracker.data.local.entity.PersonEntity
 import com.rhys.financetracker.data.local.projection.AccountWithBalance
 import com.rhys.financetracker.data.local.seed.DefaultData
 import com.rhys.financetracker.domain.model.AccountType
+import com.rhys.financetracker.domain.model.Holding
 import com.rhys.financetracker.ui.components.AmountField
 import com.rhys.financetracker.ui.components.ColorDot
 import com.rhys.financetracker.ui.components.ColorPicker
@@ -216,20 +219,21 @@ fun AccountsScreen(
                                         },
                                     )
                                 }
-                                // The name says savings and the app is
-                                // counting it as money to spend. Fixing how
-                                // the type is guessed only helps accounts made
-                                // afterwards; this is for the ones already
-                                // here, which are the ones that are wrong.
+                                // Where it counts, changeable right here.
+                                // The one setting behind Available, Saved and
+                                // Owed, so it is never more than a tap away.
+                                HoldingChips(
+                                    selected = account.account.holding,
+                                    onPick = { holding -> viewModel.setHolding(account, holding) },
+                                )
                                 if (
                                     AccountNaming.looksMistyped(
                                         name = account.account.name,
-                                        type = account.account.type,
-                                        countsAsSavings = account.account.countsAsSavings,
+                                        holding = account.account.holding,
                                     )
                                 ) {
                                     MistypedSavingsNote {
-                                        viewModel.moveToSavings(account)
+                                        viewModel.setHolding(account, Holding.SET_ASIDE)
                                     }
                                 }
                             }
@@ -288,7 +292,39 @@ private fun MistypedSavingsNote(onMove: () -> Unit) {
             color = MaterialTheme.colorScheme.error,
         )
         TextButton(onClick = onMove, contentPadding = PaddingValues(0.dp)) {
-            Text("Move it to Saved")
+            Text("Count it as set aside")
+        }
+    }
+}
+
+/**
+ * "Counts as: To spend · Set aside · Owed" — where this account's money goes
+ * on Home. The single setting behind all three tiles.
+ */
+@Composable
+private fun HoldingChips(
+    selected: Holding,
+    onPick: (Holding) -> Unit,
+    modifier: Modifier = Modifier.padding(start = 28.dp, bottom = 6.dp),
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "Counts as",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Holding.entries.forEach { holding ->
+            FilterChip(
+                selected = holding == selected,
+                onClick = { if (holding != selected) onPick(holding) },
+                label = { Text(holding.displayName) },
+            )
         }
     }
 }
@@ -356,7 +392,10 @@ private fun AccountRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = account.account.type.displayName,
+                    text = listOfNotNull(
+                        account.personName,
+                        account.account.type.displayName,
+                    ).joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -438,63 +477,50 @@ fun AccountEditScreen(
                 ErrorBanner(message = it, onDismiss = viewModel::clearError)
             }
 
-            LabelledTextField(
-                label = "Account name",
-                value = state.form.name,
-                onValueChange = { text -> viewModel.update { it.copy(name = text) } },
-                placeholder = "Everyday current account",
-            )
+            // Whose it is comes first and is its own question. The account's
+            // name is what the bank calls it; the two used to sit side by side
+            // looking like the same field twice.
+            OwnerSection(state = state, viewModel = viewModel)
 
             DropdownField(
-                label = "Type",
+                label = "Type of account",
                 options = AccountType.entries,
                 selected = state.form.type,
-                onSelect = { type -> viewModel.update { it.copy(type = type) } },
+                onSelect = viewModel::setType,
                 optionLabel = { it.displayName },
             )
 
-            DropdownField(
-                label = "Belongs to",
-                options = state.people,
-                selected = state.people.firstOrNull { it.id == state.form.personId },
-                onSelect = { person -> viewModel.update { it.copy(personId = person.id) } },
-                optionLabel = { it.name },
-                optionColor = { colorFromHex(it.colorHex) },
-                placeholder = if (state.people.isEmpty()) "Nobody yet" else "Not assigned",
+            LabelledTextField(
+                label = "Account name",
+                value = state.form.name,
+                onValueChange = viewModel::setName,
+                placeholder = "e.g. Nationwide current, Start to Save",
+                supportingText = "What the bank calls it — not whose it is.",
             )
-            // Typing a name here makes the person and puts the account under
-            // them in one go. Setting up used to mean adding a person, then an
-            // account, then going back to join the two — three screens to
-            // record one thing.
-            if (state.form.personId == null) {
-                LabelledTextField(
-                    label = "Or type a new name",
-                    value = state.form.newPersonName,
-                    onValueChange = { name ->
-                        viewModel.update { it.copy(newPersonName = name) }
-                    },
-                    placeholder = "e.g. Rhys Evans",
-                    supportingText = "They will be created and this account put under them.",
-                )
-            }
-            // An account under nobody's name is invisible to every per-person
-            // view in the app, and nothing said so — which is how a whole
-            // imported statement ended up unreachable from the person's tab.
-            if (state.form.personId == null && state.form.newPersonName.isBlank()) {
+
+            Column {
                 Text(
-                    text = "Nobody's yet, so it will not show when you pick a person on " +
-                        "Home. Pick a name above, or type one.",
+                    text = "Where this money counts",
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                HoldingChips(
+                    selected = state.form.holding,
+                    onPick = viewModel::setHolding,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                Text(
+                    text = state.form.holding.explanation,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(top = 4.dp, start = 4.dp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+
             // Almost nobody has a current account and nothing else, and the
             // second one was another trip through this same form.
-            if (state.isNew && !state.form.type.isSavings) {
+            if (state.isNew && state.form.holding == Holding.SPEND) {
                 SwitchRow(
                     label = "Also add a savings account",
-                    description = "Made under the same name, and counted as money set aside.",
+                    description = "Made under the same name, and counted as set aside.",
                     checked = state.form.alsoCreateSavings,
                     onCheckedChange = { on ->
                         viewModel.update { it.copy(alsoCreateSavings = on) }
@@ -565,16 +591,6 @@ fun AccountEditScreen(
                 },
             )
             SwitchRow(
-                label = "Money set aside",
-                description = "Counts under Saved on the home screen instead of " +
-                    "Available. Use it for anything you are not planning to spend, " +
-                    "whatever kind of account it is.",
-                checked = state.form.countsAsSavings,
-                onCheckedChange = { value ->
-                    viewModel.update { it.copy(countsAsSavings = value) }
-                },
-            )
-            SwitchRow(
                 label = "Shared household account",
                 checked = state.form.isShared,
                 onCheckedChange = { value -> viewModel.update { it.copy(isShared = value) } },
@@ -593,6 +609,68 @@ fun AccountEditScreen(
                 modifier = Modifier.fillMaxWidth().height(52.dp),
             ) {
                 Text(if (state.isNew) "Add account" else "Save changes")
+            }
+        }
+    }
+}
+
+/**
+ * Whose account this is.
+ *
+ * With nobody set up yet it asks for a name and makes the person. With one
+ * person there is nobody else it could be, so it says so rather than asking.
+ * Only with two or more is there a choice to make.
+ */
+@Composable
+private fun OwnerSection(state: AccountEditState, viewModel: AccountEditViewModel) {
+    var someoneElse by rememberSaveable { mutableStateOf(false) }
+    val people = state.people
+    val only = people.singleOrNull()
+    when {
+        people.isEmpty() || someoneElse -> {
+            LabelledTextField(
+                label = if (people.isEmpty()) "Your name" else "Their name",
+                value = state.form.newPersonName,
+                onValueChange = { name ->
+                    viewModel.update { it.copy(newPersonName = name, personId = null) }
+                },
+                placeholder = "e.g. Rhys Evans",
+                supportingText = "The account is put under this name.",
+            )
+        }
+        only != null && (state.form.personId == null || state.form.personId == only.id) -> {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ColorDot(colorFromHex(only.colorHex))
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    text = "Belongs to ${only.name}",
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = { someoneElse = true }) { Text("Someone else") }
+            }
+        }
+        else -> {
+            DropdownField(
+                label = "Belongs to",
+                options = people,
+                selected = people.firstOrNull { it.id == state.form.personId },
+                onSelect = { person ->
+                    viewModel.update { it.copy(personId = person.id, newPersonName = "") }
+                },
+                optionLabel = { it.name },
+                optionColor = { colorFromHex(it.colorHex) },
+                placeholder = "Pick a person",
+            )
+            TextButton(onClick = { someoneElse = true }) { Text("Someone new") }
+            // An account under nobody's name is invisible to every per-person
+            // view in the app.
+            if (state.form.personId == null) {
+                Text(
+                    text = "Nobody's yet, so it will not show when you pick a person on Home.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
             }
         }
     }

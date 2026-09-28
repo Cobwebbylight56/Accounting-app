@@ -23,6 +23,17 @@ data class PersonEntity(
     @ColumnInfo(name = "is_shared") val isShared: Boolean = false,
     @ColumnInfo(name = "sort_order") val sortOrder: Int = 0,
     val notes: String? = null,
+    /**
+     * Yearly pay before tax, in minor units; null when not given.
+     *
+     * Kept per person rather than read from the statements because a
+     * statement only shows what arrived — after tax, pension and anything
+     * else taken at source — and the two together are what say how much of
+     * somebody's pay they actually get.
+     */
+    @ColumnInfo(name = "gross_yearly_income_minor") val grossYearlyIncomeMinor: Long? = null,
+    /** Yearly take-home pay after tax, in minor units; null when not given. */
+    @ColumnInfo(name = "net_yearly_income_minor") val netYearlyIncomeMinor: Long? = null,
     /** Archived records stay in the database and in history but are hidden from pickers. */
     @ColumnInfo(name = "is_archived") val isArchived: Boolean = false,
     @ColumnInfo(name = "created_at") val createdAt: Long = Instant.now().toEpochMilli(),

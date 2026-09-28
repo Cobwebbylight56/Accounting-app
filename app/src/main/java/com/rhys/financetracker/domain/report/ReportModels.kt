@@ -127,7 +127,12 @@ data class AccountTypeSlice(
 
 /** The headline figures shown on the dashboard and at the top of reports. */
 data class FinancialSummary(
+    /** Balances of every account whose money is to spend. */
     val totalBalanceMinor: Long,
+    /**
+     * Saved: balances of every set-aside account, plus the cash pot when the
+     * whole household is being looked at. Nothing else — no stand-in figure.
+     */
     val totalSavingsMinor: Long,
     val totalLiabilitiesMinor: Long,
     val netWorthMinor: Long,
@@ -135,20 +140,15 @@ data class FinancialSummary(
     val monthExpenseMinor: Long,
     val committedRecurringMinor: Long,
     /**
-     * Money into and out of savings this month, read from the categories on
-     * the payments rather than from any account balance — so a saver held at
-     * another bank, which this app has no account for, still shows up.
+     * Money moved from spending accounts into savings this month, and back.
+     * Read from the category on the payments, so a saver held at another
+     * bank still shows up — but only ever as money moved, never as a balance.
      */
     val savingsInMinor: Long = 0L,
     val savingsOutMinor: Long = 0L,
 
-    /**
-     * Everything ever paid into savings less everything taken back out.
-     *
-     * The nearest thing to a balance for a saver the app holds no account for.
-     * Never called one: it knows only the movements it has been shown.
-     */
-    val savingsEverMovedMinor: Long = 0L,
+    /** What is in the household cash pot; part of [totalSavingsMinor] when counted. */
+    val cashPotMinor: Long = 0L,
 
     /** Cash out of a machine this month, and cash paid back in at a counter. */
     val cashOutMinor: Long = 0L,
@@ -158,9 +158,13 @@ data class FinancialSummary(
 
     /**
      * Money genuinely free to spend: what has come in this month, less what has
-     * gone out, less the bills still to be paid before the month ends.
+     * gone out, less what was put aside, less the bills still to be paid
+     * before the month ends.
+     *
+     * Savings are taken off here rather than counted as spending: £200 moved
+     * to a saver is not spent, but it is no longer there to spend either.
      */
-    val disposableMinor: Long get() = monthNetMinor - committedRecurringMinor
+    val disposableMinor: Long get() = monthNetMinor - savingsNetMinor - committedRecurringMinor
 
     /** What this month actually added to savings; negative when it drew them down. */
     val savingsNetMinor: Long get() = savingsInMinor - savingsOutMinor

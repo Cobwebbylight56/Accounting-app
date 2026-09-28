@@ -8,11 +8,13 @@ import com.rhys.financetracker.core.result.AppResult
 import com.rhys.financetracker.core.result.runCatchingApp
 import com.rhys.financetracker.core.time.DateUtils
 import com.rhys.financetracker.data.local.dao.AccountDao
+import com.rhys.financetracker.data.local.dao.CashPotDao
 import com.rhys.financetracker.data.local.dao.CategoryDao
 import com.rhys.financetracker.data.local.dao.PersonDao
 import com.rhys.financetracker.data.local.dao.RecurringRuleDao
 import com.rhys.financetracker.data.local.dao.TransactionDao
 import com.rhys.financetracker.data.local.entity.AccountEntity
+import com.rhys.financetracker.data.local.entity.CashPotEntryEntity
 import com.rhys.financetracker.data.local.entity.PersonEntity
 import com.rhys.financetracker.data.local.entity.RecurringRuleEntity
 import com.rhys.financetracker.data.local.entity.TransactionEntity
@@ -53,6 +55,7 @@ class SpreadsheetImporter @Inject constructor(
     private val categoryDao: CategoryDao,
     private val recurringRuleDao: RecurringRuleDao,
     private val transactionDao: TransactionDao,
+    private val cashPotDao: CashPotDao,
     private val categoryRepository: CategoryRepository,
     @com.rhys.financetracker.di.IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
@@ -554,6 +557,24 @@ class SpreadsheetImporter @Inject constructor(
         // an account: two people can each have a "Main account", and looking up
         // by name would let one person's balance overwrite the other's.
         val personResult = resolvePerson(candidate.personName, outcome)
+        if (AccountNaming.isCashPot(candidate.name)) {
+            // Notes and coins are the household's cash pot, not an account.
+            // Replacing what the last import of this row put there keeps a
+            // re-import from counting the same tin twice.
+            val note = "$CASH_POT_NOTE ${candidate.name}"
+            cashPotDao.deleteByNote(note)
+            if (candidate.amountMinor != 0L) {
+                cashPotDao.insert(
+                    CashPotEntryEntity(
+                        date = DateUtils.today(),
+                        amountMinor = kotlin.math.abs(candidate.amountMinor),
+                        isIn = candidate.amountMinor > 0L,
+                        note = note,
+                    ),
+                )
+            }
+            return personResult.second
+        }
         val existing = accountDao.getByNameForPerson(candidate.name, personResult.first)
         if (existing != null) {
             // A sheet states what is in the account *now*. The app derives that
@@ -739,6 +760,14 @@ class SpreadsheetImporter @Inject constructor(
         outcome: ImportOutcome,
     ): Pair<Long?, ImportOutcome> {
         if (name.isNullOrBlank()) return null to outcome
+        // Savings and Cash are their own kinds and belong to both directions.
+        // Looking only at income or expense categories never found them, so
+        // every row the reader had rightly called "Savings" was filed under a
+        // second, ordinary category of the same name — and savings never saw
+        // any of it.
+        for (pot in listOf(CategoryKind.SAVING, CategoryKind.CASH)) {
+            categoryDao.getByNameAndKind(name, pot)?.let { return it.id to outcome }
+        }
         val kind = if (type == TransactionType.INCOME) CategoryKind.INCOME else CategoryKind.EXPENSE
         categoryDao.getByNameAndKind(name, kind)?.let { return it.id to outcome }
         val created = categoryRepository.findOrCreate(name, kind, DefaultData.PALETTE.random())
@@ -841,6 +870,9 @@ class SpreadsheetImporter @Inject constructor(
     internal fun guessAccountType(name: String): AccountType = AccountNaming.typeFor(name)
 
     private companion object {
+        /** Marks cash pot entries a spreadsheet row put there; see [importAccount]. */
+        const val CASH_POT_NOTE = "From the spreadsheet:"
+
         /**
          * How many fingerprints to ask about at once. SQLite caps the
          * number of bound parameters in an IN clause, and a statement can

@@ -2,30 +2,61 @@ package com.rhys.financetracker.domain.model
 
 /**
  * The vocabulary of the application.  These enums are persisted **by name**, so
- * existing constants must never be renamed — only added to.  Adding a constant
- * is a non-breaking change and is the normal way to extend the app.
+ * existing constants must never be renamed.  Adding a constant is a
+ * non-breaking change and is the normal way to extend the app; removing one
+ * needs a migration that rewrites every stored row that used it, as
+ * `AccountType.CASH` had in version 5 of the database.
  */
 
-/** What kind of account holds the money. */
+/**
+ * Where an account's money counts: the one thing that decides whether it is
+ * Available, Saved or Owed on every screen.
+ *
+ * ## Why this exists
+ *
+ * "Is this savings?" used to be answered in four places — the account type,
+ * a nullable per-account override that silently beat the type, a total of
+ * everything ever moved into savings that stood in for a balance, and a cash
+ * account type that was savings by definition. Each was reasonable alone and
+ * together they disagreed: a saver typed as a current account sat in
+ * Available while Saved said there was no savings account at all, and the
+ * suggestion to fix it was hidden whenever the override had ever been set.
+ *
+ * Now there is one stored answer per account. The type only suggests it when
+ * the account is made; after that the owner's choice is the answer and
+ * nothing else is consulted.
+ */
+enum class Holding(val displayName: String, val explanation: String) {
+    /** Day-to-day money: counts towards Available. */
+    SPEND("To spend", "Day-to-day money. Counts towards Available."),
+
+    /** Money you are not going to spend from: counts towards Saved. */
+    SET_ASIDE("Set aside", "Savings you won't touch. Counts towards Saved."),
+
+    /** Borrowed money — a card, loan or mortgage: counts towards what you owe. */
+    OWED("Owed", "A card, loan or mortgage. Counts towards what you owe."),
+}
+
+/**
+ * What kind of account this is, as the bank would describe it.
+ *
+ * Descriptive only: where the money counts is [Holding], and the type merely
+ * suggests one when an account is made. Cash is deliberately absent — notes
+ * in the house are not an account, they are the cash pot.
+ */
 enum class AccountType(
     val displayName: String,
-    /** Liabilities are held as negative balances and reduce net worth. */
-    val isLiability: Boolean,
-    /** Whether the account is counted as savings on the dashboard. */
-    val isSavings: Boolean,
+    /** Where an account of this type counts unless its owner says otherwise. */
+    val defaultHolding: Holding,
 ) {
-    CURRENT("Current account", isLiability = false, isSavings = false),
-    SAVINGS("Savings account", isLiability = false, isSavings = true),
-    // Set aside rather than spendable: the notes in the house are money you
-    // are holding, not money in the account you spend from, and counting them
-    // as available made "to spend" larger than anything you could spend.
-    CASH("Cash", isLiability = false, isSavings = true),
-    CREDIT_CARD("Credit card", isLiability = true, isSavings = false),
-    LOAN("Loan", isLiability = true, isSavings = false),
-    MORTGAGE("Mortgage", isLiability = true, isSavings = false),
-    INVESTMENT("Investment", isLiability = false, isSavings = true),
-    PENSION("Pension", isLiability = false, isSavings = true),
-    OTHER("Other", isLiability = false, isSavings = false),
+    CURRENT("Current account", Holding.SPEND),
+    SAVINGS("Savings account", Holding.SET_ASIDE),
+    CREDIT_CARD("Credit card", Holding.OWED),
+    LOAN("Loan", Holding.OWED),
+    MORTGAGE("Mortgage", Holding.OWED),
+    INVESTMENT("Investment", Holding.SET_ASIDE),
+    PENSION("Pension", Holding.SET_ASIDE),
+    OTHER("Other", Holding.SPEND),
 }
 
 /** The direction money moves. */
@@ -89,8 +120,8 @@ enum class CategoryKind(val displayName: String) {
      * still spending: £50 out of a machine is £50 gone from the account, and
      * that is how it counts everywhere a total is taken.
      *
-     * What is then physically held is a separate question, answered by a cash
-     * account rather than by this.
+     * What is then physically held is a separate question, answered by the
+     * cash pot rather than by this.
      */
     CASH("Cash"),
     TRANSFER("Transfer"),
@@ -162,7 +193,7 @@ enum class DashboardWidget(val key: String, val title: String, val defaultVisibl
     OVERDUE_BILLS("overdue_bills", "Overdue", true),
     RECENT_TRANSACTIONS("recent_transactions", "This month's transactions", true),
     SAVINGS_AND_CASH("savings_and_cash", "Savings", true),
-    CASH_IN_HAND("cash_in_hand", "Cash in hand", true),
+    CASH_IN_HAND("cash_in_hand", "Cash pot", true),
     SAVINGS_PROGRESS("savings_progress", "Savings goals", true),
     SPENDING_BY_CATEGORY("spending_by_category", "Spending by category", true),
     INSIGHTS("insights", "Advice", true),

@@ -1,6 +1,8 @@
 package com.rhys.financetracker.data.backup
 
+import com.rhys.financetracker.data.importer.AccountNaming
 import com.rhys.financetracker.data.local.entity.AccountEntity
+import com.rhys.financetracker.data.local.entity.CashPotEntryEntity
 import com.rhys.financetracker.data.local.entity.CategoryEntity
 import com.rhys.financetracker.data.local.entity.ExternalDataEntity
 import com.rhys.financetracker.data.local.entity.MonthlySnapshotEntity
@@ -11,6 +13,7 @@ import com.rhys.financetracker.data.local.entity.TransactionEntity
 import com.rhys.financetracker.domain.model.AccountType
 import com.rhys.financetracker.domain.model.CategoryKind
 import com.rhys.financetracker.domain.model.Frequency
+import com.rhys.financetracker.domain.model.Holding
 import com.rhys.financetracker.domain.model.RecurrenceMode
 import com.rhys.financetracker.domain.model.RecordSource
 import com.rhys.financetracker.domain.model.TransactionType
@@ -42,6 +45,8 @@ class BackupSerializer @Inject constructor() {
         put("isShared", person.isShared)
         put("sortOrder", person.sortOrder)
         putOpt("notes", person.notes)
+        putOpt("grossYearlyIncomeMinor", person.grossYearlyIncomeMinor)
+        putOpt("netYearlyIncomeMinor", person.netYearlyIncomeMinor)
         put("isArchived", person.isArchived)
         put("createdAt", person.createdAt)
         put("updatedAt", person.updatedAt)
@@ -54,6 +59,8 @@ class BackupSerializer @Inject constructor() {
         isShared = json.optBoolean("isShared", false),
         sortOrder = json.optInt("sortOrder", 0),
         notes = json.optStringOrNull("notes"),
+        grossYearlyIncomeMinor = json.optLongOrNull("grossYearlyIncomeMinor"),
+        netYearlyIncomeMinor = json.optLongOrNull("netYearlyIncomeMinor"),
         isArchived = json.optBoolean("isArchived", false),
         createdAt = json.optLong("createdAt", System.currentTimeMillis()),
         updatedAt = json.optLong("updatedAt", System.currentTimeMillis()),
@@ -75,7 +82,7 @@ class BackupSerializer @Inject constructor() {
         putOpt("interestRatePercent", account.interestRatePercent)
         put("colorHex", account.colorHex)
         put("includeInNetWorth", account.includeInNetWorth)
-        putOpt("countsAsSavings", account.countsAsSavings)
+        put("holding", account.holding.name)
         put("isShared", account.isShared)
         put("sortOrder", account.sortOrder)
         putOpt("notes", account.notes)
@@ -84,37 +91,85 @@ class BackupSerializer @Inject constructor() {
         put("updatedAt", account.updatedAt)
     }
 
-    fun accountFromJson(json: JSONObject): AccountEntity = AccountEntity(
+    fun accountFromJson(json: JSONObject): AccountEntity {
+        val type = json.optEnum("type", AccountType.OTHER) { AccountType.valueOf(it) }
+        val name = json.optString("name", "Account")
+        return AccountEntity(
+            id = json.optLong("id", 0L),
+            name = name,
+            type = type,
+            holding = holdingFromJson(json, name, type),
+            personId = json.optLongOrNull("personId"),
+            openingBalanceMinor = json.optLong("openingBalanceMinor", 0L),
+            openingBalanceDate = json.optDate("openingBalanceDate") ?: LocalDate.now(),
+            currencyCode = json.optString("currencyCode", "GBP"),
+            overdraftLimitMinor = json.optLong("overdraftLimitMinor", 0L),
+            lowBalanceThresholdMinor = json.optLongOrNull("lowBalanceThresholdMinor"),
+            creditLimitMinor = json.optLongOrNull("creditLimitMinor"),
+            interestRatePercent = if (json.has("interestRatePercent") &&
+                !json.isNull("interestRatePercent")
+            ) {
+                json.optDouble("interestRatePercent")
+            } else {
+                null
+            },
+            colorHex = json.optString("colorHex", "#455A64"),
+            includeInNetWorth = json.optBoolean("includeInNetWorth", true),
+            isShared = json.optBoolean("isShared", false),
+            sortOrder = json.optInt("sortOrder", 0),
+            notes = json.optStringOrNull("notes"),
+            isArchived = json.optBoolean("isArchived", false),
+            createdAt = json.optLong("createdAt", System.currentTimeMillis()),
+            updatedAt = json.optLong("updatedAt", System.currentTimeMillis()),
+        )
+    }
+
+    /**
+     * Where a restored account counts.
+     *
+     * Stored directly since database version 5. An older backup has instead
+     * the type and a nullable "counts as savings" override, which are read
+     * the same way the database migration reads them — so restoring an old
+     * backup lands exactly where upgrading in place would have.
+     */
+    private fun holdingFromJson(json: JSONObject, name: String, type: AccountType): Holding {
+        if (json.has("holding")) {
+            return json.optEnum("holding", type.defaultHolding) { Holding.valueOf(it) }
+        }
+        if (type.defaultHolding == Holding.OWED) return Holding.OWED
+        val legacy = when {
+            json.has("countsAsSavings") && !json.isNull("countsAsSavings") ->
+                if (json.optBoolean("countsAsSavings")) Holding.SET_ASIDE else Holding.SPEND
+            else -> type.defaultHolding
+        }
+        return if (legacy == Holding.SPEND && AccountNaming.holdingFor(name) == Holding.SET_ASIDE) {
+            Holding.SET_ASIDE
+        } else {
+            legacy
+        }
+    }
+
+    /** True for an account a backup from before version 5 stored as cash. */
+    fun isLegacyCashAccount(json: JSONObject): Boolean = json.optString("type") == "CASH"
+
+    // ----------------------------------------------------------- cash pot
+
+    fun cashPotEntryToJson(entry: CashPotEntryEntity): JSONObject = JSONObject().apply {
+        put("id", entry.id)
+        put("date", entry.date.toString())
+        put("amountMinor", entry.amountMinor)
+        put("isIn", entry.isIn)
+        putOpt("note", entry.note)
+        put("createdAt", entry.createdAt)
+    }
+
+    fun cashPotEntryFromJson(json: JSONObject): CashPotEntryEntity = CashPotEntryEntity(
         id = json.optLong("id", 0L),
-        name = json.optString("name", "Account"),
-        type = json.optEnum("type", AccountType.OTHER) { AccountType.valueOf(it) },
-        personId = json.optLongOrNull("personId"),
-        openingBalanceMinor = json.optLong("openingBalanceMinor", 0L),
-        openingBalanceDate = json.optDate("openingBalanceDate") ?: LocalDate.now(),
-        currencyCode = json.optString("currencyCode", "GBP"),
-        overdraftLimitMinor = json.optLong("overdraftLimitMinor", 0L),
-        lowBalanceThresholdMinor = json.optLongOrNull("lowBalanceThresholdMinor"),
-        creditLimitMinor = json.optLongOrNull("creditLimitMinor"),
-        interestRatePercent = if (json.has("interestRatePercent") &&
-            !json.isNull("interestRatePercent")
-        ) {
-            json.optDouble("interestRatePercent")
-        } else {
-            null
-        },
-        colorHex = json.optString("colorHex", "#455A64"),
-        includeInNetWorth = json.optBoolean("includeInNetWorth", true),
-        countsAsSavings = if (json.has("countsAsSavings")) {
-            json.optBoolean("countsAsSavings")
-        } else {
-            null
-        },
-        isShared = json.optBoolean("isShared", false),
-        sortOrder = json.optInt("sortOrder", 0),
-        notes = json.optStringOrNull("notes"),
-        isArchived = json.optBoolean("isArchived", false),
+        date = json.optDate("date") ?: LocalDate.now(),
+        amountMinor = json.optLong("amountMinor", 0L),
+        isIn = json.optBoolean("isIn", true),
+        note = json.optStringOrNull("note"),
         createdAt = json.optLong("createdAt", System.currentTimeMillis()),
-        updatedAt = json.optLong("updatedAt", System.currentTimeMillis()),
     )
 
     // ---------------------------------------------------------- categories

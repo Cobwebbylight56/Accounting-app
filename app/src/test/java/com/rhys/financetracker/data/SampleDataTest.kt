@@ -73,7 +73,8 @@ class SampleDataTest {
     fun `opening balances total the ALL SAVINGS figure of 11418 pounds 37`() {
         assertEquals(
             1_141_837L,
-            SampleData.accounts.sumOf { Money.fromMajor(it.openingBalanceMajor) },
+            SampleData.accounts.sumOf { Money.fromMajor(it.openingBalanceMajor) } +
+                SampleData.cashPot.sumOf { Money.fromMajor(it.amountMajor) },
         )
     }
 

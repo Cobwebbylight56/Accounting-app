@@ -215,6 +215,9 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.androidx.arch.core.testing)
     testImplementation(libs.turbine)
+    // Runs the real Room migrations against a real SQLite on the JVM, so a
+    // migration that would lose or misfile somebody's data fails the build.
+    testImplementation(libs.robolectric)
 
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

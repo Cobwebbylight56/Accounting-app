@@ -105,7 +105,8 @@ interface AccountDao {
     /** Active accounts with their owner's name, for pickers. */
     @Query(
         """
-        SELECT a.id AS id, a.name AS name, a.color_hex AS color_hex, p.name AS person_name
+        SELECT a.id AS id, a.name AS name, a.color_hex AS color_hex, p.name AS person_name,
+            a.holding AS holding, a.type AS type
         FROM accounts a
         LEFT JOIN people p ON p.id = a.person_id
         WHERE a.is_archived = 0

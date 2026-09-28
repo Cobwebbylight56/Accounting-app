@@ -4,6 +4,7 @@ import androidx.room.TypeConverter
 import com.rhys.financetracker.domain.model.AccountType
 import com.rhys.financetracker.domain.model.CategoryKind
 import com.rhys.financetracker.domain.model.Frequency
+import com.rhys.financetracker.domain.model.Holding
 import com.rhys.financetracker.domain.model.RecurrenceMode
 import com.rhys.financetracker.domain.model.RecordSource
 import com.rhys.financetracker.domain.model.TransactionType
@@ -32,6 +33,16 @@ class Converters {
     @TypeConverter
     fun stringToAccountType(value: String): AccountType =
         runCatching { AccountType.valueOf(value) }.getOrDefault(AccountType.OTHER)
+
+    @TypeConverter
+    fun holdingToString(value: Holding): String = value.name
+
+    // Unreadable is read as spendable, the one that hides nothing: money
+    // wrongly shown as available is visible and gets corrected, money wrongly
+    // tucked away in savings is not.
+    @TypeConverter
+    fun stringToHolding(value: String): Holding =
+        runCatching { Holding.valueOf(value) }.getOrDefault(Holding.SPEND)
 
     @TypeConverter
     fun transactionTypeToString(value: TransactionType): String = value.name

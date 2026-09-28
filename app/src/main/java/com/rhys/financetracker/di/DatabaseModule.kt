@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.rhys.financetracker.data.local.AppDatabase
 import com.rhys.financetracker.data.local.dao.AccountDao
+import com.rhys.financetracker.data.local.dao.CashPotDao
 import com.rhys.financetracker.data.local.dao.CategoryDao
 import com.rhys.financetracker.data.local.dao.DashboardWidgetDao
 import com.rhys.financetracker.data.local.dao.ExternalDataDao
@@ -63,4 +64,5 @@ object DatabaseModule {
     @Provides fun provideWidgetDao(db: AppDatabase): DashboardWidgetDao = db.dashboardWidgetDao()
     @Provides fun provideImportProfileDao(db: AppDatabase): ImportProfileDao =
         db.importProfileDao()
+    @Provides fun provideCashPotDao(db: AppDatabase): CashPotDao = db.cashPotDao()
 }

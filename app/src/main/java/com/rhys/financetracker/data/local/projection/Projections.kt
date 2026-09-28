@@ -6,6 +6,8 @@ import com.rhys.financetracker.data.local.entity.AccountEntity
 import com.rhys.financetracker.data.local.entity.RecurringRuleEntity
 import com.rhys.financetracker.data.local.entity.SavingsGoalEntity
 import com.rhys.financetracker.data.local.entity.TransactionEntity
+import com.rhys.financetracker.domain.model.AccountType
+import com.rhys.financetracker.domain.model.Holding
 import com.rhys.financetracker.domain.model.RecordSource
 import com.rhys.financetracker.domain.model.TransactionType
 import java.time.LocalDate
@@ -39,9 +41,11 @@ data class AccountWithBalance(
     val netWorthContributionMinor: Long
         get() = if (!account.includeInNetWorth) 0L else balanceMinor
 
-    /** What the owner said, or what the type suggests when they have not said. */
-    val isSavings: Boolean get() = account.countsAsSavings ?: account.type.isSavings
-    val isLiability: Boolean get() = account.type.isLiability
+    /** Counts towards Saved; see [com.rhys.financetracker.domain.model.Holding]. */
+    val isSavings: Boolean get() = account.holding == Holding.SET_ASIDE
+
+    /** Counts towards what is owed. */
+    val isLiability: Boolean get() = account.holding == Holding.OWED
     val availableMinor: Long get() = balanceMinor + account.overdraftLimitMinor
 }
 
@@ -73,6 +77,15 @@ data class PotFlow(
     companion object {
         val EMPTY = PotFlow(intoPotMinor = 0L, outOfPotMinor = 0L)
     }
+}
+
+/** [PotFlow] for one person, so every person's savings come from one query. */
+data class PersonPotFlow(
+    @ColumnInfo(name = "person_id") val personId: Long?,
+    @ColumnInfo(name = "into_pot_minor") val intoPotMinor: Long,
+    @ColumnInfo(name = "out_of_pot_minor") val outOfPotMinor: Long,
+) {
+    val netMinor: Long get() = intoPotMinor - outOfPotMinor
 }
 
 /** Income/expense totals for one calendar month. */
@@ -208,6 +221,9 @@ data class AccountOption(
     @ColumnInfo(name = "name") val name: String,
     @ColumnInfo(name = "color_hex") val colorHex: String?,
     @ColumnInfo(name = "person_name") val personName: String?,
+    /** Where its money counts, so a statement is only offered accounts of its kind. */
+    @ColumnInfo(name = "holding") val holding: Holding = Holding.SPEND,
+    @ColumnInfo(name = "type") val type: AccountType = AccountType.CURRENT,
 )
 
 /**
