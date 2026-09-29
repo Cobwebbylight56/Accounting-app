@@ -181,7 +181,7 @@ fun DashboardScreen(
                         androidx.compose.material3.OutlinedButton(
                             onClick = onOpenSentToPeople,
                             modifier = Modifier.weight(1f),
-                        ) { Text("Sent to people") }
+                        ) { Text("Sent & received") }
                     }
                 }
 

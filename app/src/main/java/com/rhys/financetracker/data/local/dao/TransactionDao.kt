@@ -738,6 +738,24 @@ interface TransactionDao {
     )
     fun observeSentToPeople(from: LocalDate, to: LocalDate, people: List<String>): Flow<List<PayeeEntry>>
 
+    /**
+     * Money in between two dates that could have come from people: filed
+     * under [people] categories, or unsorted.
+     */
+    @Query(
+        """
+        SELECT t.id AS id, t.description AS description, t.amount_minor AS amount_minor,
+               t.date AS date, c.name AS category_name
+        FROM transactions t
+        LEFT JOIN categories c ON c.id = t.category_id
+        WHERE t.is_archived = 0 AND t.type = 'INCOME'
+          AND (t.category_id IS NULL OR c.name IN (:people))
+          AND t.date BETWEEN :from AND :to
+        ORDER BY t.date DESC
+        """,
+    )
+    fun observeReceivedFromPeople(from: LocalDate, to: LocalDate, people: List<String>): Flow<List<PayeeEntry>>
+
     /** Files several entries under one category at once. */
     @Query("UPDATE transactions SET category_id = :categoryId, updated_at = :updatedAt WHERE id IN (:ids)")
     suspend fun setCategory(ids: List<Long>, categoryId: Long, updatedAt: Long)
@@ -779,6 +797,44 @@ interface TransactionDao {
         from: LocalDate,
         to: LocalDate,
     ): List<TransactionEntity>
+
+    /**
+     * Money in and out on [accountId] that could really be a move between
+     * the person's own accounts: unfiled, filed as savings, or filed under
+     * one of the [loose] names that say only that money went somewhere.
+     */
+    @Query(
+        """
+        SELECT t.* FROM transactions t
+        LEFT JOIN categories c ON c.id = t.category_id
+        WHERE t.is_archived = 0 AND t.account_id = :accountId AND t.type IN ('INCOME', 'EXPENSE')
+          AND (t.category_id IS NULL OR c.kind = 'SAVING' OR c.name IN (:loose))
+        ORDER BY t.date ASC
+        """,
+    )
+    suspend fun looseOnAccount(accountId: Long, loose: List<String>): List<TransactionEntity>
+
+    /** Every entry with no category, or only a [vague] one, over all time. */
+    @Query(
+        """
+        SELECT t.* FROM transactions t
+        LEFT JOIN categories c ON c.id = t.category_id
+        WHERE t.is_archived = 0 AND t.type IN ('INCOME', 'EXPENSE')
+          AND (t.category_id IS NULL OR c.name IN (:vague))
+        """,
+    )
+    suspend fun getUnsortedEntries(vague: List<String>): List<TransactionEntity>
+
+    /** How much money out is still unfiled, or filed only under a [vague] name. */
+    @Query(
+        """
+        SELECT COUNT(*) FROM transactions t
+        LEFT JOIN categories c ON c.id = t.category_id
+        WHERE t.is_archived = 0 AND t.type = 'EXPENSE'
+          AND (t.category_id IS NULL OR c.name IN (:vague))
+        """,
+    )
+    suspend fun countUnsorted(vague: List<String>): Int
 
     // --------------------------------------------------------------- writes
 

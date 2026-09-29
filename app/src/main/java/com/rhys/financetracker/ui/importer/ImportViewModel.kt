@@ -667,14 +667,25 @@ class ImportViewModel @Inject constructor(
      * cannot be diagnosed without seeing what the lines actually look like.
      */
     fun showWhatWasRead() {
-        val uri = _state.value.sourceUri ?: return
+        val current = _state.value
+        val uri = current.sourceUri ?: return
         viewModelScope.launch {
+            // A PDF's own text; for a spreadsheet or CSV, its rows as read.
             val text = importer.readPdfText(uri)?.takeIf { it.isNotBlank() }
+                ?: current.sheet?.let { sheet ->
+                    (0 until sheet.rowCount).joinToString("\n") { row ->
+                        (0 until sheet.columnCount).joinToString(" | ") { column -> sheet.cell(row, column) }
+                    }
+                }?.takeIf { it.isNotBlank() }
             _state.value = _state.value.copy(
-                unreadablePdfText = text,
-                error = if (text == null) "That file is not a PDF, so there is no text to show." else null,
+                whatWasRead = text,
+                error = if (text == null) "Nothing could be read from that file." else null,
             )
         }
+    }
+
+    fun closeWhatWasRead() {
+        _state.value = _state.value.copy(whatWasRead = null)
     }
 
     fun clearUnreadablePdf() {
@@ -760,6 +771,8 @@ data class ImportState(
 
     /** Who the user has said the statement is for, settling any doubt. */
     val filingPersonName: String? = null,
+    /** Everything read from the file, shown full screen on request. */
+    val whatWasRead: String? = null,
     /** Text pulled from a PDF whose layout was not recognised, for showing. */
     val unreadablePdfText: String? = null,
     val usingDetectedLayout: Boolean = false,

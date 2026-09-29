@@ -7,6 +7,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountBalance
+import androidx.compose.material.icons.outlined.AutoFixHigh
 import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.EventRepeat
 import androidx.compose.material.icons.outlined.Lightbulb
@@ -41,6 +42,7 @@ fun MoreScreen(
     onOpenSettings: () -> Unit,
     onOpenSortSpending: () -> Unit = {},
     onOpenSentToPeople: () -> Unit = {},
+    onOpenSortEverything: () -> Unit = {},
 ) {
     Scaffold(
         topBar = { TopAppBar(title = { Text("More") }) },
@@ -79,14 +81,20 @@ fun MoreScreen(
 
             SettingsGroupHeader("Tools")
             SettingsItem(
+                title = "Sort everything",
+                subtitle = "Go through all your entries and put each in the right place",
+                icon = Icons.Outlined.AutoFixHigh,
+                onClick = onOpenSortEverything,
+            )
+            SettingsItem(
                 title = "Sort spending",
                 subtitle = "Unsorted payments by who they went to — file each in one tap",
                 icon = Icons.Outlined.Category,
                 onClick = onOpenSortSpending,
             )
             SettingsItem(
-                title = "Sent to people",
-                subtitle = "How much you have sent each person",
+                title = "Money with people",
+                subtitle = "What you sent each person and what they sent you, month by month",
                 icon = Icons.Outlined.People,
                 onClick = onOpenSentToPeople,
             )

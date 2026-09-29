@@ -379,8 +379,10 @@ every row is checked against it:
 * **⚠ £45.00 isn't accounted for between 1 Sep and 5 Sep** — if one row being
   the wrong way round explains it exactly, it's named with a **Swap it**
   button. Otherwise a row there wasn't read: look on the statement for a payment
-  of that amount. **Show what was read** shows the text the app got from the
-  file, with **Copy all text** to send on so the reader can be fixed.
+  of that amount. **Show what was read** opens every line the app got from the
+  file, full screen and numbered (for a spreadsheet or CSV, every row), with
+  **Copy all text** to send on so the reader can be fixed. If a payment isn't
+  in those lines, the file itself didn't hold it as text.
 
 The whole review page scrolls — the check, the counts and every row, each with
 its date, category and the statement's balance after it.
@@ -446,12 +448,39 @@ The app also now knows many more shops, websites and outings by name — high
 street chains, online shops (Amazon, eBay, Shein, Temu, ASOS…), cinemas,
 bowling, theme parks, ticket sites, pubs and takeaways.
 
-### Sent to people
+### Money with people
 
-**More → Sent to people** adds up the money you've sent to each person — bank
-transfers, standing orders, payments to someone — for this month, 3 months,
-this year or all time. Tap a person to see each payment. If something there
-isn't a person, file it under the right category from the same place.
+**More → Money with people** (or **Sent & received** on Home) shows, for each
+person, **what you sent them and what they sent you side by side** for one
+month — use the arrows to move between months. Each card says who is up
+("You sent £20.00 more"), and the top shows the month's totals both ways.
+
+Money sent counts bank transfers, standing orders and payments to someone.
+Money in counts when it reads like a transfer from someone, or comes from a
+name you've sent money to. Names are matched however the bank writes them —
+"J Smith", "John Smith", "Smith J" — so both sides land on one card. Tap a card
+to see every payment on each side; if one isn't a person (a wage, a refund),
+file it elsewhere and it drops off.
+
+### Sort everything
+
+**Settings → Sort everything** (also under **More → Tools**) goes through every
+entry already in the app and puts it in the right place by today's rules, so
+you don't have to move things by hand:
+
+* pay rises whose date has come are applied;
+* money in and out of savers is filed as savings;
+* payments that name another of your accounts become moves to it — the saver
+  goes up, the loan or card comes down (unless that account's own statement
+  already has the same movement, so nothing is counted twice);
+* unsorted payments and "Card spending" get a category from what you've filed
+  before, then from the app's list of shops, websites and outings;
+* paid-off loans are put away.
+
+Anything you filed yourself is left alone. It finishes with what it changed and
+how many payments it couldn't place, with **Sort the rest** to file those by
+payee. Run it again any time — after importing old statements, or after
+teaching it a few payees.
 
 ### Where each row goes
 

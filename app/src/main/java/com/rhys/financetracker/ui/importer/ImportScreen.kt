@@ -64,6 +64,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rhys.financetracker.core.money.Money
@@ -167,9 +169,14 @@ fun ImportScreen(
                     UnreadablePdfCard(
                         text = text,
                         onDismiss = viewModel::clearUnreadablePdf,
+                        onShowAll = viewModel::showWhatWasRead,
                     )
                 }
                 Spacer(Modifier.height(12.dp))
+            }
+
+            state.whatWasRead?.let { text ->
+                WhatWasReadDialog(text = text, onClose = viewModel::closeWhatWasRead)
             }
 
             when (state.step) {
@@ -212,7 +219,7 @@ fun ImportScreen(
  * fixed: copy it, send it on, and the reader can be taught this layout.
  */
 @Composable
-private fun UnreadablePdfCard(text: String, onDismiss: () -> Unit) {
+private fun UnreadablePdfCard(text: String, onDismiss: () -> Unit, onShowAll: () -> Unit) {
     val clipboard = LocalClipboardManager.current
     val preview = remember(text) {
         text.split("\n").filter { it.isNotBlank() }.take(PREVIEW_LINES)
@@ -256,6 +263,73 @@ private fun UnreadablePdfCard(text: String, onDismiss: () -> Unit) {
             }
             OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
                 Text("Dismiss")
+            }
+        }
+        TextButton(onClick = onShowAll) { Text("See every line") }
+    }
+}
+
+/**
+ * Every line read from the file, full screen, numbered so a missing row is
+ * easy to point at.
+ *
+ * A dialog rather than a card in the list, so it opens where the user is
+ * looking instead of at the top of a long review page.
+ */
+@Composable
+private fun WhatWasReadDialog(text: String, onClose: () -> Unit) {
+    val clipboard = LocalClipboardManager.current
+    val lines = remember(text) { text.split("\n").map { it.trimEnd() }.filter { it.isNotBlank() } }
+    Dialog(
+        onDismissRequest = onClose,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
+            Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+                Text("What was read", style = MaterialTheme.typography.titleLarge)
+                Text(
+                    text = "${lines.size} lines — every one the app got out of the file. " +
+                        "If a payment is missing here, the file itself did not contain it as text.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(12.dp))
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .background(
+                            MaterialTheme.colorScheme.surfaceContainerHighest,
+                            RoundedCornerShape(12.dp),
+                        )
+                        .padding(8.dp),
+                ) {
+                    items(lines.size) { index ->
+                        Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                            Text(
+                                text = "${index + 1}".padStart(4),
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = FontFamily.Monospace,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = lines[index],
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = FontFamily.Monospace,
+                                softWrap = false,
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = { clipboard.setText(AnnotatedString(text)) },
+                        modifier = Modifier.weight(1f),
+                    ) { Text("Copy all text") }
+                    OutlinedButton(onClick = onClose, modifier = Modifier.weight(1f)) { Text("Close") }
+                }
             }
         }
     }
@@ -895,7 +969,11 @@ private fun ReviewStep(state: ImportState, viewModel: ImportViewModel) {
             state.unreadablePdfText?.let { text ->
                 item {
                     Box(modifier = Modifier.padding(16.dp)) {
-                        UnreadablePdfCard(text = text, onDismiss = viewModel::clearUnreadablePdf)
+                        UnreadablePdfCard(
+                            text = text,
+                            onDismiss = viewModel::clearUnreadablePdf,
+                            onShowAll = viewModel::showWhatWasRead,
+                        )
                     }
                 }
             }

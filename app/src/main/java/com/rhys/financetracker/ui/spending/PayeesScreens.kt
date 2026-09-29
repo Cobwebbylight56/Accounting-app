@@ -126,14 +126,6 @@ class SortSpendingViewModel @Inject constructor(
     override fun observe(from: LocalDate, to: LocalDate) = payeeRepository.observeUnsorted(from, to)
 }
 
-@HiltViewModel
-class SentToPeopleViewModel @Inject constructor(
-    private val payeeRepository: PayeeRepository,
-    categoryRepository: CategoryRepository,
-) : PayeeListViewModel(payeeRepository, categoryRepository, Period.THIS_YEAR) {
-    override fun observe(from: LocalDate, to: LocalDate) = payeeRepository.observeSentToPeople(from, to)
-}
-
 /**
  * Spending that is not sorted yet, grouped by who it went to. Tap a payee
  * and pick a category: every payment to them is filed, and every future
@@ -148,21 +140,6 @@ fun SortSpendingScreen(onBack: () -> Unit, viewModel: SortSpendingViewModel = hi
             "to them is sorted at once. New statements will sort them the same way.",
         emptyTitle = "Everything is sorted",
         emptyText = "No unsorted spending in this period.",
-        viewModel = viewModel,
-        onBack = onBack,
-    )
-}
-
-/** How much has been sent to each person, over a period. */
-@Composable
-fun SentToPeopleScreen(onBack: () -> Unit, viewModel: SentToPeopleViewModel = hiltViewModel()) {
-    PayeeListScreen(
-        title = "Sent to people",
-        intro = "Money sent to people — bank transfers, standing orders and payments to " +
-            "someone — added up by who it went to. Tap one to see each payment, or to file it " +
-            "elsewhere if it isn't a person.",
-        emptyTitle = "Nothing sent to people",
-        emptyText = "No payments to people in this period.",
         viewModel = viewModel,
         onBack = onBack,
     )

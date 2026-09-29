@@ -129,8 +129,18 @@ class SpreadsheetImporter @Inject constructor(
      * it. Returns null for anything that is not a PDF.
      */
     suspend fun readPdfText(uri: Uri): String? = withContext(ioDispatcher) {
+        // Judged by what the file is, not only its name: a statement shared
+        // from a banking app often arrives with no ".pdf" on the end at all.
         val name = DocumentFile.fromSingleUri(context, uri)?.name.orEmpty()
-        if (!name.endsWith(".pdf", ignoreCase = true)) return@withContext null
+        val isPdf = name.endsWith(".pdf", ignoreCase = true) ||
+            context.contentResolver.getType(uri) == "application/pdf" ||
+            runCatching {
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    val head = ByteArray(PDF_MAGIC.length)
+                    input.read(head) == head.size && String(head, Charsets.US_ASCII) == PDF_MAGIC
+                }
+            }.getOrNull() == true
+        if (!isPdf) return@withContext null
         runCatching {
             context.contentResolver.openInputStream(uri)?.use { input ->
                 PdfStatementReader.extractTextForDiagnostics(input)
@@ -1069,6 +1079,9 @@ class SpreadsheetImporter @Inject constructor(
     internal fun guessAccountType(name: String): AccountType = AccountNaming.typeFor(name)
 
     companion object {
+        /** How every PDF file begins. */
+        private const val PDF_MAGIC = "%PDF-"
+
         /** Marks the regular payment that is somebody's wage; see IncomeRepository. */
         const val WAGE_MARKER = "Wage — paid in by the app each month until a statement replaces it."
 

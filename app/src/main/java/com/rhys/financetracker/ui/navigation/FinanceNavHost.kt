@@ -64,6 +64,7 @@ import com.rhys.financetracker.ui.settings.NotificationSettingsScreen
 import com.rhys.financetracker.ui.settings.SecuritySettingsScreen
 import com.rhys.financetracker.ui.settings.SettingsScreen
 import com.rhys.financetracker.ui.spending.SentToPeopleScreen
+import com.rhys.financetracker.ui.tidy.SortEverythingScreen
 import com.rhys.financetracker.ui.spending.SortSpendingScreen
 import com.rhys.financetracker.ui.transactions.TransactionEditScreen
 import com.rhys.financetracker.ui.transactions.TransactionListScreen
@@ -244,6 +245,14 @@ private fun NavGraphBuilder.topLevelDestinations(
             onOpenSettings = { navController.navigate(Routes.SETTINGS) },
             onOpenSortSpending = { navController.navigate(Routes.SORT_SPENDING) },
             onOpenSentToPeople = { navController.navigate(Routes.SENT_TO_PEOPLE) },
+            onOpenSortEverything = { navController.navigate(Routes.SORT_EVERYTHING) },
+        )
+    }
+
+    composable(Routes.SORT_EVERYTHING) {
+        SortEverythingScreen(
+            onBack = { navController.popBackStack() },
+            onOpenSortSpending = { navController.navigate(Routes.SORT_SPENDING) },
         )
     }
 
@@ -415,6 +424,7 @@ private fun NavGraphBuilder.settingsDestinations(navController: NavHostControlle
             onOpenDashboardLayout = { navController.navigate(Routes.SETTINGS_DASHBOARD) },
             onOpenCategories = { navController.navigate(Routes.CATEGORIES) },
             onOpenImport = { navController.navigate(Routes.importForAccount()) },
+            onOpenSortEverything = { navController.navigate(Routes.SORT_EVERYTHING) },
         )
     }
     composable(Routes.SETTINGS_APPEARANCE) {

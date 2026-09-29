@@ -219,10 +219,10 @@ class AccountRepository @Inject constructor(
         }
 
     /** See [TransactionDao.fileAsSavings]. */
-    suspend fun fileAsSavings(accountId: Long) {
+    suspend fun fileAsSavings(accountId: Long): Int {
         val savings = categoryDao.getByNameAndKind(SAVINGS_CATEGORY, CategoryKind.SAVING)
-            ?: return
-        transactionDao.fileAsSavings(accountId, savings.id, Instant.now().toEpochMilli())
+            ?: return 0
+        return transactionDao.fileAsSavings(accountId, savings.id, Instant.now().toEpochMilli())
     }
 
     /**

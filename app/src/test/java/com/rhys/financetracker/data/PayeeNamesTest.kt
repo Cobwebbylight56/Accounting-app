@@ -20,4 +20,21 @@ class PayeeNamesTest {
         assertTrue(PayeeNames.looksLikeAPerson("FASTER PAYMENT J SMITH"))
         assertTrue(!PayeeNames.looksLikeAPerson("TESCO STORES 3294"))
     }
+
+    @Test
+    fun `the same person gives the same key however the bank writes them`() {
+        val key = PayeeNames.personKey("J Smith")
+        assertEquals("j smith", key)
+        assertEquals(key, PayeeNames.personKey("John Smith"))
+        assertEquals(key, PayeeNames.personKey("Mr J Smith"))
+        assertEquals(key, PayeeNames.personKey("Smith J"))
+        assertTrue(PayeeNames.personKey("Hannah Evans") != key)
+    }
+
+    @Test
+    fun `money in from someone reads as from a person`() {
+        assertTrue(PayeeNames.looksLikeFromAPerson("FASTER PAYMENT FROM J SMITH"))
+        assertTrue(PayeeNames.looksLikeFromAPerson("From HANNAH EVANS ref dinner"))
+        assertTrue(!PayeeNames.looksLikeFromAPerson("ACME LTD SALARY"))
+    }
 }
