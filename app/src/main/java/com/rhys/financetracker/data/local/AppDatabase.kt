@@ -9,6 +9,7 @@ import com.rhys.financetracker.data.local.dao.CategoryDao
 import com.rhys.financetracker.data.local.dao.DashboardWidgetDao
 import com.rhys.financetracker.data.local.dao.ExternalDataDao
 import com.rhys.financetracker.data.local.dao.ImportProfileDao
+import com.rhys.financetracker.data.local.dao.IncomeChangeDao
 import com.rhys.financetracker.data.local.dao.MonthlySnapshotDao
 import com.rhys.financetracker.data.local.dao.PersonDao
 import com.rhys.financetracker.data.local.dao.RecurringRuleDao
@@ -20,6 +21,7 @@ import com.rhys.financetracker.data.local.entity.CategoryEntity
 import com.rhys.financetracker.data.local.entity.DashboardWidgetEntity
 import com.rhys.financetracker.data.local.entity.ExternalDataEntity
 import com.rhys.financetracker.data.local.entity.ImportProfileEntity
+import com.rhys.financetracker.data.local.entity.IncomeChangeEntity
 import com.rhys.financetracker.data.local.entity.MonthlySnapshotEntity
 import com.rhys.financetracker.data.local.entity.PersonEntity
 import com.rhys.financetracker.data.local.entity.RecurringRuleEntity
@@ -52,6 +54,7 @@ import com.rhys.financetracker.data.local.entity.TransactionEntity
         DashboardWidgetEntity::class,
         ImportProfileEntity::class,
         CashPotEntryEntity::class,
+        IncomeChangeEntity::class,
     ],
     version = AppDatabase.DATABASE_VERSION,
     exportSchema = true,
@@ -70,9 +73,10 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun dashboardWidgetDao(): DashboardWidgetDao
     abstract fun importProfileDao(): ImportProfileDao
     abstract fun cashPotDao(): CashPotDao
+    abstract fun incomeChangeDao(): IncomeChangeDao
 
     companion object {
-        const val DATABASE_VERSION = 5
+        const val DATABASE_VERSION = 6
         const val DATABASE_NAME = "finance_tracker.db"
     }
 }

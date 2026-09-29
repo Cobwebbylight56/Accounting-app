@@ -288,6 +288,30 @@ object Migrations {
             if (cursor.moveToFirst() && !cursor.isNull(0)) cursor.getLong(0) else null
         }
 
+    /**
+     * Pay history: every pay rise, yearly review or new job, with the pay
+     * before and after and the day it started. Purely additive; the people
+     * table already holds what everybody earns now.
+     */
+    val MIGRATION_5_6 = Migration(5, 6) { db ->
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `income_changes` (" +
+                "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "`person_id` INTEGER NOT NULL, `effective_date` TEXT NOT NULL, " +
+                "`previous_gross_minor` INTEGER, `previous_net_minor` INTEGER, " +
+                "`new_gross_minor` INTEGER, `new_net_minor` INTEGER, " +
+                "`net_is_estimate` INTEGER NOT NULL, `reason` TEXT, " +
+                "`is_applied` INTEGER NOT NULL, `created_at` INTEGER NOT NULL, " +
+                "FOREIGN KEY(`person_id`) REFERENCES `people`(`id`) " +
+                "ON UPDATE NO ACTION ON DELETE CASCADE )",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_income_changes_person_id` " +
+                "ON `income_changes` (`person_id`)",
+        )
+    }
+
     /** Registered with Room in `di/DatabaseModule.kt`. */
-    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+    val ALL: Array<Migration> =
+        arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
 }

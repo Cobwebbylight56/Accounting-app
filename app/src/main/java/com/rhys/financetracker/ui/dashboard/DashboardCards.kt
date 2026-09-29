@@ -462,7 +462,7 @@ private const val TRANSACTIONS_SHOWN = 8
 internal fun SavingsAndCashCard(state: DashboardState, onOpenAccounts: () -> Unit) {
     val summary = state.summary
     val setAside = state.accounts.filter { it.isSavings }
-    val potCounts = state.scope.personId == null && state.scope.accountId == null
+    val potCounts = state.scope.includesHousehold
     val activity = state.accountActivity.associateBy { it.accountId }
     SectionCard(
         title = "Savings",

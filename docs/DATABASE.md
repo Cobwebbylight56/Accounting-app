@@ -3,7 +3,7 @@
 SQLite via Room. The schema is exported to `app/schemas/` on every build, so
 every change is reviewable and every migration is testable.
 
-Current version: **5**.
+Current version: **6**.
 
 | Version | Change |
 |---|---|
@@ -12,6 +12,7 @@ Current version: **5**.
 | 3 | `transactions.source` — where a record came from, so a bank statement can correct a remembered entry rather than sit beside it. Existing rows become `UNKNOWN`, the weakest source, because a stored hash says a row was imported but not from what; labelling a hand-built spreadsheet as bank-authoritative would shield it from the very correction this allows. |
 | 4 | `accounts.counts_as_savings` — whether an account counts under Saved rather than Available, overriding its type. Nullable on purpose: null means "follow the type", which is true of every account that existed before there was a way to say otherwise. |
 | 5 | The savings redesign. `accounts.counts_as_savings` is replaced by `accounts.holding` (`SPEND`, `SET_ASIDE`, `OWED`) — the one answer to where an account's money counts; the table is rebuilt, since older SQLite cannot drop a column. Each account keeps the answer it was effectively giving, and one whose name says savings is set aside. `AccountType.CASH` is removed: cash accounts become rows in the new `cash_pot_entries` table, and transfers between them and bank accounts become cash withdrawals or paying-ins on the bank side, so no bank balance moves. Rows the old importer filed under an ordinary category called "Savings" or "Cash" are pointed at the real one, and movements on set-aside accounts other than interest are filed as savings. `people` gains `gross_yearly_income_minor` and `net_yearly_income_minor`. |
+| 6 | `income_changes` — pay history: each pay rise, yearly review or new job, with pay before and after, the day it starts, and whether it has been applied. A person's own pay columns always hold what they earn now; a change dated later waits here until its day. Purely additive. |
 
 ---
 
@@ -115,6 +116,20 @@ total is every `is_in` entry less every other.
 | `amount_minor` | INTEGER | Never negative |
 | `is_in` | INTEGER | 1 for money put in, 0 for money spent |
 | `note` | TEXT? | What it was for |
+| `created_at` | INTEGER | |
+
+### `income_changes`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | INTEGER PK | |
+| `person_id` | INTEGER | FK → `people`, `CASCADE` on delete |
+| `effective_date` | TEXT | The day the new pay starts |
+| `previous_gross_minor`, `previous_net_minor` | INTEGER? | Pay before the change |
+| `new_gross_minor`, `new_net_minor` | INTEGER? | Pay after it |
+| `net_is_estimate` | INTEGER | 1 when take-home was worked out rather than given |
+| `reason` | TEXT? | "Yearly review", "Pay rise", "Promotion"… |
+| `is_applied` | INTEGER | 0 until the date arrives and the person's pay moves |
 | `created_at` | INTEGER | |
 
 ### `categories`

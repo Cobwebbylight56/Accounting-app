@@ -6,10 +6,12 @@ import com.rhys.financetracker.core.validation.Validators
 import com.rhys.financetracker.data.local.dao.AccountDao
 import com.rhys.financetracker.data.local.dao.CategoryDao
 import com.rhys.financetracker.data.local.dao.PersonDao
+import com.rhys.financetracker.data.local.dao.RecurringRuleDao
 import com.rhys.financetracker.data.local.dao.TransactionDao
 import com.rhys.financetracker.data.local.entity.AccountEntity
 import com.rhys.financetracker.data.local.projection.AccountOption
 import com.rhys.financetracker.data.local.projection.AccountWithBalance
+import com.rhys.financetracker.domain.model.AccountType
 import com.rhys.financetracker.domain.model.CategoryKind
 import com.rhys.financetracker.domain.model.Holding
 import java.time.Instant
@@ -25,6 +27,7 @@ class AccountRepository @Inject constructor(
     private val personDao: PersonDao,
     private val categoryDao: CategoryDao,
     private val transactionDao: TransactionDao,
+    private val recurringRuleDao: RecurringRuleDao,
 ) {
 
     fun observeWithBalances(): Flow<List<AccountWithBalance>> =
@@ -183,6 +186,26 @@ class AccountRepository @Inject constructor(
         transactionDao.fileAsSavings(accountId, savings.id, Instant.now().toEpochMilli())
     }
 
+    /**
+     * Puts away every loan and mortgage that has been paid off, and stops the
+     * payments into it. Returns the names of the ones it put away.
+     *
+     * A loan is something to get rid of: once it reaches nothing owed it has
+     * no business sitting on the screen at £0.00. It is archived rather than
+     * deleted, so its history — every payment that cleared it — is kept and
+     * it can be brought back. Credit cards are left alone; being at £0 is
+     * their normal state, not an ending.
+     */
+    suspend fun archivePaidOffLoans(accounts: List<AccountWithBalance>): List<String> {
+        val paidOff = accounts.filter { isPaidOffLoan(it) }
+        val now = Instant.now().toEpochMilli()
+        paidOff.forEach { loan ->
+            accountDao.setArchived(loan.account.id, true, now)
+            recurringRuleDao.pauseAllFor(loan.account.id, now)
+        }
+        return paidOff.map { it.account.name }
+    }
+
     suspend fun setArchived(id: Long, archived: Boolean): AppResult<Unit> =
         runCatchingApp("Could not archive this account") {
             accountDao.setArchived(id, archived, Instant.now().toEpochMilli())
@@ -198,9 +221,20 @@ class AccountRepository @Inject constructor(
             accountDao.delete(account)
         }
 
-    private companion object {
+    companion object {
         /** The seeded savings category; see `DefaultData`. */
-        const val SAVINGS_CATEGORY = "Savings"
+        private const val SAVINGS_CATEGORY = "Savings"
+
+        /**
+         * A loan or mortgage that was owed and now is not. It must have
+         * started in debt — a loan added at £0 by mistake is not "paid off".
+         */
+        fun isPaidOffLoan(item: AccountWithBalance): Boolean {
+            val account = item.account
+            val isLoan = account.type == AccountType.LOAN || account.type == AccountType.MORTGAGE
+            val wasOwed = account.openingBalanceMinor < 0L || (account.creditLimitMinor ?: 0L) > 0L
+            return isLoan && wasOwed && !account.isArchived && item.balanceMinor >= 0L
+        }
     }
 
     private suspend fun uniqueName(base: String, personId: Long?): String {

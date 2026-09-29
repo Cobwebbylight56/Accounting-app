@@ -132,6 +132,13 @@ interface RecurringRuleDao {
     @Query("UPDATE recurring_rules SET is_archived = :archived, updated_at = :updatedAt WHERE id = :id")
     suspend fun setArchived(id: Long, archived: Boolean, updatedAt: Long)
 
+    /** Pauses every regular payment into or out of [accountId]; see loans paid off. */
+    @Query(
+        "UPDATE recurring_rules SET is_paused = 1, updated_at = :updatedAt " +
+            "WHERE account_id = :accountId OR transfer_account_id = :accountId",
+    )
+    suspend fun pauseAllFor(accountId: Long, updatedAt: Long)
+
     @Query("DELETE FROM recurring_rules")
     suspend fun deleteAll()
 }

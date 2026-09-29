@@ -258,14 +258,15 @@ interface TransactionDao {
           AND (c.kind IS NULL OR c.kind <> 'SAVING')
           AND t.date BETWEEN :start AND :end
           AND (:accountId IS NULL OR t.account_id = :accountId)
-          AND (:personId IS NULL OR COALESCE(t.person_id, a.person_id) = :personId)
+          AND (:everyone = 1 OR COALESCE(t.person_id, a.person_id) IN (:personIds))
         """,
     )
     fun observeIncomeExpense(
         start: LocalDate,
         end: LocalDate,
         accountId: Long?,
-        personId: Long?,
+        everyone: Boolean,
+        personIds: List<Long>,
     ): Flow<IncomeExpenseTotals?>
 
     @Query(
@@ -305,7 +306,7 @@ interface TransactionDao {
           AND t.type = :type
           AND t.date BETWEEN :start AND :end
           AND (:accountId IS NULL OR t.account_id = :accountId)
-          AND (:personId IS NULL OR COALESCE(t.person_id, a.person_id) = :personId)
+          AND (:everyone = 1 OR COALESCE(t.person_id, a.person_id) IN (:personIds))
         GROUP BY t.category_id
         ORDER BY total_minor DESC
         """,
@@ -315,7 +316,8 @@ interface TransactionDao {
         start: LocalDate,
         end: LocalDate,
         accountId: Long?,
-        personId: Long?,
+        everyone: Boolean,
+        personIds: List<Long>,
     ): Flow<List<CategoryTotal>>
 
     /**
@@ -343,7 +345,7 @@ interface TransactionDao {
           AND IFNULL(a.holding, 'SPEND') <> 'SET_ASIDE'
           AND t.date BETWEEN :start AND :end
           AND (:accountId IS NULL OR t.account_id = :accountId)
-          AND (:personId IS NULL OR COALESCE(t.person_id, a.person_id) = :personId)
+          AND (:everyone = 1 OR COALESCE(t.person_id, a.person_id) IN (:personIds))
         """,
     )
     fun observePotFlow(
@@ -351,7 +353,8 @@ interface TransactionDao {
         start: LocalDate,
         end: LocalDate,
         accountId: Long?,
-        personId: Long?,
+        everyone: Boolean,
+        personIds: List<Long>,
     ): Flow<PotFlow?>
 
     /** [observePotFlow] for every person at once. */
@@ -444,7 +447,7 @@ interface TransactionDao {
           AND (c.kind IS NULL OR c.kind <> 'SAVING')
           AND t.date BETWEEN :start AND :end
           AND (:accountId IS NULL OR t.account_id = :accountId)
-          AND (:personId IS NULL OR COALESCE(t.person_id, a.person_id) = :personId)
+          AND (:everyone = 1 OR COALESCE(t.person_id, a.person_id) IN (:personIds))
         GROUP BY year_month
         ORDER BY year_month ASC
         """,
@@ -453,7 +456,8 @@ interface TransactionDao {
         start: LocalDate,
         end: LocalDate,
         accountId: Long?,
-        personId: Long?,
+        everyone: Boolean,
+        personIds: List<Long>,
     ): Flow<List<MonthTotals>>
 
     @Query(

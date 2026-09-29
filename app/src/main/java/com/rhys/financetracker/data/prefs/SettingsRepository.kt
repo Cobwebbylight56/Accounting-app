@@ -58,12 +58,16 @@ class SettingsRepository @Inject constructor(
         val ONBOARDING_COMPLETE = booleanPreferencesKey("onboarding_complete")
         val DEFAULT_ACCOUNT_ID = longPreferencesKey("default_account_id")
         val LARGE_TEXT = booleanPreferencesKey("large_text")
+        val SHARED_PEOPLE = stringPreferencesKey("shared_people")
     }
 
     /** Defaults chosen so a fresh install is immediately usable and private. */
     object Defaults {
         val THEME_MODE = ThemeMode.SYSTEM
-        const val DYNAMIC_COLOR = true
+
+        // Off, so the app has its own look — the soft blue, sage and pink of
+        // the home screen — rather than whatever the wallpaper suggests.
+        const val DYNAMIC_COLOR = false
         val LOCK_METHOD = LockMethod.NONE
         const val AUTO_LOCK_MINUTES = 2
         const val NOTIFY_BILLS = true
@@ -113,6 +117,9 @@ class SettingsRepository @Inject constructor(
             onboardingComplete = prefs[Keys.ONBOARDING_COMPLETE] ?: false,
             defaultAccountId = prefs[Keys.DEFAULT_ACCOUNT_ID]?.takeIf { it > 0L },
             largeText = prefs[Keys.LARGE_TEXT] ?: Defaults.LARGE_TEXT,
+            sharedPeopleIds = prefs[Keys.SHARED_PEOPLE]?.let { stored ->
+                stored.split(',').mapNotNull { it.trim().toLongOrNull() }.toSet()
+            },
         )
     }
 
@@ -148,6 +155,10 @@ class SettingsRepository @Inject constructor(
     suspend fun setDefaultAccountId(id: Long?) = put(Keys.DEFAULT_ACCOUNT_ID, id ?: 0L)
     suspend fun setLargeText(enabled: Boolean) = put(Keys.LARGE_TEXT, enabled)
 
+    /** Who the Shared tab on Home covers; see [AppSettings.sharedPeopleIds]. */
+    suspend fun setSharedPeople(ids: Set<Long>) =
+        put(Keys.SHARED_PEOPLE, ids.sorted().joinToString(","))
+
     private suspend fun <T> put(key: Preferences.Key<T>, value: T) {
         context.dataStore.edit { it[key] = value }
     }
@@ -162,7 +173,7 @@ class SettingsRepository @Inject constructor(
 /** Every user preference in one immutable object. */
 data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
-    val useDynamicColor: Boolean = true,
+    val useDynamicColor: Boolean = false,
     val currencyCode: String = Money.DEFAULT_CURRENCY_CODE,
     val lockMethod: LockMethod = LockMethod.NONE,
     val autoLockMinutes: Int = 2,
@@ -183,6 +194,11 @@ data class AppSettings(
     val onboardingComplete: Boolean = false,
     val defaultAccountId: Long? = null,
     val largeText: Boolean = false,
+    /**
+     * The people the Shared tab on Home covers. Null until chosen, which
+     * means everybody.
+     */
+    val sharedPeopleIds: Set<Long>? = null,
 ) {
     val isLockEnabled: Boolean get() = lockMethod != LockMethod.NONE
     val requiresPin: Boolean

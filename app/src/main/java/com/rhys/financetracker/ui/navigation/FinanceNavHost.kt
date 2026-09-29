@@ -4,11 +4,29 @@ import android.net.Uri
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
+import androidx.compose.material3.Surface
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
+import com.rhys.financetracker.ui.theme.FinanceTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -31,6 +49,8 @@ import com.rhys.financetracker.ui.importer.ImportScreen
 import com.rhys.financetracker.ui.insights.InsightsScreen
 import com.rhys.financetracker.ui.people.PeopleScreen
 import com.rhys.financetracker.ui.people.PersonEditScreen
+import com.rhys.financetracker.ui.people.PersonHubScreen
+import com.rhys.financetracker.ui.people.SetupScreen
 import com.rhys.financetracker.ui.recurring.RecurringEditScreen
 import com.rhys.financetracker.ui.recurring.RecurringScreen
 import com.rhys.financetracker.ui.reports.ReportsScreen
@@ -72,18 +92,10 @@ fun FinanceNavHost(
     Scaffold(
         bottomBar = {
             if (isTopLevel) {
-                NavigationBar {
-                    TopLevelDestination.entries.forEach { destination ->
-                        NavigationBarItem(
-                            selected = currentRoute == destination.route,
-                            onClick = { navController.navigateToTab(destination.route) },
-                            icon = {
-                                Icon(destination.icon, contentDescription = destination.label)
-                            },
-                            label = { Text(destination.label) },
-                        )
-                    }
-                }
+                SoftBottomBar(
+                    currentRoute = currentRoute,
+                    onSelect = { navController.navigateToTab(it.route) },
+                )
             }
         },
     ) { padding ->
@@ -105,6 +117,76 @@ fun FinanceNavHost(
     }
 }
 
+/**
+ * The bar along the bottom: icons on a soft rounded bar, with the tab you are
+ * on lifted into a coloured circle.
+ */
+@Composable
+private fun SoftBottomBar(
+    currentRoute: String?,
+    onSelect: (TopLevelDestination) -> Unit,
+) {
+    val colors = FinanceTheme.colors
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background)
+            .navigationBarsPadding()
+            .padding(start = 16.dp, end = 16.dp, top = 18.dp, bottom = 10.dp),
+    ) {
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = colors.navBar,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(60.dp),
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TopLevelDestination.entries.forEach { destination ->
+                    val selected = currentRoute == destination.route
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .clip(CircleShape)
+                            .clickable { onSelect(destination) }
+                            .semantics { this.selected = selected },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (selected) {
+                            Surface(
+                                shape = CircleShape,
+                                color = colors.navSelected,
+                                shadowElevation = 6.dp,
+                                border = BorderStroke(3.dp, MaterialTheme.colorScheme.background),
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .offset(y = (-14).dp),
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        destination.icon,
+                                        contentDescription = destination.label,
+                                        tint = colors.onNavSelected,
+                                    )
+                                }
+                            }
+                        } else {
+                            Icon(
+                                destination.icon,
+                                contentDescription = destination.label,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 /** The five tabs. */
 private fun NavGraphBuilder.topLevelDestinations(
     navController: NavHostController,
@@ -121,6 +203,9 @@ private fun NavGraphBuilder.topLevelDestinations(
             onOpenDashboardSettings = { navController.navigate(Routes.SETTINGS_DASHBOARD) },
             onOpenExternalData = { navController.navigate(Routes.SETTINGS_EXTERNAL_DATA) },
             onOpenInsights = { navController.navigate(Routes.INSIGHTS) },
+            onOpenSetup = { navController.navigate(Routes.SETUP) },
+            onOpenPerson = { navController.navigate(Routes.personHub(it)) },
+            onOpenPeople = { navController.navigate(Routes.PEOPLE) },
         )
     }
 
@@ -190,8 +275,25 @@ private fun NavGraphBuilder.editorDestinations(
     composable(Routes.PEOPLE) {
         PeopleScreen(
             onBack = { navController.popBackStack() },
-            onEditPerson = { navController.navigate(Routes.personEdit(it)) },
-            onAddPerson = { navController.navigate(Routes.personEdit()) },
+            onEditPerson = { navController.navigate(Routes.personHub(it)) },
+            // A new person is set up in full — name, pay, accounts, loans —
+            // rather than as a name on its own.
+            onAddPerson = { navController.navigate(Routes.SETUP) },
+        )
+    }
+
+    composable(Routes.SETUP) {
+        SetupScreen(onFinished = { navController.popBackStack() })
+    }
+
+    composable(
+        route = Routes.PERSON_HUB_PATTERN,
+        arguments = listOf(navArgument(Routes.ARG_ID) { type = NavType.StringType }),
+    ) {
+        PersonHubScreen(
+            onBack = { navController.popBackStack() },
+            onEditDetails = { navController.navigate(Routes.personEdit(it)) },
+            onOpenAccount = { navController.navigate(Routes.accountEdit(it)) },
         )
     }
 

@@ -89,6 +89,13 @@ class BackupManager @Inject constructor(
                 ),
             )
             put(
+                BackupFormat.KEY_INCOME_CHANGES,
+                serializer.writeArray(
+                    database.incomeChangeDao().getAll(),
+                    serializer::incomeChangeToJson,
+                ),
+            )
+            put(
                 BackupFormat.KEY_CASH_POT,
                 serializer.writeArray(
                     database.cashPotDao().getAll(),
@@ -231,6 +238,10 @@ class BackupManager @Inject constructor(
             val rules = converted.rules
             val goals = converted.goals
             val snapshots = converted.snapshots
+            val payHistory = serializer.readArray(
+                json.optJSONArray(BackupFormat.KEY_INCOME_CHANGES),
+                serializer::incomeChangeFromJson,
+            ).filter { change -> people.any { it.id == change.personId } }
             val cashPot = converted.potEntries + serializer.readArray(
                 json.optJSONArray(BackupFormat.KEY_CASH_POT),
                 serializer::cashPotEntryFromJson,
@@ -260,6 +271,7 @@ class BackupManager @Inject constructor(
                 database.personDao().deleteAll()
                 database.externalDataDao().deleteAll()
                 database.cashPotDao().deleteAll()
+                database.incomeChangeDao().deleteAll()
 
                 database.personDao().insertAll(people)
                 database.categoryDao().insertAll(categories)
@@ -270,6 +282,7 @@ class BackupManager @Inject constructor(
                 database.monthlySnapshotDao().insertAll(snapshots)
                 database.externalDataDao().upsertAll(external)
                 database.cashPotDao().insertAll(cashPot)
+                database.incomeChangeDao().insertAll(payHistory)
             }
 
             // A backup from before categories existed would leave the app

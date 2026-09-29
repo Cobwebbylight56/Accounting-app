@@ -33,6 +33,7 @@ object BackupFormat {
     const val KEY_SNAPSHOTS = "monthlySnapshots"
     const val KEY_EXTERNAL_DATA = "externalData"
     const val KEY_CASH_POT = "cashPot"
+    const val KEY_INCOME_CHANGES = "incomeChanges"
 }
 
 /** What a backup contains, shown before a restore so the user knows what they are about to load. */

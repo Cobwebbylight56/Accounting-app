@@ -53,9 +53,10 @@ class TransactionRepository @Inject constructor(
         start: LocalDate,
         end: LocalDate,
         accountId: Long? = null,
-        personId: Long? = null,
+        /** Whose money; null for everybody. */
+        personIds: Set<Long>? = null,
     ): Flow<IncomeExpenseTotals> =
-        transactionDao.observeIncomeExpense(start, end, accountId, personId)
+        transactionDao.observeIncomeExpense(start, end, accountId, personIds == null, personIds.orEmpty().toList())
             .map { it ?: IncomeExpenseTotals.EMPTY }
 
     fun observeCategoryTotals(
@@ -63,9 +64,10 @@ class TransactionRepository @Inject constructor(
         start: LocalDate,
         end: LocalDate,
         accountId: Long? = null,
-        personId: Long? = null,
+        /** Whose money; null for everybody. */
+        personIds: Set<Long>? = null,
     ): Flow<List<CategoryTotal>> =
-        transactionDao.observeCategoryTotals(type.name, start, end, accountId, personId)
+        transactionDao.observeCategoryTotals(type.name, start, end, accountId, personIds == null, personIds.orEmpty().toList())
 
     /**
      * Money moved into and out of savings or cash over a period, read from the
@@ -76,9 +78,10 @@ class TransactionRepository @Inject constructor(
         start: LocalDate,
         end: LocalDate,
         accountId: Long? = null,
-        personId: Long? = null,
+        /** Whose money; null for everybody. */
+        personIds: Set<Long>? = null,
     ): Flow<PotFlow> =
-        transactionDao.observePotFlow(kind.name, start, end, accountId, personId)
+        transactionDao.observePotFlow(kind.name, start, end, accountId, personIds == null, personIds.orEmpty().toList())
             .map { it ?: PotFlow.EMPTY }
 
     /** Money in and out of every account over a period, one row per account. */
@@ -89,9 +92,10 @@ class TransactionRepository @Inject constructor(
         start: LocalDate,
         end: LocalDate,
         accountId: Long? = null,
-        personId: Long? = null,
+        /** Whose money; null for everybody. */
+        personIds: Set<Long>? = null,
     ): Flow<List<MonthTotals>> =
-        transactionDao.observeMonthlyTotals(start, end, accountId, personId)
+        transactionDao.observeMonthlyTotals(start, end, accountId, personIds == null, personIds.orEmpty().toList())
 
     fun observePotFlowByPerson(
         kind: CategoryKind,

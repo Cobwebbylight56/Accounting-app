@@ -53,6 +53,7 @@ class MigrationFourToFiveTest {
             null,
             SQLiteDatabase.OPEN_READWRITE,
         )
+        db.execSQL("DROP TABLE income_changes") // version 6
         db.execSQL("DROP TABLE cash_pot_entries")
         db.execSQL(
             "CREATE TABLE accounts_v4 (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +

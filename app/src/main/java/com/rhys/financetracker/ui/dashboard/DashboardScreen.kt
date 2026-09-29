@@ -33,7 +33,10 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -69,9 +72,15 @@ fun DashboardScreen(
     onOpenDashboardSettings: () -> Unit,
     onOpenExternalData: () -> Unit,
     onOpenInsights: () -> Unit,
+    onOpenSetup: () -> Unit,
+    onOpenPerson: (Long) -> Unit,
+    onOpenPeople: () -> Unit,
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val sharedPeople by viewModel.sharedPeopleIds.collectAsStateWithLifecycle()
+    var choosingShared by rememberSaveable { mutableStateOf(false) }
+    val individuals = state.people.filterNot { it.isShared }
     val categoryDetail by viewModel.categoryDetail.collectAsStateWithLifecycle()
     val message by viewModel.messages.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
@@ -87,34 +96,14 @@ fun DashboardScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
-        topBar = {
-            TopAppBar(
-                title = { Text("Finance Tracker") },
-                actions = {
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
-                    }
-                },
-            )
-        },
     ) { padding ->
         when {
             state.isLoading -> LoadingState(Modifier.padding(padding))
 
-            // Only when there is genuinely nothing set up. A person with no
-            // accounts of their own is a different problem with a different
-            // answer, and showing this instead took the person tabs off the
-            // screen along with everything else — so there was no way back to
-            // Everyone except leaving Home.
-            !state.hasAnyData && !state.scopeHasNothingButAppDoes -> EmptyState(
-                icon = Icons.Outlined.AccountBalanceWallet,
-                title = "Let's set things up",
-                message = "Add an account to begin, or load the example household from " +
-                    "Settings to see how everything fits together.",
-                actionLabel = "Add an account",
-                onAction = onOpenAccounts,
-                modifier = Modifier.padding(padding),
-            )
+            // Nobody set up and nothing recorded: a fresh install. Everything
+            // is built around a person, so that is where it starts.
+            individuals.isEmpty() && state.accountsInTotal == 0 ->
+                WelcomeScreen(onStart = onOpenSetup, modifier = Modifier.padding(padding))
 
             else -> LazyColumn(
                 modifier = Modifier
@@ -129,6 +118,45 @@ fun DashboardScreen(
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 item {
+                    HomeHeader(
+                        state = state,
+                        onMenu = onOpenSettings,
+                        onAvatar = {
+                            state.scope.personId?.let(onOpenPerson) ?: onOpenPeople()
+                        },
+                        onCustomise = onOpenDashboardSettings,
+                    )
+                }
+
+                item {
+                    PersonTabs(
+                        individuals = individuals,
+                        scope = state.scope,
+                        onPerson = viewModel::showPerson,
+                        onShared = viewModel::showShared,
+                        onChooseShared = { choosingShared = true },
+                    )
+                }
+
+                // Money exists but nobody has been set up to own it — an
+                // install from before the app was built around people.
+                if (individuals.isEmpty()) {
+                    item {
+                        SectionCard(title = "Who is this money for?") {
+                            Text(
+                                text = "Set yourself up as a person, then your accounts go " +
+                                    "under your name and Home becomes your tab.",
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            Button(onClick = onOpenSetup, modifier = Modifier.fillMaxWidth()) {
+                                Text("Set up a person")
+                            }
+                        }
+                    }
+                }
+
+                item {
                     MonthSelector(
                         label = DateUtils.formatMonth(state.month),
                         isCurrentMonth = state.isCurrentMonth,
@@ -138,19 +166,22 @@ fun DashboardScreen(
                     )
                 }
 
-                item {
-                    ScopeSelector(
-                        state = state,
-                        onScopeChange = viewModel::setScope,
-                    )
-                }
+                item { HomeTiles(state = state, onOpenAccounts = onOpenAccounts) }
+
+                item { MonthList(state = state) }
+
+                item { LoansCard(state = state, onOpenAccounts = onOpenAccounts) }
 
                 if (state.scopeHasNothingButAppDoes) {
                     item { NoAccountsForThisPerson(state, onOpenAccounts) }
                 }
 
                 items(
-                    items = state.widgets.filter { it.isVisible },
+                    // The tiles and the month list above are these two cards
+                    // drawn the new way, so they are not shown twice.
+                    items = state.widgets.filter {
+                        it.isVisible && it.widget !in REPLACED_BY_TILES
+                    },
                     key = { it.widget.key },
                 ) { visible ->
                     DashboardCard(
@@ -184,6 +215,15 @@ fun DashboardScreen(
         }
     }
 
+    if (choosingShared) {
+        SharedPeopleDialog(
+            individuals = individuals,
+            selected = sharedPeople,
+            onSave = viewModel::setSharedPeople,
+            onDismiss = { choosingShared = false },
+        )
+    }
+
     categoryDetail?.let { detail ->
         CategoryDetailSheet(
             detail = detail,
@@ -195,6 +235,12 @@ fun DashboardScreen(
         )
     }
 }
+
+/** Cards the Home tiles and month list now show instead. */
+private val REPLACED_BY_TILES = setOf(
+    DashboardWidget.BALANCE_SUMMARY,
+    DashboardWidget.MONTH_SUMMARY,
+)
 
 /** Steps through months, and offers a way straight back to the current one. */
 @Composable
@@ -231,7 +277,6 @@ private fun MonthSelector(
     }
 }
 
-/** Switches between the household, one person, and one account. */
 /**
  * Shown when the person picked has no accounts, but the app has some.
  *
@@ -261,50 +306,6 @@ private fun NoAccountsForThisPerson(state: DashboardState, onOpenAccounts: () ->
         Spacer(Modifier.height(12.dp))
         Button(onClick = onOpenAccounts, modifier = Modifier.fillMaxWidth()) {
             Text(if (state.unassignedAccounts > 0) "Sort this out in Accounts" else "Open Accounts")
-        }
-    }
-}
-
-@Composable
-private fun ScopeSelector(
-    state: DashboardState,
-    onScopeChange: (DashboardScope) -> Unit,
-) {
-    // Never hidden once a person is picked. [accounts] is the *filtered* list,
-    // so choosing somebody with one account or none could satisfy this and
-    // take the chips off the screen — including the "Everyone" chip, which is
-    // the only way back. There was then no way out of that person's view but
-    // to kill the app. The unfiltered count is what this question was always
-    // about.
-    // These chips only ever offer people, so one person is nothing to choose
-    // between: "Everyone" and the one name mean the same screen. They appear
-    // when a second person is added.
-    //
-    // Still shown while a filter is on, whatever the count. [accounts] is the
-    // filtered list, and hiding the chips there once took "Everyone" off the
-    // screen — the only way back — and left killing the app as the way out.
-    val isFiltered = state.scope.personId != null || state.scope.accountId != null
-    if (!isFiltered && state.people.size <= 1) return
-
-    androidx.compose.foundation.lazy.LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        item {
-            androidx.compose.material3.FilterChip(
-                selected = state.scope.personId == null && state.scope.accountId == null,
-                onClick = { onScopeChange(DashboardScope()) },
-                label = { Text("Everyone") },
-            )
-        }
-        items(state.people) { person ->
-            androidx.compose.material3.FilterChip(
-                selected = state.scope.personId == person.id,
-                onClick = {
-                    onScopeChange(DashboardScope(personId = person.id, label = person.name))
-                },
-                label = { Text(person.name) },
-            )
         }
     }
 }

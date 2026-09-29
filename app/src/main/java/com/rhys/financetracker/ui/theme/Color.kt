@@ -14,62 +14,77 @@ import androidx.compose.ui.graphics.Color
  */
 
 // ------------------------------------------------------------------- light
-val LightPrimary = Color(0xFF1B5E4B)
+// Soft slate blue, sage and blush on white: calm, and quiet enough that the
+// only strong colours on screen are the ones that mean something — money in,
+// money out, a warning.
+val LightPrimary = Color(0xFF4F6482)
 val LightOnPrimary = Color(0xFFFFFFFF)
-val LightPrimaryContainer = Color(0xFFA7F2D4)
-val LightOnPrimaryContainer = Color(0xFF002115)
+val LightPrimaryContainer = Color(0xFFD6DFEB)
+val LightOnPrimaryContainer = Color(0xFF0B1D33)
 
-val LightSecondary = Color(0xFF4B635A)
+val LightSecondary = Color(0xFF5E746C)
 val LightOnSecondary = Color(0xFFFFFFFF)
-val LightSecondaryContainer = Color(0xFFCDE9DC)
-val LightOnSecondaryContainer = Color(0xFF072019)
+val LightSecondaryContainer = Color(0xFFD5E0DC)
+val LightOnSecondaryContainer = Color(0xFF16241F)
 
-val LightTertiary = Color(0xFF3F6375)
+val LightTertiary = Color(0xFF7F5F6C)
 val LightOnTertiary = Color(0xFFFFFFFF)
-val LightTertiaryContainer = Color(0xFFC2E8FD)
-val LightOnTertiaryContainer = Color(0xFF001E2B)
+val LightTertiaryContainer = Color(0xFFEEDCE3)
+val LightOnTertiaryContainer = Color(0xFF2E1822)
 
 val LightError = Color(0xFFBA1A1A)
 val LightOnError = Color(0xFFFFFFFF)
 val LightErrorContainer = Color(0xFFFFDAD6)
 val LightOnErrorContainer = Color(0xFF410002)
 
-val LightBackground = Color(0xFFFBFDF9)
-val LightOnBackground = Color(0xFF191C1B)
-val LightSurface = Color(0xFFFBFDF9)
-val LightOnSurface = Color(0xFF191C1B)
-val LightSurfaceVariant = Color(0xFFDCE5DF)
-val LightOnSurfaceVariant = Color(0xFF404944)
-val LightOutline = Color(0xFF707974)
+val LightBackground = Color(0xFFF6F7F9)
+val LightOnBackground = Color(0xFF1B1F26)
+val LightSurface = Color(0xFFFFFFFF)
+val LightOnSurface = Color(0xFF1B1F26)
+val LightSurfaceVariant = Color(0xFFE3E7ED)
+val LightOnSurfaceVariant = Color(0xFF474E59)
+val LightOutline = Color(0xFF737A86)
+
+val LightSurfaceContainerLowest = Color(0xFFFFFFFF)
+val LightSurfaceContainerLow = Color(0xFFF3F5F8)
+val LightSurfaceContainer = Color(0xFFEEF1F5)
+val LightSurfaceContainerHigh = Color(0xFFE8ECF1)
+val LightSurfaceContainerHighest = Color(0xFFE2E6EC)
 
 // -------------------------------------------------------------------- dark
-val DarkPrimary = Color(0xFF8BD5B9)
-val DarkOnPrimary = Color(0xFF003827)
-val DarkPrimaryContainer = Color(0xFF00513A)
-val DarkOnPrimaryContainer = Color(0xFFA7F2D4)
+val DarkPrimary = Color(0xFFB3C6E2)
+val DarkOnPrimary = Color(0xFF1C2E47)
+val DarkPrimaryContainer = Color(0xFF354760)
+val DarkOnPrimaryContainer = Color(0xFFD6DFEB)
 
-val DarkSecondary = Color(0xFFB2CCC0)
-val DarkOnSecondary = Color(0xFF1D352D)
-val DarkSecondaryContainer = Color(0xFF344C43)
-val DarkOnSecondaryContainer = Color(0xFFCDE9DC)
+val DarkSecondary = Color(0xFFB9CAC3)
+val DarkOnSecondary = Color(0xFF243530)
+val DarkSecondaryContainer = Color(0xFF3B4B45)
+val DarkOnSecondaryContainer = Color(0xFFD5E0DC)
 
-val DarkTertiary = Color(0xFFA7CCE0)
-val DarkOnTertiary = Color(0xFF0B3446)
-val DarkTertiaryContainer = Color(0xFF264B5D)
-val DarkOnTertiaryContainer = Color(0xFFC2E8FD)
+val DarkTertiary = Color(0xFFE0C2CE)
+val DarkOnTertiary = Color(0xFF432A36)
+val DarkTertiaryContainer = Color(0xFF5C4450)
+val DarkOnTertiaryContainer = Color(0xFFEEDCE3)
 
 val DarkError = Color(0xFFFFB4AB)
 val DarkOnError = Color(0xFF690005)
 val DarkErrorContainer = Color(0xFF93000A)
 val DarkOnErrorContainer = Color(0xFFFFDAD6)
 
-val DarkBackground = Color(0xFF101413)
-val DarkOnBackground = Color(0xFFE1E3E0)
-val DarkSurface = Color(0xFF101413)
-val DarkOnSurface = Color(0xFFE1E3E0)
-val DarkSurfaceVariant = Color(0xFF404944)
-val DarkOnSurfaceVariant = Color(0xFFBFC9C3)
-val DarkOutline = Color(0xFF8A938D)
+val DarkBackground = Color(0xFF12151A)
+val DarkOnBackground = Color(0xFFE2E5EA)
+val DarkSurface = Color(0xFF181C22)
+val DarkOnSurface = Color(0xFFE2E5EA)
+val DarkSurfaceVariant = Color(0xFF424852)
+val DarkOnSurfaceVariant = Color(0xFFC2C8D2)
+val DarkOutline = Color(0xFF8C929C)
+
+val DarkSurfaceContainerLowest = Color(0xFF0E1115)
+val DarkSurfaceContainerLow = Color(0xFF1C2027)
+val DarkSurfaceContainer = Color(0xFF20252C)
+val DarkSurfaceContainerHigh = Color(0xFF2A2F37)
+val DarkSurfaceContainerHighest = Color(0xFF353A42)
 
 /**
  * Colours whose meaning is fixed regardless of the theme.
@@ -95,6 +110,16 @@ data class FinanceColors(
     val neutral: Color,
     /** Series colours for charts, in the order they should be used. */
     val chartSeries: List<Color>,
+    /** The home screen's tiles: slate blue, sage, blush and mist, and text on them. */
+    val tileBlue: Color,
+    val tileSage: Color,
+    val tileBlush: Color,
+    val tileMist: Color,
+    val onTile: Color,
+    /** The bottom bar, and the raised circle behind the tab you are on. */
+    val navBar: Color,
+    val navSelected: Color,
+    val onNavSelected: Color,
 ) {
     companion object {
         val Light = FinanceColors(
@@ -117,6 +142,14 @@ data class FinanceColors(
                 Color(0xFF5E35B1), Color(0xFF00838F), Color(0xFF558B2F), Color(0xFFC62828),
                 Color(0xFF6D4C41), Color(0xFF455A64), Color(0xFF9E9D24), Color(0xFF7B1FA2),
             ),
+            tileBlue = Color(0xFF9DB0C9),
+            tileSage = Color(0xFFD5E0DC),
+            tileBlush = Color(0xFFDCC5CF),
+            tileMist = Color(0xFFC9D4E1),
+            onTile = Color(0xFF1C2635),
+            navBar = Color(0xFFC9C3C3),
+            navSelected = Color(0xFF93A7C1),
+            onNavSelected = Color(0xFF15202F),
         )
 
         val Dark = FinanceColors(
@@ -139,6 +172,14 @@ data class FinanceColors(
                 Color(0xFFB39DDB), Color(0xFF7ED6DE), Color(0xFFAED581), Color(0xFFEF9A9A),
                 Color(0xFFBCAAA4), Color(0xFFB0BEC5), Color(0xFFDCE775), Color(0xFFCE93D8),
             ),
+            tileBlue = Color(0xFF3C4D66),
+            tileSage = Color(0xFF394a44),
+            tileBlush = Color(0xFF55414C),
+            tileMist = Color(0xFF3A4555),
+            onTile = Color(0xFFEDF1F7),
+            navBar = Color(0xFF2B2F36),
+            navSelected = Color(0xFF7C92B0),
+            onNavSelected = Color(0xFF0F1826),
         )
     }
 }

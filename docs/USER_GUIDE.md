@@ -24,27 +24,32 @@ Along the bottom of the screen:
 Doing this in order takes about ten minutes and means everything afterwards
 works by itself.
 
-### 1. Add the people
+### 1. Start with a person
 
-**More → People → +**
+Everything is built around a person. A new install opens on a welcome page
+with one round button; it sets up the first person in four short steps:
 
-Add yourself, your partner, and any children whose money you want to keep track
-of. There is already a "Joint" person for shared money.
+1. **Who is this?** A name and a colour.
+2. **Their pay** — yearly pay before tax and take-home after tax (optional).
+3. **Their accounts** — current accounts, savings, cards. Each goes under
+   their name as it is added.
+4. **Loans to pay** — what is still owed, what was borrowed (optional), and
+   the monthly payment and which account it comes from (optional). With a
+   payment set, each month's payment comes off what is owed by itself, and
+   **when a loan is paid off it disappears** — put away with its history, and
+   its payment stopped. Credit cards stay, since £0 is normal for a card.
 
-Give each person a colour — it is used on charts and lists to tell your figures
-apart at a glance.
+Add everyone else the same way: **More → People → +**.
 
-**Yearly pay** (optional): each person can have their pay **before tax** and
-their **take-home after tax** for the year. A statement only ever shows what
-arrived, so these are what the rest is measured against. They are used for:
+**Each person has their own page** (tap them on People, or their picture on
+Home): their pay, their **pay history**, their accounts and their loans.
 
-* **People screen** — a *Yearly pay* card for everyone together: before tax,
-  take-home a year and a month, tax and deductions (and what percentage of pay
-  that is), and what share of a month's take-home has been spent and put aside
-  so far this month. Each person's line says the same for them.
-* **Left to spend** on Home — take-home a month from yearly pay, and what
-  percentage of it this month has spent and put aside, for whoever is on
-  screen.
+**Pay rises**: on a person's page, **Add a pay rise**. Say why (Yearly review,
+Pay rise, Promotion, New job), how it was given — **a percentage**, **an amount
+a year**, or **the new yearly pay** — and when it starts. Take-home is optional;
+left blank it is estimated from what they take home now, and marked as an
+estimate. A rise dated in the future is kept and applied on its day. The
+history shows each change as before → after with the percentage.
 
 ### 2. Add the accounts
 
@@ -208,11 +213,23 @@ The month's Money in and Money out leave savings movements out entirely. They
 appear on the **Savings** card instead, and are taken off **Left to spend** —
 £200 in a saver has not been spent, but it is not there to spend either.
 
-### The person tabs
+### Home and the person tabs
 
-The Everyone / name chips on Home appear once there is **more than one
-person**. With one person they say nothing — "Everyone" and the one name are
-the same screen — so they stay out of the way until a second person is added.
+Home opens on **your** tab: "Hello Rhys", your picture top right (tap it for
+your page), and four tiles — **Available**, **Saved**, **Owed on loans and
+cards**, and **Take-home a month** (from yearly pay, or money in this month if
+none is set). Under them is the month as a short list — money in, money out,
+put aside, left to spend — then your loans with how far each is paid off, and
+then the cards you have chosen.
+
+With two or more people there is a **tab for each person** and a **Shared**
+tab. Shared adds together **only the people you choose** — tap the pencil
+beside it — plus anything held jointly. Everybody keeps their own tab whoever
+Shared covers. The cash pot counts on Shared, never on one person's tab.
+
+The ≡ button opens Settings; the sliders button chooses which cards appear.
+The colours are the app's own; to use your wallpaper's instead, turn on dynamic
+colour in **Settings → Appearance**.
 
 ### Setting up in one go
 

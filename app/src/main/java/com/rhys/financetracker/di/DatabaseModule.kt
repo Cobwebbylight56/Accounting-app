@@ -9,6 +9,7 @@ import com.rhys.financetracker.data.local.dao.CategoryDao
 import com.rhys.financetracker.data.local.dao.DashboardWidgetDao
 import com.rhys.financetracker.data.local.dao.ExternalDataDao
 import com.rhys.financetracker.data.local.dao.ImportProfileDao
+import com.rhys.financetracker.data.local.dao.IncomeChangeDao
 import com.rhys.financetracker.data.local.dao.MonthlySnapshotDao
 import com.rhys.financetracker.data.local.dao.PersonDao
 import com.rhys.financetracker.data.local.dao.RecurringRuleDao
@@ -65,4 +66,6 @@ object DatabaseModule {
     @Provides fun provideImportProfileDao(db: AppDatabase): ImportProfileDao =
         db.importProfileDao()
     @Provides fun provideCashPotDao(db: AppDatabase): CashPotDao = db.cashPotDao()
+    @Provides fun provideIncomeChangeDao(db: AppDatabase): IncomeChangeDao =
+        db.incomeChangeDao()
 }

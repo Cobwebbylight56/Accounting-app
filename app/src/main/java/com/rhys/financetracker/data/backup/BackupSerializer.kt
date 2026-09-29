@@ -5,6 +5,7 @@ import com.rhys.financetracker.data.local.entity.AccountEntity
 import com.rhys.financetracker.data.local.entity.CashPotEntryEntity
 import com.rhys.financetracker.data.local.entity.CategoryEntity
 import com.rhys.financetracker.data.local.entity.ExternalDataEntity
+import com.rhys.financetracker.data.local.entity.IncomeChangeEntity
 import com.rhys.financetracker.data.local.entity.MonthlySnapshotEntity
 import com.rhys.financetracker.data.local.entity.PersonEntity
 import com.rhys.financetracker.data.local.entity.RecurringRuleEntity
@@ -151,6 +152,36 @@ class BackupSerializer @Inject constructor() {
 
     /** True for an account a backup from before version 5 stored as cash. */
     fun isLegacyCashAccount(json: JSONObject): Boolean = json.optString("type") == "CASH"
+
+    // ------------------------------------------------------ pay history
+
+    fun incomeChangeToJson(change: IncomeChangeEntity): JSONObject = JSONObject().apply {
+        put("id", change.id)
+        put("personId", change.personId)
+        put("effectiveDate", change.effectiveDate.toString())
+        putOpt("previousGrossMinor", change.previousGrossMinor)
+        putOpt("previousNetMinor", change.previousNetMinor)
+        putOpt("newGrossMinor", change.newGrossMinor)
+        putOpt("newNetMinor", change.newNetMinor)
+        put("netIsEstimate", change.netIsEstimate)
+        putOpt("reason", change.reason)
+        put("isApplied", change.isApplied)
+        put("createdAt", change.createdAt)
+    }
+
+    fun incomeChangeFromJson(json: JSONObject): IncomeChangeEntity = IncomeChangeEntity(
+        id = json.optLong("id", 0L),
+        personId = json.optLong("personId", 0L),
+        effectiveDate = json.optDate("effectiveDate") ?: LocalDate.now(),
+        previousGrossMinor = json.optLongOrNull("previousGrossMinor"),
+        previousNetMinor = json.optLongOrNull("previousNetMinor"),
+        newGrossMinor = json.optLongOrNull("newGrossMinor"),
+        newNetMinor = json.optLongOrNull("newNetMinor"),
+        netIsEstimate = json.optBoolean("netIsEstimate", false),
+        reason = json.optStringOrNull("reason"),
+        isApplied = json.optBoolean("isApplied", true),
+        createdAt = json.optLong("createdAt", System.currentTimeMillis()),
+    )
 
     // ----------------------------------------------------------- cash pot
 

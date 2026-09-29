@@ -18,10 +18,12 @@ import com.rhys.financetracker.data.local.projection.PotFlow
 import com.rhys.financetracker.data.local.projection.RecurringRuleWithDetails
 import com.rhys.financetracker.data.local.projection.SavingsGoalWithProgress
 import com.rhys.financetracker.data.local.projection.TransactionWithDetails
+import com.rhys.financetracker.data.prefs.SettingsRepository
 import com.rhys.financetracker.data.remote.ExternalDataRepository
 import com.rhys.financetracker.data.remote.ExternalDataSnapshot
 import com.rhys.financetracker.data.repository.AccountRepository
 import com.rhys.financetracker.data.repository.CashPotRepository
+import com.rhys.financetracker.data.repository.IncomeRepository
 import com.rhys.financetracker.data.repository.InsightRepository
 import com.rhys.financetracker.data.repository.PeopleRepository
 import com.rhys.financetracker.data.repository.RecurringRepository
@@ -75,9 +77,52 @@ class DashboardViewModel @Inject constructor(
     private val widgetDao: DashboardWidgetDao,
     private val insightRepository: InsightRepository,
     private val cashPotRepository: CashPotRepository,
+    private val incomeRepository: IncomeRepository,
+    private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
 
-    private val scope = MutableStateFlow(DashboardScope())
+    /** Which tab is picked; null until somebody picks, meaning the first person. */
+    private val choice = MutableStateFlow<ScopeChoice?>(null)
+
+    private val people = peopleRepository.observeActive()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** Who the Shared tab covers, as chosen; null means everybody. */
+    val sharedPeopleIds: StateFlow<Set<Long>?> = settingsRepository.settings
+        .map { it.sharedPeopleIds }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    /**
+     * What Home is showing: one person's tab, or the Shared tab with the
+     * people chosen for it.
+     *
+     * Everything is built around a person. The Shared tab is not "everyone"
+     * by definition — it is the people picked for it, plus whatever is held
+     * jointly — so a lodger or a grown-up child can have their own tab
+     * without being folded into the household's figures.
+     */
+    private val scope: StateFlow<DashboardScope> =
+        combine(choice, people, sharedPeopleIds) { picked, everyone, shared ->
+            scopeFor(picked, everyone, shared)
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, DashboardScope())
+
+    init {
+        viewModelScope.launch {
+            // Pay rises dated for today or earlier take effect now.
+            incomeRepository.applyDue()
+        }
+        viewModelScope.launch {
+            // Loans are for paying off, and once they are they go.
+            accountRepository.observeWithBalances().collect { accounts ->
+                val cleared = accountRepository.archivePaidOffLoans(accounts)
+                if (cleared.isNotEmpty()) {
+                    message.value = cleared.joinToString(" and ") + " paid off — well done. " +
+                        (if (cleared.size == 1) "It has" else "They have") +
+                        " been put away with their history."
+                }
+            }
+        }
+    }
 
     /** Feedback from the cash pot buttons, shown once and cleared. */
     private val message = MutableStateFlow<String?>(null)
@@ -100,7 +145,7 @@ class DashboardViewModel @Inject constructor(
             start = range.start,
             end = range.endInclusive,
             accountId = currentScope.accountId,
-            personId = currentScope.personId,
+            personIds = currentScope.personIds,
         )
     }
 
@@ -111,7 +156,7 @@ class DashboardViewModel @Inject constructor(
             start = range.start,
             end = range.endInclusive,
             accountId = currentScope.accountId,
-            personId = currentScope.personId,
+            personIds = currentScope.personIds,
         )
     }
 
@@ -144,7 +189,7 @@ class DashboardViewModel @Inject constructor(
             start = range.start,
             end = range.endInclusive,
             accountId = currentScope.accountId,
-            personId = currentScope.personId,
+            personIds = currentScope.personIds,
         )
     }
 
@@ -160,7 +205,7 @@ class DashboardViewModel @Inject constructor(
             start = months.first().atDay(1),
             end = months.last().atEndOfMonth(),
             accountId = currentScope.accountId,
-            personId = currentScope.personId,
+            personIds = currentScope.personIds,
         ).map { rows ->
             // Fill in the months with no activity, so the chart has an even
             // spacing rather than silently skipping quiet months.
@@ -275,12 +320,22 @@ class DashboardViewModel @Inject constructor(
             .firstOrNull()?.transaction?.date
 
         val inScope = accountList.filter { currentScope.matches(it) }
+        // The month's entries for whoever's tab this is: their own, and those
+        // on accounts in view. Every tab used to list the whole household's.
+        val owners = accountList.associate { it.account.id to it.account.personId }
+        val inScopeIds = inScope.map { it.account.id }.toSet()
+        val monthEntries = currentScope.personIds?.let { ids ->
+            recent.filter { item ->
+                val entry = item.transaction
+                (entry.personId ?: owners[entry.accountId]) in ids || entry.accountId in inScopeIds
+            }
+        } ?: recent
         val unassigned = accountList.count { it.account.personId == null }
         // The cash pot is the household's, not anybody's account, so it is
         // counted when the whole household is on screen and not otherwise —
         // adding it to one person's savings would give them money that is
         // everybody's.
-        val potCounts = currentScope.personId == null && currentScope.accountId == null
+        val potCounts = currentScope.includesHousehold
         val savingsTotal = inScope.filter { it.isSavings }.sumOf { it.balanceMinor } +
             if (potCounts) cashPot else 0L
         val liabilities = inScope.filter { it.isLiability }.sumOf { it.balanceMinor }
@@ -312,7 +367,7 @@ class DashboardViewModel @Inject constructor(
             monthlyTrend = trend,
             upcomingBills = upcoming,
             overdueBills = overdue,
-            monthTransactions = recent,
+            monthTransactions = monthEntries,
             savingsGoals = goals,
             externalData = external,
             topInsight = insights.topPriority,
@@ -380,7 +435,7 @@ class DashboardViewModel @Inject constructor(
                             dateFrom = range.start,
                             dateTo = range.endInclusive,
                             types = setOf(TransactionType.EXPENSE),
-                            personIds = currentScope.personId?.let { setOf(it) } ?: emptySet(),
+                            personIds = currentScope.personIds.orEmpty(),
                             sort = TransactionSort.AMOUNT_DESC,
                         ),
                     ),
@@ -389,7 +444,7 @@ class DashboardViewModel @Inject constructor(
                         start = previous.start,
                         end = previous.endInclusive,
                         accountId = currentScope.accountId,
-                        personId = currentScope.personId,
+                        personIds = currentScope.personIds,
                     ),
                 ) { entries, lastMonth ->
                     CategoryDetail(
@@ -474,8 +529,19 @@ class DashboardViewModel @Inject constructor(
         if (!month.isAfter(DateUtils.currentYearMonth())) visibleMonth.value = month
     }
 
-    fun setScope(newScope: DashboardScope) {
-        scope.value = newScope
+    /** Shows one person's tab. */
+    fun showPerson(personId: Long) {
+        choice.value = ScopeChoice.Person(personId)
+    }
+
+    /** Shows the Shared tab. */
+    fun showShared() {
+        choice.value = ScopeChoice.Shared
+    }
+
+    /** Sets who the Shared tab covers. */
+    fun setSharedPeople(ids: Set<Long>) {
+        viewModelScope.launch { settingsRepository.setSharedPeople(ids) }
     }
 
     fun showPreviousMonth() {
@@ -519,16 +585,68 @@ class DashboardViewModel @Inject constructor(
     }
 }
 
+/** A tab the user picked on Home. */
+sealed interface ScopeChoice {
+    data class Person(val personId: Long) : ScopeChoice
+    data object Shared : ScopeChoice
+}
+
+/**
+ * Works out what Home shows for a tab.
+ *
+ * Nothing picked yet opens on the first person — the app is built around a
+ * person. The Shared tab covers the people chosen for it (everybody until
+ * somebody chooses) and the joint person, whose accounts are the household's.
+ */
+internal fun scopeFor(
+    picked: ScopeChoice?,
+    people: List<PersonEntity>,
+    sharedIds: Set<Long>?,
+): DashboardScope {
+    val individuals = people.filterNot { it.isShared }
+    val joint = people.filter { it.isShared }.map { it.id }.toSet()
+    return when (picked) {
+        is ScopeChoice.Person -> people.firstOrNull { it.id == picked.personId }
+            ?.let { DashboardScope(personIds = setOf(it.id), label = it.name) }
+            ?: DashboardScope()
+        ScopeChoice.Shared -> {
+            val chosen = sharedIds?.filter { id -> individuals.any { it.id == id } }?.toSet()
+            val members = chosen ?: individuals.map { it.id }.toSet()
+            DashboardScope(
+                personIds = if (chosen == null) null else members + joint,
+                isShared = true,
+                label = "Shared",
+            )
+        }
+        null -> individuals.firstOrNull()
+            ?.let { DashboardScope(personIds = setOf(it.id), label = it.name) }
+            ?: DashboardScope()
+    }
+}
+
 /** Which slice of the household the dashboard is showing. */
 data class DashboardScope(
-    val personId: Long? = null,
+    /** Whose money; null for everybody. */
+    val personIds: Set<Long>? = null,
     val accountId: Long? = null,
-    val label: String = "Whole household",
+    /** True for the Shared tab rather than one person's. */
+    val isShared: Boolean = false,
+    val label: String = "Everyone",
 ) {
+    /** The one person whose tab this is, or null for the Shared tab or everybody. */
+    val personId: Long? get() = if (isShared) null else personIds?.singleOrNull()
+
+    /**
+     * True when the household's own things — the cash pot — belong on this
+     * view: the Shared tab, or everybody. Never one person's tab, because
+     * the pot is everybody's.
+     */
+    val includesHousehold: Boolean get() = accountId == null && (isShared || personIds == null)
+
     fun matches(account: AccountWithBalance): Boolean = when {
         accountId != null -> account.account.id == accountId
-        personId != null -> account.account.personId == personId || account.account.isShared
-        else -> true
+        personIds == null -> true
+        else -> account.account.personId in personIds || account.account.isShared
     }
 }
 
@@ -589,9 +707,10 @@ data class DashboardState(
     val incomeInScope: IncomeStats
         get() = when {
             scope.accountId != null -> IncomeStats.NONE
-            scope.personId != null -> people.firstOrNull { it.id == scope.personId }
-                ?.let { IncomeStats(it.grossYearlyIncomeMinor, it.netYearlyIncomeMinor) }
-                ?: IncomeStats.NONE
+            scope.personIds != null -> people.filter { it.id in scope.personIds }
+                .fold(IncomeStats.NONE) { total, person ->
+                    total + IncomeStats(person.grossYearlyIncomeMinor, person.netYearlyIncomeMinor)
+                }
             else -> people.fold(IncomeStats.NONE) { total, person ->
                 total + IncomeStats(person.grossYearlyIncomeMinor, person.netYearlyIncomeMinor)
             }
