@@ -74,9 +74,25 @@ object StatementOwner {
         if (heading.isBlank()) return null
         val words = heading.split(' ').filter { it.isNotBlank() }.toSet()
 
+        // A name this person has confirmed before settles it outright: it
+        // was learned from one of their own statements.
+        val learned = people.filter { person -> knownAs(person, words) }
+        learned.singleOrNull()?.let { return it }
+
         val matched = people.filter { person -> names(person, words) }
         return matched.singleOrNull()
     }
+
+    /** True when every word of a name learned for this person is on the page. */
+    private fun knownAs(person: PersonEntity, words: Set<String>): Boolean =
+        person.knownStatementNames.any { printed ->
+            val parts = TransactionFingerprint.normaliseDescription(printed)
+                .split(' ')
+                .filter { it.isNotBlank() && it !in TITLES }
+            parts.isNotEmpty() && parts.all { it in words }
+        }
+
+    private val TITLES = setOf("mr", "mrs", "miss", "ms", "dr", "mx", "sir", "prof")
 
     /** True when both the surname and the first initial are on the page. */
     private fun names(person: PersonEntity, words: Set<String>): Boolean {

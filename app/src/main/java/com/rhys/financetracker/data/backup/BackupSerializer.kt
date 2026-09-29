@@ -48,6 +48,7 @@ class BackupSerializer @Inject constructor() {
         putOpt("notes", person.notes)
         putOpt("grossYearlyIncomeMinor", person.grossYearlyIncomeMinor)
         putOpt("netYearlyIncomeMinor", person.netYearlyIncomeMinor)
+        putOpt("statementNames", person.statementNames)
         put("isArchived", person.isArchived)
         put("createdAt", person.createdAt)
         put("updatedAt", person.updatedAt)
@@ -62,6 +63,7 @@ class BackupSerializer @Inject constructor() {
         notes = json.optStringOrNull("notes"),
         grossYearlyIncomeMinor = json.optLongOrNull("grossYearlyIncomeMinor"),
         netYearlyIncomeMinor = json.optLongOrNull("netYearlyIncomeMinor"),
+        statementNames = json.optStringOrNull("statementNames"),
         isArchived = json.optBoolean("isArchived", false),
         createdAt = json.optLong("createdAt", System.currentTimeMillis()),
         updatedAt = json.optLong("updatedAt", System.currentTimeMillis()),

@@ -215,6 +215,7 @@ fun PersonHubScreen(
     onBack: () -> Unit,
     onEditDetails: (Long) -> Unit,
     onOpenAccount: (Long) -> Unit,
+    onImportStatement: (Long) -> Unit,
     viewModel: PersonHubViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -304,6 +305,32 @@ fun PersonHubScreen(
                             modifier = Modifier.fillMaxWidth(),
                         ) { Text(if (income.hasAny) "Add a pay rise" else "Add their pay") }
                     }
+                }
+            }
+
+            // --------------------------------------------------- statements
+            item {
+                SectionCard(title = "Statements", subtitle = "Checked against their name") {
+                    Text(
+                        text = "The name on the statement is checked against " +
+                            "${person?.name ?: "theirs"}. If it's someone else's, you're " +
+                            "told and can add it to theirs, or start a new person.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    person?.knownStatementNames?.takeIf { it.isNotEmpty() }?.let { names ->
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            text = "Also recognised as: ${names.joinToString(", ")}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Button(
+                        onClick = { person?.let { onImportStatement(it.id) } },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Import a statement") }
                 }
             }
 

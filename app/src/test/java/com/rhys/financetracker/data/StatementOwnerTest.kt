@@ -98,4 +98,32 @@ class StatementOwnerTest {
         assertNull(StatementOwner.detect(emptyList(), household))
         assertNull(StatementOwner.detect(nationwide("MR R M W EVANS"), emptyList()))
     }
+
+    @Test
+    fun `a name confirmed once is recognised from then on`() {
+        // Hannah is in the app as just "Hannah", so "MRS H JONES" cannot be
+        // worked out from her name. Once somebody says that statement is
+        // hers, the app remembers the name.
+        val hannah = person(2L, "Hannah")
+        assertNull(StatementOwner.detect(nationwide("MRS H JONES"), listOf(hannah)))
+
+        val learned = hannah.withStatementName("MRS H JONES")
+        assertEquals(listOf("MRS H JONES"), learned.knownStatementNames)
+        assertEquals(
+            "Hannah",
+            StatementOwner.detect(nationwide("MRS H JONES"), listOf(learned))?.name,
+        )
+        // Remembering it twice keeps one copy.
+        assertEquals(learned, learned.withStatementName("mrs h jones"))
+    }
+
+    @Test
+    fun `a learned name wins over a guess from the surname`() {
+        val rhys = person(1L, "Rhys Evans")
+        val other = person(4L, "Hannah Jones").withStatementName("MRS H JONES")
+        assertEquals(
+            "Hannah Jones",
+            StatementOwner.detect(nationwide("MRS H JONES"), listOf(rhys, other))?.name,
+        )
+    }
 }

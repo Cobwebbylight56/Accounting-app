@@ -49,6 +49,10 @@ class ImportViewModel @Inject constructor(
     private val _state = MutableStateFlow(ImportState())
     val state: StateFlow<ImportState> = _state.asStateFlow()
 
+    /** The people a statement can be said to belong to. */
+    val people: StateFlow<List<PersonEntity>> = peopleRepository.observeActive()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     /** Offered when filing a statement, so the rows land on the right account. */
     val accounts: StateFlow<List<AccountOption>> = accountRepository.observeActiveOptions()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -76,6 +80,7 @@ class ImportViewModel @Inject constructor(
             _state.value = _state.value.copy(statementKind = kind)
             val people = peopleRepository.activePeople()
             val owner = if (lines.isEmpty()) null else StatementOwner.detect(lines, people)
+            _state.value = _state.value.copy(printedName = StatementOwner.nameOnStatement(lines))
             if (owner == null) {
                 // Nobody here is called that. Worth saying: staying quiet
                 // looked exactly like not having read the statement at all,
@@ -115,9 +120,10 @@ class ImportViewModel @Inject constructor(
      * is made, already set aside.
      */
     fun createAccountForStatement() {
-        val found = _state.value.statementKind ?: return
+        val found = _state.value.statementKind
+            ?: StatementKind.Found(StatementKind.CURRENT, productName = null)
         viewModelScope.launch {
-            val ownerName = _state.value.statementOwnerName
+            val ownerName = _state.value.filingFor
             val owner = peopleRepository.activePeople()
                 .firstOrNull { it.name == ownerName }
                 ?: peopleRepository.activePeople().singleOrNull()
@@ -164,9 +170,15 @@ class ImportViewModel @Inject constructor(
                     val firstSheet = workbook.sheets.firstOrNull()
                     val detected = firstSheet?.let(importer::detectHouseholdLayout)
                     val statement = firstSheet?.let { importer.detectStatement(it) }
+                    val before = _state.value
                     _state.value = ImportState(
                         step = if (firstSheet == null) ImportStep.CHOOSE_FILE else ImportStep.MAP,
                         sourceUri = uri,
+                        // Where the import was started from survives the
+                        // file being opened: the account, or the person.
+                        preselectedAccountId = before.preselectedAccountId,
+                        expectedPersonId = before.expectedPersonId,
+                        expectedPersonName = before.expectedPersonName,
                         workbook = workbook,
                         selectedSheetIndex = 0,
                         detectedLayout = detected,
@@ -507,16 +519,65 @@ class ImportViewModel @Inject constructor(
                     colorHex = DefaultData.PALETTE.random(),
                 ),
             )
+            if (result is AppResult.Success) {
+                peopleRepository.rememberStatementName(result.data, name)
+            }
             _state.value = _state.value.copy(
                 unknownOwnerName = null,
                 statementOwnerName = tidied.takeIf { result is AppResult.Success },
+                filingPersonName = tidied.takeIf { result is AppResult.Success },
+                preselectedAccountId = null,
                 error = (result as? AppResult.Failure)?.message,
             )
         }
     }
 
+    /**
+     * The person whose page the import was started from.
+     *
+     * Their name is checked against the one on the statement: if it is
+     * somebody else's, the card says so and offers to file it under them.
+     */
+    fun expectPerson(personId: Long?) {
+        if (personId == null || personId == _state.value.expectedPersonId) return
+        viewModelScope.launch {
+            val person = peopleRepository.get(personId) ?: return@launch
+            _state.value = _state.value.copy(
+                expectedPersonId = person.id,
+                expectedPersonName = person.name,
+            )
+        }
+    }
+
+    /**
+     * Files the statement under [personName], whoever it seemed to be for.
+     *
+     * When the statement carried a name the app did not recognise, that name
+     * is remembered for this person, so their next statement is recognised
+     * without asking.
+     */
+    fun fileUnder(personName: String) {
+        val current = _state.value
+        viewModelScope.launch {
+            val person = peopleRepository.activePeople().firstOrNull { it.name == personName }
+            val printed = current.printedName
+            if (person != null && printed != null && current.statementOwnerName == null) {
+                peopleRepository.rememberStatementName(person.id, printed)
+            }
+            _state.value = _state.value.copy(
+                filingPersonName = personName,
+                unknownOwnerName = if (person != null) null else current.unknownOwnerName,
+                preselectedAccountId = null,
+            )
+        }
+    }
+
     fun reset() {
-        _state.value = ImportState()
+        val before = _state.value
+        _state.value = ImportState(
+            expectedPersonId = before.expectedPersonId,
+            expectedPersonName = before.expectedPersonName,
+        )
     }
 
     /**
@@ -602,6 +663,16 @@ data class ImportState(
 
     /** A name read off the statement that belongs to nobody in the app yet. */
     val unknownOwnerName: String? = null,
+
+    /** The name as printed on the statement, whether or not anybody matched it. */
+    val printedName: String? = null,
+
+    /** The person whose page this import was started from, if any. */
+    val expectedPersonId: Long? = null,
+    val expectedPersonName: String? = null,
+
+    /** Who the user has said the statement is for, settling any doubt. */
+    val filingPersonName: String? = null,
     /** Text pulled from a PDF whose layout was not recognised, for showing. */
     val unreadablePdfText: String? = null,
     val usingDetectedLayout: Boolean = false,
@@ -620,6 +691,28 @@ data class ImportState(
 
     /** True when the sheet can be imported whole without any manual mapping. */
     val canAutoImport: Boolean get() = detectedLayout?.isUsable == true
+
+    /**
+     * Whose accounts the statement is offered for: what the user said, else
+     * the name on the statement, else the person it was opened from.
+     */
+    val filingFor: String?
+        get() = filingPersonName
+            ?: statementOwnerName.takeIf { !ownerConflict }
+            ?: expectedPersonName
+            ?: statementOwnerName
+
+    /**
+     * True when the statement was opened from one person's page but the
+     * name on it is somebody else's — worth saying before it is filed.
+     */
+    val ownerConflict: Boolean
+        get() = filingPersonName == null && expectedPersonName != null &&
+            statementOwnerName != null && statementOwnerName != expectedPersonName
+
+    /** True when the name on the statement belongs to nobody, and nobody has been picked. */
+    val ownerUnknown: Boolean
+        get() = filingPersonName == null && unknownOwnerName != null
 
     /** True when the sheet is a bank statement and can be read as it stands. */
     val canImportStatement: Boolean get() = detectedStatement != null

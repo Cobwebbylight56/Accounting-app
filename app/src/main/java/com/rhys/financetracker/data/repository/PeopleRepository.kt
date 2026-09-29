@@ -51,6 +51,16 @@ class PeopleRepository @Inject constructor(
         }
 
     /** Copies a person, so a second child can be set up from the first. */
+    /**
+     * Teaches the app that statements addressed to [printed] are [personId]'s,
+     * so the next one is recognised without asking.
+     */
+    suspend fun rememberStatementName(personId: Long, printed: String) {
+        val person = personDao.getById(personId) ?: return
+        val updated = person.withStatementName(printed)
+        if (updated != person) personDao.update(updated)
+    }
+
     suspend fun duplicate(id: Long): AppResult<Long> =
         runCatchingApp("Could not duplicate this person") {
             val original = personDao.getById(id) ?: error("That person no longer exists")

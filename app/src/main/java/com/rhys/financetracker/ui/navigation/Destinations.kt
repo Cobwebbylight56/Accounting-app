@@ -68,6 +68,9 @@ object Routes {
      */
     fun importForAccount(accountId: Long = NEW_ID): String = "$IMPORT?$ARG_ACCOUNT_ID=$accountId"
 
+    /** The importer, started from a person's page: their name is checked against the statement's. */
+    fun importForPerson(personId: Long): String = "$IMPORT?$ARG_PERSON_ID=$personId"
+
     /** Route patterns, with the argument placeholder Navigation expects. */
     const val TRANSACTION_EDIT_PATTERN = "$TRANSACTION_EDIT/{$ARG_ID}"
     const val ACCOUNT_EDIT_PATTERN = "$ACCOUNT_EDIT/{$ARG_ID}"
@@ -80,7 +83,9 @@ object Routes {
 
     /** Optional so the plain `import` route still matches. */
     const val ARG_ACCOUNT_ID = "accountId"
-    const val IMPORT_PATTERN = "$IMPORT?$ARG_ACCOUNT_ID={$ARG_ACCOUNT_ID}"
+    const val ARG_PERSON_ID = "personId"
+    const val IMPORT_PATTERN =
+        "$IMPORT?$ARG_ACCOUNT_ID={$ARG_ACCOUNT_ID}&$ARG_PERSON_ID={$ARG_PERSON_ID}"
 }
 
 /** The five tabs along the bottom. */

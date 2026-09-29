@@ -327,6 +327,27 @@ names and post gets forwarded, so two matches means it asks rather than guesses.
 Matching is on the **surname plus a first initial**, because statements almost
 never print a full first name.
 
+### Importing from a person's page
+
+Each person's page has **Import a statement**. The name printed on the
+statement is checked against that person:
+
+* **It matches** — "✓ The name on the statement matches Rhys", and only
+  Rhys's accounts are offered.
+* **It's somebody else's** — "This statement is addressed to Hannah, not
+  Rhys", with **Add it to Hannah's accounts** or **It's Rhys's — keep it
+  here**. Nothing can be read in until you choose.
+* **It's somebody the app doesn't know** — **Start a new person for them**
+  (made from the name on the statement, which you can edit later), or pick the
+  person it belongs to. Picking someone **teaches the app that name**: their
+  next statement addressed "MRS H JONES" is recognised as theirs without
+  asking. A person's page lists the names they are recognised by.
+* **No name could be read** — it says whose accounts it's going to, with
+  **Someone else's?** to change it.
+
+If the person has no account of the statement's kind, it offers to add one
+for them there and then.
+
 ### What kind of statement is it
 
 The importer also reads **what kind of account** the statement is for, from

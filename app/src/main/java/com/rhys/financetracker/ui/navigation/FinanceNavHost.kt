@@ -294,6 +294,7 @@ private fun NavGraphBuilder.editorDestinations(
             onBack = { navController.popBackStack() },
             onEditDetails = { navController.navigate(Routes.personEdit(it)) },
             onOpenAccount = { navController.navigate(Routes.accountEdit(it)) },
+            onImportStatement = { navController.navigate(Routes.importForPerson(it)) },
         )
     }
 
@@ -359,9 +360,14 @@ private fun NavGraphBuilder.editorDestinations(
                 type = NavType.LongType
                 defaultValue = Routes.NEW_ID
             },
+            navArgument(Routes.ARG_PERSON_ID) {
+                type = NavType.LongType
+                defaultValue = Routes.NEW_ID
+            },
         ),
     ) { entry ->
         val accountId = entry.arguments?.getLong(Routes.ARG_ACCOUNT_ID) ?: Routes.NEW_ID
+        val personId = entry.arguments?.getLong(Routes.ARG_PERSON_ID) ?: Routes.NEW_ID
         ImportScreen(
             onBack = { navController.popBackStack() },
             // Unwind to the dashboard rather than navigating to it.
@@ -375,6 +381,7 @@ private fun NavGraphBuilder.editorDestinations(
                 }
             },
             preselectedAccountId = accountId.takeIf { it != Routes.NEW_ID },
+            expectedPersonId = personId.takeIf { it != Routes.NEW_ID },
             incomingFile = importFile,
             onIncomingFileHandled = onImportFileHandled,
         )

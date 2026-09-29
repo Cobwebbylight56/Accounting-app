@@ -178,7 +178,11 @@ class PersonEditViewModel @Inject constructor(
                 )
                 return@launch
             }
-            val entity = PersonEntity(
+            // Starting from what is stored keeps everything this form does
+            // not show — the names learned from statements, when they were
+            // added — rather than quietly wiping it on every save.
+            val stored = if (personId == Routes.NEW_ID) null else peopleRepository.get(personId)
+            val entity = (stored ?: PersonEntity(name = "", colorHex = current.colorHex)).copy(
                 id = if (personId == Routes.NEW_ID) 0L else personId,
                 name = current.name.trim(),
                 colorHex = current.colorHex,

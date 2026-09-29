@@ -3,7 +3,7 @@
 SQLite via Room. The schema is exported to `app/schemas/` on every build, so
 every change is reviewable and every migration is testable.
 
-Current version: **6**.
+Current version: **7**.
 
 | Version | Change |
 |---|---|
@@ -13,6 +13,7 @@ Current version: **6**.
 | 4 | `accounts.counts_as_savings` — whether an account counts under Saved rather than Available, overriding its type. Nullable on purpose: null means "follow the type", which is true of every account that existed before there was a way to say otherwise. |
 | 5 | The savings redesign. `accounts.counts_as_savings` is replaced by `accounts.holding` (`SPEND`, `SET_ASIDE`, `OWED`) — the one answer to where an account's money counts; the table is rebuilt, since older SQLite cannot drop a column. Each account keeps the answer it was effectively giving, and one whose name says savings is set aside. `AccountType.CASH` is removed: cash accounts become rows in the new `cash_pot_entries` table, and transfers between them and bank accounts become cash withdrawals or paying-ins on the bank side, so no bank balance moves. Rows the old importer filed under an ordinary category called "Savings" or "Cash" are pointed at the real one, and movements on set-aside accounts other than interest are filed as savings. `people` gains `gross_yearly_income_minor` and `net_yearly_income_minor`. |
 | 6 | `income_changes` — pay history: each pay rise, yearly review or new job, with pay before and after, the day it starts, and whether it has been applied. A person's own pay columns always hold what they earn now; a change dated later waits here until its day. Purely additive. |
+| 7 | `people.statement_names` — names a person's statements have been addressed to, learned when somebody confirms a statement is theirs, separated by `|`. Nullable and additive. |
 
 ---
 
@@ -71,6 +72,7 @@ Everyone whose money is being tracked, plus a shared "Joint" record.
 | `notes` | TEXT? | |
 | `gross_yearly_income_minor` | INTEGER? | Yearly pay before tax, for statistics |
 | `net_yearly_income_minor` | INTEGER? | Yearly take-home after tax |
+| `statement_names` | TEXT? | Names learned from their statements, `|`-separated |
 | `is_archived` | INTEGER | Hidden from pickers, kept in history |
 | `created_at`, `updated_at` | INTEGER | Epoch milliseconds |
 

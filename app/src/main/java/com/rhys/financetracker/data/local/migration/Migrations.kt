@@ -311,7 +311,16 @@ object Migrations {
         )
     }
 
+    /**
+     * The names each person's statements are addressed to, learned when a
+     * statement is confirmed as theirs. Nullable and additive.
+     */
+    val MIGRATION_6_7 = Migration(6, 7) { db ->
+        db.execSQL("ALTER TABLE people ADD COLUMN statement_names TEXT")
+    }
+
     /** Registered with Room in `di/DatabaseModule.kt`. */
-    val ALL: Array<Migration> =
-        arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+    val ALL: Array<Migration> = arrayOf(
+        MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+    )
 }

@@ -25,6 +25,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.UploadFile
 import androidx.compose.material3.Button
+import com.rhys.financetracker.ui.components.ColorDot
+import com.rhys.financetracker.data.local.entity.PersonEntity
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -86,6 +89,8 @@ fun ImportScreen(
     onBack: () -> Unit,
     onFinished: () -> Unit,
     preselectedAccountId: Long? = null,
+    /** The person whose page the import was started from. */
+    expectedPersonId: Long? = null,
     incomingFile: Uri? = null,
     onIncomingFileHandled: () -> Unit = {},
     viewModel: ImportViewModel = hiltViewModel(),
@@ -96,6 +101,12 @@ fun ImportScreen(
     // has nothing left to ask.
     LaunchedEffect(preselectedAccountId) {
         viewModel.preselectAccount(preselectedAccountId)
+    }
+
+    // Arrived from a person's page: the name on the statement is checked
+    // against theirs.
+    LaunchedEffect(expectedPersonId) {
+        viewModel.expectPerson(expectedPersonId)
     }
 
     // Opened from a download or the share sheet: read it without making the
@@ -303,17 +314,18 @@ private fun DetectedStatementCard(state: ImportState, viewModel: ImportViewModel
     val allAccounts by viewModel.accounts.collectAsStateWithLifecycle()
     val found = state.statementKind
     var showEveryAccount by rememberSaveable { mutableStateOf(false) }
-    // Only accounts of the statement's own kind, and the named person's first.
-    // The picker used to list every account in the household, which is how a
-    // saver's statement ended up on a current account.
+    val people by viewModel.people.collectAsStateWithLifecycle()
+    var pickingPerson by rememberSaveable { mutableStateOf(false) }
+    // Whose accounts are offered: the person the statement is for, as best
+    // it is known. Only theirs — making sure it lands on the right person is
+    // the point — and only of the statement's own kind, which is what stops
+    // a saver's statement being filed against a current account.
+    val whom = state.filingFor
     val ofThisKind = allAccounts.filter { found == null || it.holding == found.kind.holding }
-    val theirs = ofThisKind.filter {
-        state.statementOwnerName == null || it.personName == state.statementOwnerName
-    }
+    val theirsOfKind = ofThisKind.filter { whom == null || it.personName == whom }
     val accounts = when {
         showEveryAccount -> allAccounts
-        theirs.isNotEmpty() -> theirs
-        else -> ofThisKind
+        else -> theirsOfKind
     }
     val preselected = allAccounts.firstOrNull { it.id == state.preselectedAccountId }
     var chosen by remember(accounts, preselected) {
@@ -329,33 +341,18 @@ private fun DetectedStatementCard(state: ImportState, viewModel: ImportViewModel
                 "the app are skipped, so importing overlapping statements is safe.",
             style = MaterialTheme.typography.bodyMedium,
         )
-        // The name at the top of the statement, when it settles whose it is.
-        // Said rather than acted on: a joint account carries both names, and
-        // post gets forwarded.
-        state.statementOwnerName?.let { owner ->
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = "The name on this statement is $owner's" +
-                    if (preselected != null) ", so their account is chosen below." else ".",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        }
-        // A name it read that belongs to nobody here. Saying nothing looked
-        // exactly like not having read the statement, and the answer — add
-        // them — is one tap.
-        state.unknownOwnerName?.let { printed ->
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = "This statement is addressed to $printed, and nobody in the app " +
-                    "has that name. Adding them means their accounts can sit under " +
-                    "their own name.",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            TextButton(onClick = viewModel::addPersonFromStatement) {
-                Text("Add them as a person")
-            }
-        }
+        Spacer(Modifier.height(10.dp))
+        WhoseStatement(
+            state = state,
+            people = people,
+            pickingPerson = pickingPerson,
+            onPickPerson = { pickingPerson = !pickingPerson },
+            onFileUnder = { name ->
+                viewModel.fileUnder(name)
+                pickingPerson = false
+            },
+            onNewPerson = viewModel::addPersonFromStatement,
+        )
         found?.let { kind ->
             Spacer(Modifier.height(8.dp))
             Text(
@@ -365,14 +362,15 @@ private fun DetectedStatementCard(state: ImportState, viewModel: ImportViewModel
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
-        // Nothing of the right kind to put it in: offer to make exactly that,
-        // under the person it is addressed to, rather than letting it be
-        // filed against whatever account happens to exist.
-        if (found != null && ofThisKind.isEmpty() && !showEveryAccount) {
+        // Nothing of the right kind under this person: offer to make exactly
+        // that, under them, rather than letting it be filed against whatever
+        // account happens to exist.
+        if (theirsOfKind.isEmpty() && !showEveryAccount && !state.ownerConflict && !state.ownerUnknown) {
             Spacer(Modifier.height(8.dp))
-            val whose = state.statementOwnerName?.let { "$it's " }.orEmpty()
+            val whose = whom?.let { "$it's " }.orEmpty()
+            val kindName = found?.kind?.displayName ?: "account"
             Text(
-                text = "There's no ${whose}${found.kind.displayName} in the app yet.",
+                text = "There's no ${whose}$kindName in the app yet.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error,
             )
@@ -381,7 +379,12 @@ private fun DetectedStatementCard(state: ImportState, viewModel: ImportViewModel
                 enabled = !state.isBusy,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Add ${found.productName ?: found.kind.accountType.displayName}")
+                Text(
+                    "Add " + (
+                        found?.productName ?: found?.kind?.accountType?.displayName
+                            ?: "a current account"
+                        ) + (whom?.let { " for $it" } ?: ""),
+                )
             }
         }
         Spacer(Modifier.height(12.dp))
@@ -394,7 +397,7 @@ private fun DetectedStatementCard(state: ImportState, viewModel: ImportViewModel
             optionColor = { colorFromHex(it.colorHex) },
             placeholder = if (accounts.isEmpty()) "No accounts of this kind" else "Choose an account",
         )
-        if (found != null || state.statementOwnerName != null) {
+        if (found != null || whom != null) {
             TextButton(onClick = { showEveryAccount = !showEveryAccount }) {
                 Text(if (showEveryAccount) "Only matching accounts" else "Show every account")
             }
@@ -410,7 +413,8 @@ private fun DetectedStatementCard(state: ImportState, viewModel: ImportViewModel
         Spacer(Modifier.height(14.dp))
         Button(
             onClick = { viewModel.useDetectedStatement(chosen) },
-            enabled = chosen != null && !state.isBusy,
+            // Not while it is still unsettled whose statement this is.
+            enabled = chosen != null && !state.isBusy && !state.ownerConflict,
             modifier = Modifier.fillMaxWidth().height(52.dp),
         ) {
             Text("Read the statement")
@@ -422,6 +426,109 @@ private fun DetectedStatementCard(state: ImportState, viewModel: ImportViewModel
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+/**
+ * Whose statement this is, and what to do if it is not who it was expected
+ * to be.
+ *
+ * Four cases: the name on it matches (said, with a tick); it names somebody
+ * else in the app (offer to file it under them, or keep it here); it names
+ * nobody the app knows (start a new person, or say whose it is — which
+ * teaches the app that name); or no name could be read (say whose it is
+ * going under, with a way to change it).
+ */
+@Composable
+private fun WhoseStatement(
+    state: ImportState,
+    people: List<PersonEntity>,
+    pickingPerson: Boolean,
+    onPickPerson: () -> Unit,
+    onFileUnder: (String) -> Unit,
+    onNewPerson: () -> Unit,
+) {
+    val owner = state.statementOwnerName
+    val expected = state.expectedPersonName
+    when {
+        state.ownerConflict && owner != null && expected != null -> {
+            Text(
+                text = "This statement is addressed to $owner, not $expected.",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+            Spacer(Modifier.height(6.dp))
+            Button(onClick = { onFileUnder(owner) }, modifier = Modifier.fillMaxWidth()) {
+                Text("Add it to $owner's accounts")
+            }
+            OutlinedButton(onClick = { onFileUnder(expected) }, modifier = Modifier.fillMaxWidth()) {
+                Text("It's $expected's — keep it here")
+            }
+        }
+
+        state.ownerUnknown -> {
+            val printed = state.unknownOwnerName.orEmpty()
+            Text(
+                text = "This statement is addressed to $printed, who isn't in the app yet.",
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Spacer(Modifier.height(6.dp))
+            Button(onClick = onNewPerson, modifier = Modifier.fillMaxWidth()) {
+                Text("Start a new person for them")
+            }
+            Text(
+                text = "Or, if it's someone already here under another name, pick them — " +
+                    "the app will recognise \"$printed\" as them from now on:",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            PersonChips(people, expected, onFileUnder)
+        }
+
+        else -> {
+            val whom = state.filingFor
+            Text(
+                text = when {
+                    whom == null -> "No name could be read from this statement. Whose is it?"
+                    owner == whom && state.filingPersonName == null ->
+                        "✓ The name on the statement matches $whom."
+                    owner == null && state.filingPersonName == null ->
+                        "Adding to $whom's accounts. No name could be read from the " +
+                            "statement to check."
+                    else -> "Adding to $whom's accounts."
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (owner == whom && whom != null) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+            )
+            if (whom == null || pickingPerson) {
+                PersonChips(people, expected, onFileUnder)
+            } else {
+                TextButton(onClick = onPickPerson) { Text("Someone else's?") }
+            }
+        }
+    }
+}
+
+/** A chip per person, for saying whose a statement is. */
+@Composable
+private fun PersonChips(people: List<PersonEntity>, first: String?, onPick: (String) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        people.sortedByDescending { it.name == first }.forEach { person ->
+            AssistChip(
+                onClick = { onPick(person.name) },
+                label = { Text("It's ${person.name}'s") },
+                leadingIcon = { ColorDot(colorFromHex(person.colorHex)) },
+            )
+        }
     }
 }
 
