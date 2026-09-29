@@ -168,6 +168,16 @@ data class ImportCandidate(
      * beside it. See [StatementPriority].
      */
     val corrects: StatementCorrection? = null,
+    /**
+     * Another of the person's own accounts this row moves money to or from —
+     * their saver, loan or card. Set, the row is saved as a transfer, so
+     * both accounts move: the saver goes up, the loan comes down. Null for
+     * ordinary spending and income.
+     */
+    val transferAccountId: Long? = null,
+    val transferAccountName: String? = null,
+    /** Why the row is not being added even though it is new here, for the review screen. */
+    val alreadyNote: String? = null,
     /** Set when the row cannot be imported; it is shown but not selected. */
     val problem: String? = null,
     val isSelected: Boolean = true,

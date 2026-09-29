@@ -97,6 +97,16 @@ class TransactionRepository @Inject constructor(
     ): Flow<List<MonthTotals>> =
         transactionDao.observeMonthlyTotals(start, end, accountId, personIds == null, personIds.orEmpty().toList())
 
+    /** Money paid off loans and mortgages; see [TransactionDao.observeLoanPayments]. */
+    fun observeLoanPayments(
+        start: LocalDate,
+        end: LocalDate,
+        accountId: Long? = null,
+        personIds: Set<Long>? = null,
+    ): Flow<Long> = transactionDao.observeLoanPayments(
+        start, end, accountId, personIds == null, personIds.orEmpty().toList(),
+    )
+
     fun observePotFlowByPerson(
         kind: CategoryKind,
         start: LocalDate,

@@ -403,6 +403,15 @@ internal fun MonthList(state: DashboardState) {
         MonthRow(Icons.Outlined.South, "Money in", month, summary.monthIncomeMinor, colors.tileBlue)
         MonthRow(Icons.Outlined.North, "Money out", month, summary.monthExpenseMinor, colors.tileBlush)
         MonthRow(Icons.Outlined.Savings, "Put aside", month, summary.savingsNetMinor, colors.tileSage)
+        if (summary.loanPaymentsMinor != 0L) {
+            MonthRow(
+                Icons.Outlined.CreditCard,
+                "Paid off loans",
+                month,
+                summary.loanPaymentsMinor,
+                colors.tileBlush,
+            )
+        }
         MonthRow(
             Icons.Outlined.AccountBalance,
             "Left to spend",

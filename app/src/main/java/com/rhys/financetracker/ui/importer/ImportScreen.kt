@@ -25,6 +25,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.UploadFile
 import androidx.compose.material3.Button
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.AlertDialog
 import com.rhys.financetracker.ui.components.ColorDot
 import com.rhys.financetracker.data.local.entity.PersonEntity
 import androidx.compose.material3.AssistChip
@@ -875,6 +879,8 @@ private fun WrongAccountWarning(state: ImportState, viewModel: ImportViewModel) 
 
 @Composable
 private fun ReviewStep(state: ImportState, viewModel: ImportViewModel) {
+    val targets by viewModel.ownTargets.collectAsStateWithLifecycle()
+    var choosingFor by remember { mutableStateOf<ImportCandidate?>(null) }
     Column(modifier = Modifier.fillMaxSize()) {
         WrongAccountWarning(state = state, viewModel = viewModel)
         Row(
@@ -910,6 +916,14 @@ private fun ReviewStep(state: ImportState, viewModel: ImportViewModel) {
                             "already had rather than add a second copy",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (state.moveCount > 0) {
+                    Text(
+                        text = "${state.moveCount} move money to or from your own accounts — " +
+                            "savers go up, loans come down",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
                     )
                 }
                 if (state.problemCount > 0) {
@@ -967,6 +981,11 @@ private fun ReviewStep(state: ImportState, viewModel: ImportViewModel) {
                     candidate = candidate,
                     onToggle = { viewModel.toggleCandidate(candidate.id) },
                     onFlip = { viewModel.toggleDirection(candidate.id) },
+                    onChooseDestination = if (targets.isNotEmpty()) {
+                        { choosingFor = candidate }
+                    } else {
+                        null
+                    },
                 )
             }
         }
@@ -986,6 +1005,64 @@ private fun ReviewStep(state: ImportState, viewModel: ImportViewModel) {
             ) { Text("Import") }
         }
     }
+
+    choosingFor?.let { candidate ->
+        val out = candidate.transactionType != TransactionType.INCOME
+        AlertDialog(
+            onDismissRequest = { choosingFor = null },
+            title = { Text(if (out) "Where did this go?" else "Where did this come from?") },
+            text = {
+                Column {
+                    Text(
+                        text = candidate.name,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    DestinationOption(
+                        label = if (out) "Spending — it's gone" else "Income — money earned",
+                        selected = candidate.transferAccountId == null,
+                        onClick = {
+                            viewModel.setDestination(candidate.id, null)
+                            choosingFor = null
+                        },
+                    )
+                    targets.forEach { target ->
+                        DestinationOption(
+                            label = (if (out) "Into " else "From ") + target.name +
+                                " · " + target.type.displayName,
+                            selected = candidate.transferAccountId == target.id,
+                            onClick = {
+                                viewModel.setDestination(candidate.id, target)
+                                choosingFor = null
+                            },
+                        )
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = "The app remembers this payee for next time.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
+            confirmButton = { TextButton(onClick = { choosingFor = null }) { Text("Close") } },
+        )
+    }
+}
+
+@Composable
+private fun DestinationOption(label: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(selected = selected, onClick = onClick)
+        Text(label, style = MaterialTheme.typography.bodyLarge)
+    }
 }
 
 @Composable
@@ -993,6 +1070,7 @@ private fun CandidateRow(
     candidate: ImportCandidate,
     onToggle: () -> Unit,
     onFlip: () -> Unit,
+    onChooseDestination: (() -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
@@ -1003,13 +1081,37 @@ private fun CandidateRow(
             onCheckedChange = { onToggle() },
             enabled = candidate.isImportable,
         )
-        Column(modifier = Modifier.weight(1f)) {
+        val canChoose = onChooseDestination != null && candidate.isImportable &&
+            candidate.target == ImportTarget.TRANSACTION && !candidate.isAlreadyPresent
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .then(if (canChoose) Modifier.clickable { onChooseDestination?.invoke() } else Modifier),
+        ) {
             Text(
                 text = candidate.name,
                 style = MaterialTheme.typography.bodyLarge,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            // Where the money went, when it went to one of their own accounts
+            // — the line that says the saver will go up or the loan come down.
+            candidate.transferAccountName?.let { other ->
+                val out = candidate.transactionType != TransactionType.INCOME
+                Text(
+                    text = if (out) "→ into $other" else "← from $other",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            candidate.alreadyNote?.let { note ->
+                Text(
+                    text = note,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Text(
                 text = candidate.problem
                     // A correction changes an entry that is already there, so

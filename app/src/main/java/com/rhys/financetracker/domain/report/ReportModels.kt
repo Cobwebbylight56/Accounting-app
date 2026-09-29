@@ -150,6 +150,9 @@ data class FinancialSummary(
     /** What is in the household cash pot; part of [totalSavingsMinor] when counted. */
     val cashPotMinor: Long = 0L,
 
+    /** Money paid off loans and mortgages this month: not spent, but not there to spend. */
+    val loanPaymentsMinor: Long = 0L,
+
     /** Cash out of a machine this month, and cash paid back in at a counter. */
     val cashOutMinor: Long = 0L,
     val cashInMinor: Long = 0L,
@@ -158,13 +161,14 @@ data class FinancialSummary(
 
     /**
      * Money genuinely free to spend: what has come in this month, less what has
-     * gone out, less what was put aside, less the bills still to be paid
+     * gone out, less what was put aside and paid off loans, less the bills still to be paid
      * before the month ends.
      *
      * Savings are taken off here rather than counted as spending: £200 moved
      * to a saver is not spent, but it is no longer there to spend either.
      */
-    val disposableMinor: Long get() = monthNetMinor - savingsNetMinor - committedRecurringMinor
+    val disposableMinor: Long
+        get() = monthNetMinor - savingsNetMinor - loanPaymentsMinor - committedRecurringMinor
 
     /** What this month actually added to savings; negative when it drew them down. */
     val savingsNetMinor: Long get() = savingsInMinor - savingsOutMinor

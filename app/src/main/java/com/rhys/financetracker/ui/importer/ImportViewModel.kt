@@ -13,6 +13,7 @@ import com.rhys.financetracker.data.importer.ImportOutcome
 import com.rhys.financetracker.data.importer.ImportTarget
 import com.rhys.financetracker.data.importer.SheetData
 import com.rhys.financetracker.data.importer.SpreadsheetImporter
+import com.rhys.financetracker.data.importer.OwnAccountMatcher
 import com.rhys.financetracker.data.importer.StatementKind
 import com.rhys.financetracker.data.importer.StatementOwner
 import com.rhys.financetracker.data.importer.WorkbookData
@@ -48,6 +49,32 @@ class ImportViewModel @Inject constructor(
 
     private val _state = MutableStateFlow(ImportState())
     val state: StateFlow<ImportState> = _state.asStateFlow()
+
+    /** The person's other accounts a row can be moved to; loaded with the statement. */
+    private val _ownTargets = MutableStateFlow<List<OwnAccountMatcher.Target>>(emptyList())
+    val ownTargets: StateFlow<List<OwnAccountMatcher.Target>> = _ownTargets.asStateFlow()
+
+    /**
+     * Says where one row's money went: into one of the person's own accounts
+     * ([target]), or nowhere of theirs — ordinary spending or income.
+     *
+     * Saved as a transfer, the choice teaches the importer: the next
+     * statement with this payee goes to the same account by itself.
+     */
+    fun setDestination(candidateId: String, target: OwnAccountMatcher.Target?) {
+        _state.value = _state.value.copy(
+            candidates = _state.value.candidates.map { candidate ->
+                if (candidate.id != candidateId) {
+                    candidate
+                } else {
+                    candidate.copy(
+                        transferAccountId = target?.id,
+                        transferAccountName = target?.name,
+                    )
+                }
+            },
+        )
+    }
 
     /** The people a statement can be said to belong to. */
     val people: StateFlow<List<PersonEntity>> = peopleRepository.observeActive()
@@ -248,6 +275,7 @@ class ImportViewModel @Inject constructor(
         }
         viewModelScope.launch {
             _state.value = current.copy(isBusy = true)
+            _ownTargets.value = account?.let { importer.ownAccountTargets(it.id) }.orEmpty()
             val read = importer.buildCandidatesWithDuplicates(sheet, mapping)
             // On a set-aside account every movement is money moved to or from
             // savings, other than interest. Filed any other way, the £200
@@ -716,6 +744,10 @@ data class ImportState(
 
     /** True when the sheet is a bank statement and can be read as it stands. */
     val canImportStatement: Boolean get() = detectedStatement != null
+
+    /** How many rows move money between the person's own accounts. */
+    val moveCount: Int
+        get() = candidates.count { it.isSelected && it.transferAccountId != null && !it.isAlreadyPresent }
 
     /** How many rows the import would skip because they are already recorded. */
     val alreadyPresentCount: Int get() = candidates.count { it.isAlreadyPresent }

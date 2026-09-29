@@ -165,6 +165,13 @@ data class FingerprintCount(
     @ColumnInfo(name = "occurrences") val occurrences: Int,
 )
 
+/** A transfer touching an account, used to learn which payee goes where. */
+data class TransferLink(
+    @ColumnInfo(name = "description") val description: String,
+    @ColumnInfo(name = "account_id") val accountId: Long,
+    @ColumnInfo(name = "transfer_account_id") val transferAccountId: Long?,
+)
+
 /** A payee and the category it was filed under, used to learn from past choices. */
 data class DescriptionCategory(
     @ColumnInfo(name = "description") val description: String,

@@ -182,6 +182,17 @@ class DashboardViewModel @Inject constructor(
     /** The same for cash: out of a machine, and back in at a counter. */
     private val cashThisMonth = potFlow(CategoryKind.CASH)
 
+    /** Money paid off loans this month. */
+    private val loanPaymentsThisMonth = monthFlow.flatMapLatest { (month, currentScope) ->
+        val range = DateUtils.monthRange(month)
+        transactionRepository.observeLoanPayments(
+            start = range.start,
+            end = range.endInclusive,
+            accountId = currentScope.accountId,
+            personIds = currentScope.personIds,
+        )
+    }
+
     private fun potFlow(kind: CategoryKind) = monthFlow.flatMapLatest { (month, currentScope) ->
         val range = DateUtils.monthRange(month)
         transactionRepository.observePotFlow(
@@ -288,6 +299,7 @@ class DashboardViewModel @Inject constructor(
             // empty. Opening on today's month and finding nothing looks like a
             // broken app when the entries are simply in an earlier month.
             transactionRepository.observeRecent(1),
+            loanPaymentsThisMonth,
         ),
     ) { values -> buildState(values) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DashboardState())
@@ -318,6 +330,7 @@ class DashboardViewModel @Inject constructor(
         val cashLog = values[19] as List<CashPotEntryEntity>
         val latest = (values[20] as List<TransactionWithDetails>)
             .firstOrNull()?.transaction?.date
+        val loanPayments = values[21] as Long
 
         val inScope = accountList.filter { currentScope.matches(it) }
         // The month's entries for whoever's tab this is: their own, and those
@@ -360,6 +373,7 @@ class DashboardViewModel @Inject constructor(
                 savingsInMinor = savings.intoPotMinor,
                 savingsOutMinor = savings.outOfPotMinor,
                 cashPotMinor = cashPot,
+                loanPaymentsMinor = loanPayments,
                 cashOutMinor = cash.intoPotMinor,
                 cashInMinor = cash.outOfPotMinor,
             ),

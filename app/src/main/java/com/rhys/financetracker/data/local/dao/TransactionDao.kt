@@ -24,6 +24,7 @@ import com.rhys.financetracker.data.local.projection.PersonPotFlow
 import com.rhys.financetracker.data.local.projection.PersonTotals
 import com.rhys.financetracker.data.local.projection.PotFlow
 import com.rhys.financetracker.data.local.projection.TransactionWithDetails
+import com.rhys.financetracker.data.local.projection.TransferLink
 import java.time.LocalDate
 import kotlinx.coroutines.flow.Flow
 
@@ -333,16 +334,24 @@ interface TransactionDao {
      */
     @Query(
         """
-        SELECT IFNULL(SUM(CASE WHEN t.type = 'EXPENSE' THEN t.amount_minor ELSE 0 END), 0)
-                   AS into_pot_minor,
-               IFNULL(SUM(CASE WHEN t.type = 'INCOME' THEN t.amount_minor ELSE 0 END), 0)
-                   AS out_of_pot_minor
+        SELECT IFNULL(SUM(CASE
+                   WHEN t.type = 'EXPENSE' AND c.kind = :kind
+                        AND IFNULL(a.holding, 'SPEND') <> 'SET_ASIDE' THEN t.amount_minor
+                   WHEN :kind = 'SAVING' AND t.type = 'TRANSFER'
+                        AND IFNULL(a.holding, 'SPEND') <> 'SET_ASIDE'
+                        AND d.holding = 'SET_ASIDE' THEN t.amount_minor
+                   ELSE 0 END), 0) AS into_pot_minor,
+               IFNULL(SUM(CASE
+                   WHEN t.type = 'INCOME' AND c.kind = :kind
+                        AND IFNULL(a.holding, 'SPEND') <> 'SET_ASIDE' THEN t.amount_minor
+                   WHEN :kind = 'SAVING' AND t.type = 'TRANSFER' AND a.holding = 'SET_ASIDE'
+                        AND IFNULL(d.holding, 'SPEND') <> 'SET_ASIDE' THEN t.amount_minor
+                   ELSE 0 END), 0) AS out_of_pot_minor
         FROM transactions t
-        JOIN categories c ON c.id = t.category_id
+        LEFT JOIN categories c ON c.id = t.category_id
         LEFT JOIN accounts a ON a.id = t.account_id
+        LEFT JOIN accounts d ON d.id = t.transfer_account_id
         WHERE t.is_archived = 0
-          AND c.kind = :kind
-          AND IFNULL(a.holding, 'SPEND') <> 'SET_ASIDE'
           AND t.date BETWEEN :start AND :end
           AND (:accountId IS NULL OR t.account_id = :accountId)
           AND (:everyone = 1 OR COALESCE(t.person_id, a.person_id) IN (:personIds))
@@ -357,20 +366,57 @@ interface TransactionDao {
         personIds: List<Long>,
     ): Flow<PotFlow?>
 
+    /**
+     * Money paid off loans and mortgages over a period: transfers into them
+     * from the accounts money is spent from.
+     *
+     * Not spending — the debt goes down by the same amount — but not there to
+     * spend either, so Home shows it and takes it off what is left.
+     */
+    @Query(
+        """
+        SELECT IFNULL(SUM(t.amount_minor), 0)
+        FROM transactions t
+        LEFT JOIN accounts a ON a.id = t.account_id
+        JOIN accounts d ON d.id = t.transfer_account_id
+        WHERE t.is_archived = 0 AND t.type = 'TRANSFER'
+          AND d.type IN ('LOAN', 'MORTGAGE')
+          AND IFNULL(a.holding, 'SPEND') <> 'OWED'
+          AND t.date BETWEEN :start AND :end
+          AND (:accountId IS NULL OR t.account_id = :accountId OR t.transfer_account_id = :accountId)
+          AND (:everyone = 1 OR COALESCE(t.person_id, a.person_id) IN (:personIds))
+        """,
+    )
+    fun observeLoanPayments(
+        start: LocalDate,
+        end: LocalDate,
+        accountId: Long?,
+        everyone: Boolean,
+        personIds: List<Long>,
+    ): Flow<Long>
+
     /** [observePotFlow] for every person at once. */
     @Query(
         """
         SELECT COALESCE(t.person_id, a.person_id) AS person_id,
-               IFNULL(SUM(CASE WHEN t.type = 'EXPENSE' THEN t.amount_minor ELSE 0 END), 0)
-                   AS into_pot_minor,
-               IFNULL(SUM(CASE WHEN t.type = 'INCOME' THEN t.amount_minor ELSE 0 END), 0)
-                   AS out_of_pot_minor
+               IFNULL(SUM(CASE
+                   WHEN t.type = 'EXPENSE' AND c.kind = :kind
+                        AND IFNULL(a.holding, 'SPEND') <> 'SET_ASIDE' THEN t.amount_minor
+                   WHEN :kind = 'SAVING' AND t.type = 'TRANSFER'
+                        AND IFNULL(a.holding, 'SPEND') <> 'SET_ASIDE'
+                        AND d.holding = 'SET_ASIDE' THEN t.amount_minor
+                   ELSE 0 END), 0) AS into_pot_minor,
+               IFNULL(SUM(CASE
+                   WHEN t.type = 'INCOME' AND c.kind = :kind
+                        AND IFNULL(a.holding, 'SPEND') <> 'SET_ASIDE' THEN t.amount_minor
+                   WHEN :kind = 'SAVING' AND t.type = 'TRANSFER' AND a.holding = 'SET_ASIDE'
+                        AND IFNULL(d.holding, 'SPEND') <> 'SET_ASIDE' THEN t.amount_minor
+                   ELSE 0 END), 0) AS out_of_pot_minor
         FROM transactions t
-        JOIN categories c ON c.id = t.category_id
+        LEFT JOIN categories c ON c.id = t.category_id
         LEFT JOIN accounts a ON a.id = t.account_id
+        LEFT JOIN accounts d ON d.id = t.transfer_account_id
         WHERE t.is_archived = 0
-          AND c.kind = :kind
-          AND IFNULL(a.holding, 'SPEND') <> 'SET_ASIDE'
           AND t.date BETWEEN :start AND :end
         GROUP BY COALESCE(t.person_id, a.person_id)
         """,
@@ -384,16 +430,24 @@ interface TransactionDao {
     /** [observePotFlow], once. */
     @Query(
         """
-        SELECT IFNULL(SUM(CASE WHEN t.type = 'EXPENSE' THEN t.amount_minor ELSE 0 END), 0)
-                   AS into_pot_minor,
-               IFNULL(SUM(CASE WHEN t.type = 'INCOME' THEN t.amount_minor ELSE 0 END), 0)
-                   AS out_of_pot_minor
+        SELECT IFNULL(SUM(CASE
+                   WHEN t.type = 'EXPENSE' AND c.kind = :kind
+                        AND IFNULL(a.holding, 'SPEND') <> 'SET_ASIDE' THEN t.amount_minor
+                   WHEN :kind = 'SAVING' AND t.type = 'TRANSFER'
+                        AND IFNULL(a.holding, 'SPEND') <> 'SET_ASIDE'
+                        AND d.holding = 'SET_ASIDE' THEN t.amount_minor
+                   ELSE 0 END), 0) AS into_pot_minor,
+               IFNULL(SUM(CASE
+                   WHEN t.type = 'INCOME' AND c.kind = :kind
+                        AND IFNULL(a.holding, 'SPEND') <> 'SET_ASIDE' THEN t.amount_minor
+                   WHEN :kind = 'SAVING' AND t.type = 'TRANSFER' AND a.holding = 'SET_ASIDE'
+                        AND IFNULL(d.holding, 'SPEND') <> 'SET_ASIDE' THEN t.amount_minor
+                   ELSE 0 END), 0) AS out_of_pot_minor
         FROM transactions t
-        JOIN categories c ON c.id = t.category_id
+        LEFT JOIN categories c ON c.id = t.category_id
         LEFT JOIN accounts a ON a.id = t.account_id
+        LEFT JOIN accounts d ON d.id = t.transfer_account_id
         WHERE t.is_archived = 0
-          AND c.kind = :kind
-          AND IFNULL(a.holding, 'SPEND') <> 'SET_ASIDE'
           AND t.date BETWEEN :start AND :end
           AND (:accountId IS NULL OR t.account_id = :accountId)
           AND (:personId IS NULL OR COALESCE(t.person_id, a.person_id) = :personId)
@@ -579,6 +633,44 @@ interface TransactionDao {
         """,
     )
     suspend fun existsForRuleOnDate(ruleId: Long, date: LocalDate): Boolean
+
+    /** Recent transfers into or out of [accountId], newest first; see OwnAccountMatcher. */
+    @Query(
+        """
+        SELECT description, account_id, transfer_account_id FROM transactions
+        WHERE is_archived = 0 AND type = 'TRANSFER'
+          AND (account_id = :accountId OR transfer_account_id = :accountId)
+        ORDER BY date DESC LIMIT :limit
+        """,
+    )
+    suspend fun transferLinks(accountId: Long, limit: Int): List<TransferLink>
+
+    /** Transfers into or out of [accountId] over a period, for spotting a movement already held. */
+    @Query(
+        """
+        SELECT * FROM transactions
+        WHERE is_archived = 0 AND type = 'TRANSFER'
+          AND (account_id = :accountId OR transfer_account_id = :accountId)
+          AND date BETWEEN :from AND :to
+        """,
+    )
+    suspend fun transfersTouching(accountId: Long, from: LocalDate, to: LocalDate): List<TransactionEntity>
+
+    /** Ordinary entries on [accountId] of one direction and amount over a period. */
+    @Query(
+        """
+        SELECT * FROM transactions
+        WHERE is_archived = 0 AND account_id = :accountId AND type = :type
+          AND amount_minor = :amountMinor AND date BETWEEN :from AND :to
+        """,
+    )
+    suspend fun sameMovement(
+        accountId: Long,
+        type: String,
+        amountMinor: Long,
+        from: LocalDate,
+        to: LocalDate,
+    ): List<TransactionEntity>
 
     // --------------------------------------------------------------- writes
 

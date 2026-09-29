@@ -348,6 +348,40 @@ statement is checked against that person:
 If the person has no account of the statement's kind, it offers to add one
 for them there and then.
 
+### Where each row goes
+
+When a statement is read, every row is sorted into one of three:
+
+* **A move to or from your own account** — a saver, a loan, a card. The row
+  is saved as money moving between the two, so **both** change: "TRANSFER TO
+  START TO SAVE" takes £200 off the current account *and* puts £200 in your
+  Start to Save; "CAR LOAN PAYMENT" takes it off the current account *and* off
+  what you owe on the car loan. It is recognised when:
+  * the account's name is in the description (all its meaningful words —
+    "Rainy Day Saver" needs "rainy", "day" and "saver"; with several savers,
+    each goes to the one it names),
+  * it is exactly a loan's monthly payment within a few days of its payment
+    day (for loans set up with a payment),
+  * it was recognised as savings and you have only one saver, or
+  * you sent the same payee there before.
+* **Spending** — sorted into categories (Groceries, Fuel, Bills…) and counted
+  under the person.
+* **Income** — pay, refunds, money received.
+
+On the review screen these rows say **→ into Start to Save** or **← from Start
+to Save**. Tap any row's name to change where it went: spending, or into (or
+from) any of your accounts. The app remembers the payee for next time.
+
+**Nothing is counted twice.** If the same move is already in the app — from the
+saver's own statement, or from a loan's automatic monthly payment — the row is
+marked "Already recorded" and left unticked. If you import the saver's
+statement first, the current account's row stays as ordinary savings rather
+than moving the money a second time.
+
+On Home, money moved into a saver counts as **Put aside**, and loan payments
+show as **Paid off loans**. Neither is counted as spending, but both come off
+**Left to spend**.
+
 ### What kind of statement is it
 
 The importer also reads **what kind of account** the statement is for, from

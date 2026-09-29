@@ -266,7 +266,7 @@ class SpreadsheetImporter @Inject constructor(
             .map { it.copy(source = RecordSource.STATEMENT) }
         val accountId = resolveTargetAccount(mapping)
             ?: return@withContext candidates
-        markCorrections(markDuplicates(candidates, accountId), accountId)
+        linkOwnAccounts(markCorrections(markDuplicates(candidates, accountId), accountId), accountId)
     }
 
     /**
@@ -286,10 +286,13 @@ class SpreadsheetImporter @Inject constructor(
                 isAlreadyPresent = false,
                 corrects = null,
                 isSelected = it.isImportable,
+                transferAccountId = null,
+                transferAccountName = null,
+                alreadyNote = null,
             )
         }
         val accountId = resolveTargetAccount(mapping) ?: return@withContext cleared
-        markCorrections(markDuplicates(cleared, accountId), accountId)
+        linkOwnAccounts(markCorrections(markDuplicates(cleared, accountId), accountId), accountId)
     }
 
     /**
@@ -355,6 +358,124 @@ class SpreadsheetImporter @Inject constructor(
                     payeesAgreed = correction.payeesAgreed,
                 ),
             )
+        }
+    }
+
+    /**
+     * The person's other accounts a row on [accountId]'s statement could be
+     * moving money to or from: their own, and anything held jointly.
+     */
+    suspend fun ownAccountTargets(accountId: Long): List<OwnAccountMatcher.Target> =
+        withContext(ioDispatcher) {
+            val account = accountDao.getById(accountId) ?: return@withContext emptyList()
+            val joint = personDao.getAll().filter { it.isShared }.map { it.id }.toSet()
+            val payments = recurringRuleDao.getAllActive()
+                .filter { it.type == TransactionType.TRANSFER && it.transferAccountId != null }
+                .associateBy { it.transferAccountId }
+            accountDao.getAllActive()
+                .filter { other ->
+                    other.id != accountId && (
+                        account.personId == null || other.personId == account.personId ||
+                            other.isShared || other.personId in joint
+                        )
+                }
+                .map { other ->
+                    val rule = payments[other.id]
+                    OwnAccountMatcher.Target(
+                        id = other.id,
+                        name = other.name,
+                        type = other.type,
+                        holding = other.holding,
+                        monthlyPaymentMinor = rule?.amountMinor,
+                        paymentDay = rule?.nextDueDate?.dayOfMonth,
+                    )
+                }
+        }
+
+    /**
+     * Finds the rows that move money between the person's own accounts.
+     *
+     * Each is checked against what is already held first, because the same
+     * movement can arrive twice: once from each account's statement, or once
+     * as the automatic loan payment and again from the bank. What is already
+     * recorded is marked and skipped; what the other account's own statement
+     * already has is left as an ordinary entry, since both sides agree; and
+     * the rest become transfers to the account they name.
+     */
+    internal suspend fun linkOwnAccounts(
+        candidates: List<ImportCandidate>,
+        accountId: Long,
+    ): List<ImportCandidate> {
+        val targets = ownAccountTargets(accountId)
+        val dates = candidates
+            .filter { it.isImportable && it.target == ImportTarget.TRANSACTION }
+            .mapNotNull { it.dateIso?.let(DateUtils::parseIsoOrNull) }
+        val first = dates.minOrNull() ?: return candidates
+        val last = dates.maxOrNull() ?: return candidates
+        val held = transactionDao.transfersTouching(
+            accountId,
+            first.minusDays(TRANSFER_MARGIN_DAYS),
+            last.plusDays(TRANSFER_MARGIN_DAYS),
+        ).toMutableList()
+        val names = accountDao.getAll().associate { it.id to it.name }
+        val learned = transactionDao.transferLinks(accountId, LEARNED_PAYEE_LIMIT)
+            .mapNotNull { link ->
+                val other = if (link.accountId == accountId) link.transferAccountId else link.accountId
+                other?.let { TransactionFingerprint.normaliseDescription(link.description) to it }
+            }
+            .toMap()
+        val savingsNames = categoryDao.getAll()
+            .filter { it.kind == CategoryKind.SAVING }
+            .map { it.name.lowercase() }
+            .toSet()
+
+        return candidates.map { candidate ->
+            if (!candidate.isImportable || candidate.target != ImportTarget.TRANSACTION ||
+                candidate.isAlreadyPresent || candidate.corrects != null
+            ) {
+                return@map candidate
+            }
+            val date = candidate.dateIso?.let(DateUtils::parseIsoOrNull) ?: return@map candidate
+            val out = (candidate.transactionType ?: TransactionType.EXPENSE) == TransactionType.EXPENSE
+
+            val existing = held.firstOrNull { transfer ->
+                transfer.amountMinor == candidate.amountMinor &&
+                    kotlin.math.abs(transfer.date.toEpochDay() - date.toEpochDay()) <= TRANSFER_MARGIN_DAYS &&
+                    if (out) transfer.accountId == accountId else transfer.transferAccountId == accountId
+            }
+            if (existing != null) {
+                held.remove(existing)
+                val other = if (out) existing.transferAccountId else existing.accountId
+                return@map candidate.copy(
+                    isAlreadyPresent = true,
+                    isSelected = false,
+                    alreadyNote = "Already recorded as money " +
+                        (if (out) "to " else "from ") + (names[other] ?: "another account"),
+                )
+            }
+
+            val target = OwnAccountMatcher.match(
+                description = candidate.name,
+                amountMinor = candidate.amountMinor,
+                date = date,
+                isMoneyOut = out,
+                isSavings = candidate.categoryName?.lowercase() in savingsNames,
+                targets = targets,
+                learned = learned,
+            ) ?: return@map candidate
+
+            // The other account's own statement already has this movement:
+            // both sides are recorded, so a transfer would count it twice.
+            val mirrored = transactionDao.sameMovement(
+                accountId = target.id,
+                type = (if (out) TransactionType.INCOME else TransactionType.EXPENSE).name,
+                amountMinor = candidate.amountMinor,
+                from = date.minusDays(TRANSFER_MARGIN_DAYS),
+                to = date.plusDays(TRANSFER_MARGIN_DAYS),
+            )
+            if (mirrored.isNotEmpty()) return@map candidate
+
+            candidate.copy(transferAccountId = target.id, transferAccountName = target.name)
         }
     }
 
@@ -664,13 +785,22 @@ class SpreadsheetImporter @Inject constructor(
 
         val date = candidate.dateIso?.let { DateUtils.parseIsoOrNull(it) } ?: DateUtils.today()
 
+        // A move between the person's own accounts: out of this one into the
+        // other, or the other way round. Both balances move with one entry.
+        val other = candidate.transferAccountId
+        val isMove = other != null && other != accountId
         transactionDao.insert(
             TransactionEntity(
                 amountMinor = candidate.amountMinor,
-                type = type,
+                type = if (isMove) TransactionType.TRANSFER else type,
                 date = date,
                 description = candidate.name,
-                accountId = accountId,
+                accountId = if (isMove && type == TransactionType.INCOME) other!! else accountId,
+                transferAccountId = when {
+                    !isMove -> null
+                    type == TransactionType.INCOME -> accountId
+                    else -> other
+                },
                 categoryId = categoryId,
                 personId = personId,
                 notes = candidate.notes,
@@ -870,6 +1000,9 @@ class SpreadsheetImporter @Inject constructor(
     internal fun guessAccountType(name: String): AccountType = AccountNaming.typeFor(name)
 
     private companion object {
+        /** How far apart two records of the same move between accounts can be dated. */
+        const val TRANSFER_MARGIN_DAYS = 3L
+
         /** Marks cash pot entries a spreadsheet row put there; see [importAccount]. */
         const val CASH_POT_NOTE = "From the spreadsheet:"
 
