@@ -390,6 +390,20 @@ its date, category and the statement's balance after it.
 A statement without a running balance can't be checked this way; compare the
 totals shown with the statement's own.
 
+### Statements with a side panel (Nationwide and others)
+
+Some statements print account details down the right-hand side — IBAN, sort
+code, "Average credit balance" — and a day's later payments with no date or
+balance of their own. The reader cuts the side panel off, reads those payments
+as the day above, and takes a card payment's shop from the line underneath, so
+"Contactless Payment" becomes "Contactless Payment FRIERS STORE NEWPORT" and can
+be put in the right category. Returned direct debits and standing orders count
+as money coming back.
+
+**Already imported a statement before this?** Import it again. Payments already
+held are recognised — ones now read with their shop's name are updated in
+place, not added twice — and the payments that were missed are added.
+
 ### Bills found in statements
 
 After a statement is imported, the finished screen lists **regular payments

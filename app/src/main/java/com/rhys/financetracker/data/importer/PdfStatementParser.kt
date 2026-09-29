@@ -452,25 +452,129 @@ object PdfStatementParser {
         "receipts", "withdrawn", "deposited", "debit", "credit",
     )
 
-    /** The lines that look like statement rows, in order. */
+    /**
+     * The lines that look like statement rows, in order.
+     *
+     * Three things about real statements shape this:
+     *
+     * - **Side panels.** Nationwide and others print a column of account
+     *   details down the right — IBAN, sort code, "Average credit balance
+     *   £3,778.58" — and the text comes out with those words stuck on the end
+     *   of whichever payment shares their line. The panel is cut off first
+     *   (see [withoutSidePanel]), or the payment's figure is not at the end
+     *   and the row is lost, or worse, the panel's balance is read as one.
+     * - **Rows under a date.** A day's second and third payments carry no
+     *   date and, until the day's last, no balance: "Contactless Payment
+     *   5.00". Within the table they are payments on the day above.
+     * - **The shop on the next line.** "Contactless Payment 5.00" is followed
+     *   by "FRIERS STORE NEWPORT". Without it every card payment is only
+     *   "Contactless Payment", which no rule can put in a category.
+     */
     private fun readLines(lines: List<String>, documentYear: Int?): List<ReadLine> {
         val read = mutableListOf<ReadLine>()
         var lastDate: LocalDate? = null
+        // A brought-forward balance printed before the first dated row. It is
+        // kept until that row gives it a date, so the first day's payments
+        // have something to be proved against.
+        var opening: Pair<String, List<Figure>>? = null
+        // Whether the row just read is a bare "Contactless Payment" still
+        // waiting for the shop's name on the next line.
+        var wantsPayee = false
         for (raw in lines) {
-            val line = raw.trimEnd()
+            val line = withoutSidePanel(raw.trimEnd())
             if (line.isBlank()) continue
             val figures = trailingFigures(line)
-            if (figures.isEmpty()) continue
             val date = leadingDate(line.trim(), documentYear)
-                ?: lastDate?.takeIf { figures.size >= 2 }
-                ?: continue
-            lastDate = date
-            val description = describe(line)
+
+            if (figures.isEmpty()) {
+                val last = read.lastOrNull()
+                if (wantsPayee && date == null && last != null && isPayeeLine(line)) {
+                    read[read.lastIndex] = last.copy(description = "${last.description} ${line.trim()}")
+                }
+                wantsPayee = false
+                continue
+            }
+            wantsPayee = false
+
+            var description = describe(line)
+            val resolved: LocalDate = when {
+                date != null -> date
+                lastDate == null -> {
+                    if (figures.size == 1 && BALANCE_LINE.containsMatchIn(description)) {
+                        opening = description to figures
+                    }
+                    continue
+                }
+                figures.size >= 2 -> lastDate
+                // A figure with nothing but a year beside it is the balance
+                // carried to the top of a new page.
+                description.isBlank() || YEAR_ONLY.matches(description) -> {
+                    description = "Balance carried forward"
+                    lastDate
+                }
+                SUMMARY_LINE.containsMatchIn(description) -> continue
+                else -> lastDate
+            }
+            opening?.let { (text, openingFigures) ->
+                read += ReadLine(resolved, text, openingFigures)
+            }
+            opening = null
+            lastDate = resolved
             if (description.isBlank()) continue
-            read += ReadLine(date, description, figures, trailingMarker(line))
+            read += ReadLine(resolved, description, figures, trailingMarker(line))
+            wantsPayee = BARE_CARD_PAYMENT.matches(description)
         }
         return read
     }
+
+    /**
+     * [line] with any side-panel text cut off its end.
+     *
+     * Only cut when it follows a figure, so a payee that happens to start
+     * with one of these words — "SWIFT TRANSFER" — is never touched.
+     */
+    internal fun withoutSidePanel(line: String): String {
+        var text = line
+        while (true) {
+            val match = SIDE_PANEL.find(text) ?: return text
+            text = text.substring(0, match.groups[1]!!.range.last + 1)
+        }
+    }
+
+    /** True when a line with no figures could be the shop a card payment was made at. */
+    private fun isPayeeLine(line: String): Boolean {
+        val text = line.trim()
+        return text.length >= 3 && !NOT_A_PAYEE.containsMatchIn(text) && text.any { it.isLetter() }
+    }
+
+    /**
+     * Side-panel wording that ends up on a payment's line: account details,
+     * and a balance written with a pound sign, which the table never uses.
+     * Group 1 is the end of the figure it follows.
+     */
+    private val SIDE_PANEL = Regex(
+        """(?i)(\.\d{2}[)\-]?)\s+(?:(?:average\s+(?:credit|debit)\s+)?balance\s+£[\d,]+\.\d{2}|""" +
+            """average\s+(?:credit|debit)\b.*|iban\b.*|bic\b.*|swift\b.*|sort\s+code\b.*|""" +
+            """account\s+no\b.*|account\s+number\b.*|statement\s+(?:date|no|number)\b.*|""" +
+            """intermediary\s+bank\b.*|receiving\s+an\b.*|international\s+payment\b.*)$""",
+    )
+
+    /** A card payment named only as such, whose shop is on the next line. */
+    private val BARE_CARD_PAYMENT = Regex(
+        """(?i)^(contactless( payment)?|card payment|debit card payment|visa (purchase|debit)|""" +
+            """pos( purchase)?|card purchase|apple pay|google pay)$""",
+    )
+
+    /** Lines under a payment that are not the shop's name. */
+    private val NOT_A_PAYEE = Regex(
+        """(?i)^(effective date|statement|page\b|sort code|account no|iban|bic|swift|""" +
+            """date\b|description|balance|average|continued|your .* account)""",
+    )
+
+    /** A total or summary line, which is not a payment even inside the table. */
+    private val SUMMARY_LINE = Regex("""(?i)\b(total|totals|average|summary|aer|gross|limit)\b""")
+
+    private val YEAR_ONLY = Regex("""^(19|20)\d{2}$""")
 
     /**
      * The money columns, as end positions, left to right.
@@ -704,10 +808,16 @@ object PdfStatementParser {
      */
     internal fun directionFromWording(description: String): Boolean? {
         val text = description.lowercase()
+        // "Returned direct debit" is the direct debit's money coming back,
+        // so it is tested before "direct debit" can call it money out.
+        if (RETURNED_WORDS.containsMatchIn(text)) return false
         if (OUTGOING_WORDS.containsMatchIn(text)) return true
         if (INCOMING_WORDS.containsMatchIn(text)) return false
         return null
     }
+
+    /** Money coming back: a payment the bank returned or reversed. */
+    private val RETURNED_WORDS = Regex("""(?i)\b(returned|reversal|reversed|unpaid|recalled)\b""")
 
     /** How a statement writes "money left the account". */
     private val OUTGOING_WORDS = Regex(

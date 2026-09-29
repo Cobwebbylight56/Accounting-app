@@ -362,6 +362,8 @@ class SpreadsheetImporter @Inject constructor(
         )
         val corrections = StatementPriority.corrections(candidates, existing)
         val corrected = candidates.map { candidate ->
+            // Already matched to its own earlier reading; see markRereads.
+            if (candidate.corrects != null) return@map candidate
             val correction = corrections[candidate.id] ?: return@map candidate
             candidate.copy(
                 corrects = StatementCorrection(
@@ -606,7 +608,7 @@ class SpreadsheetImporter @Inject constructor(
         }
 
         val remaining = stored.toMutableMap()
-        return candidates.mapIndexed { index, candidate ->
+        val marked = candidates.mapIndexed { index, candidate ->
             val fingerprint = fingerprints[index] ?: return@mapIndexed candidate
             val left = remaining[fingerprint] ?: 0
             if (left <= 0) {
@@ -615,6 +617,49 @@ class SpreadsheetImporter @Inject constructor(
                 remaining[fingerprint] = left - 1
                 candidate.copy(isAlreadyPresent = true, isSelected = false)
             }
+        }
+        return markRereads(marked, accountId)
+    }
+
+    /**
+     * Recognises a payment this app already read from the same statement, when
+     * the reader has since learned to read more of it.
+     *
+     * Card payments used to arrive as a bare "Contactless Payment"; they now
+     * carry the shop from the line below. Re-importing the statement should
+     * give the entry already held its shop's name, not add the payment a
+     * second time under the fuller one. Same account, day, amount and
+     * direction, and the old description is the start of the new one.
+     */
+    private suspend fun markRereads(
+        candidates: List<ImportCandidate>,
+        accountId: Long,
+    ): List<ImportCandidate> {
+        val claimed = mutableSetOf<Long>()
+        return candidates.map { candidate ->
+            if (!candidate.isImportable || candidate.target != ImportTarget.TRANSACTION ||
+                candidate.isAlreadyPresent || candidate.corrects != null
+            ) {
+                return@map candidate
+            }
+            val date = candidate.dateIso?.let(DateUtils::parseIsoOrNull) ?: return@map candidate
+            val type = candidate.transactionType ?: TransactionType.EXPENSE
+            val name = TransactionFingerprint.normaliseDescription(candidate.name)
+            val earlier = transactionDao.sameMovement(accountId, type.name, candidate.amountMinor, date, date)
+                .firstOrNull { entry ->
+                    val old = TransactionFingerprint.normaliseDescription(entry.description)
+                    entry.id !in claimed && entry.source == RecordSource.STATEMENT &&
+                        old.isNotBlank() && name.startsWith("$old ")
+                } ?: return@map candidate
+            claimed += earlier.id
+            candidate.copy(
+                corrects = StatementCorrection(
+                    existingId = earlier.id,
+                    existingDescription = earlier.description,
+                    existingDateIso = earlier.date.toString(),
+                    payeesAgreed = true,
+                ),
+            )
         }
     }
 
@@ -690,7 +735,12 @@ class SpreadsheetImporter @Inject constructor(
             ?: error("the entry it was going to update has since been deleted")
         var running = outcome
         val type = candidate.transactionType ?: TransactionType.EXPENSE
-        val categoryId = existing.categoryId ?: run {
+        // "Card spending" only says a card was used; the statement's fuller
+        // reading can say what on, so it gives way like no category at all.
+        val keptCategory = existing.categoryId?.takeIf { id ->
+            categoryDao.getById(id)?.name !in VAGUE_CATEGORIES
+        }
+        val categoryId = keptCategory ?: run {
             val (resolved, afterCategory) = resolveCategory(candidate.categoryName, type, running)
             running = afterCategory
             resolved
@@ -742,8 +792,10 @@ class SpreadsheetImporter @Inject constructor(
         previousNotes: String?,
         candidate: ImportCandidate,
     ): String? {
-        val renamed = TransactionFingerprint.normaliseDescription(previousDescription) !=
-            TransactionFingerprint.normaliseDescription(candidate.name)
+        val before = TransactionFingerprint.normaliseDescription(previousDescription)
+        val after = TransactionFingerprint.normaliseDescription(candidate.name)
+        // Only the shop's name added to the end is not worth a note.
+        val renamed = before != after && !after.startsWith("$before ")
         return listOfNotNull(
             previousNotes?.takeIf { it.isNotBlank() },
             candidate.notes?.takeIf { it.isNotBlank() },
@@ -1087,6 +1139,9 @@ class SpreadsheetImporter @Inject constructor(
 
         /** The category overtime typed in by hand is filed under. */
         const val OVERTIME_CATEGORY = "Overtime"
+
+        /** Categories that say only that a card was used, not what on. */
+        private val VAGUE_CATEGORIES = setOf("Card spending")
         const val SALARY_CATEGORY = "Salary"
 
         /** How far from its usual day a wage can land and still be the same one. */
