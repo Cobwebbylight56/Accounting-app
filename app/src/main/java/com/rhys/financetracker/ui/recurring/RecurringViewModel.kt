@@ -14,6 +14,8 @@ import com.rhys.financetracker.data.local.projection.RecurringRuleWithDetails
 import com.rhys.financetracker.data.repository.AccountRepository
 import com.rhys.financetracker.data.repository.CategoryRepository
 import com.rhys.financetracker.data.repository.PeopleRepository
+import com.rhys.financetracker.data.importer.RecurringDetector
+import com.rhys.financetracker.data.repository.BillFinderRepository
 import com.rhys.financetracker.data.repository.RecurringRepository
 import com.rhys.financetracker.domain.model.CategoryKind
 import com.rhys.financetracker.domain.model.Frequency
@@ -42,7 +44,39 @@ import kotlinx.coroutines.launch
 class RecurringViewModel @Inject constructor(
     private val recurringRepository: RecurringRepository,
     private val generator: RecurringTransactionGenerator,
+    private val billFinder: BillFinderRepository,
 ) : ViewModel() {
+
+    /** Bills found in the statements, while the list is open; null when it is closed. */
+    private val _found = MutableStateFlow<List<RecurringDetector.RegularPayment>?>(null)
+    val found: StateFlow<List<RecurringDetector.RegularPayment>?> = _found
+
+    /** Looks through every statement imported for regular payments not yet set up. */
+    fun findBills() {
+        viewModelScope.launch {
+            val bills = billFinder.find()
+            if (bills.isEmpty()) {
+                message.value = "No new regular payments found in your statements"
+            } else {
+                _found.value = bills
+            }
+        }
+    }
+
+    fun closeFound() {
+        _found.value = null
+    }
+
+    fun addFound(bills: List<RecurringDetector.RegularPayment>) {
+        viewModelScope.launch {
+            _found.value = null
+            message.value = when (val result = billFinder.addAsBills(bills)) {
+                is AppResult.Success -> "${result.data} " +
+                    (if (result.data == 1) "bill" else "bills") + " added"
+                is AppResult.Failure -> result.message
+            }
+        }
+    }
 
     private val typeFilter = MutableStateFlow<TransactionType?>(null)
     private val message = MutableStateFlow<String?>(null)

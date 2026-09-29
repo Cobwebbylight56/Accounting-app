@@ -529,7 +529,7 @@ fun AccountEditScreen(
             }
 
             AmountField(
-                label = "Starting balance",
+                label = "Money in it",
                 value = state.form.openingBalanceText,
                 onValueChange = { text ->
                     viewModel.update { it.copy(openingBalanceText = text) }
@@ -537,11 +537,19 @@ fun AccountEditScreen(
             )
 
             DateField(
-                label = "Balance as at",
+                label = "On this day",
                 date = state.form.openingBalanceDate,
                 onDateChange = { date ->
                     viewModel.update { it.copy(openingBalanceDate = date) }
                 },
+            )
+            Text(
+                text = "What the bank says is in it on that day. Anything dated before " +
+                    "then is already in this figure, so older statements won't add to it. " +
+                    "Anything after moves it on — and importing a newer statement sets it " +
+                    "to the statement's own closing balance.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             AmountField(

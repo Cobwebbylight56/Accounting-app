@@ -140,26 +140,65 @@ class AccountRepository @Inject constructor(
         }
 
     /**
-     * Makes an account's balance equal [balanceMinor] by moving its starting
-     * figure, without inventing a transaction to do it.
+     * Says what an account holds on [asOf]: the balance from then on is this,
+     * plus whatever happens after that day.
      *
      * What is already in an account is not income — it is money you had before
-     * the app knew about it. Recorded as a payment in, a £1,480 balance shows
-     * up as £1,480 earned this month and the month's figures are nonsense. The
-     * starting balance is what that belongs in, and it is dated when the
-     * account started rather than today.
+     * the app knew about it — so it is never recorded as a payment in.
      */
-    suspend fun setBalanceTo(accountId: Long, balanceMinor: Long): AppResult<Unit> =
-        runCatchingApp("Could not correct this balance") {
-            val account = accountDao.getById(accountId) ?: error("That account no longer exists")
-            val recorded = accountDao.getRecordedMovementMinor(accountId)
-            accountDao.update(
-                account.copy(
-                    openingBalanceMinor = balanceMinor - recorded,
-                    updatedAt = Instant.now().toEpochMilli(),
-                ),
-            )
+    suspend fun setBalanceTo(
+        accountId: Long,
+        balanceMinor: Long,
+        asOf: LocalDate = LocalDate.now(),
+    ): AppResult<Unit> = runCatchingApp("Could not correct this balance") {
+        accountDao.getById(accountId) ?: error("That account no longer exists")
+        accountDao.setBalanceAsOf(accountId, balanceMinor, asOf, Instant.now().toEpochMilli())
+    }
+
+    /**
+     * Brings an account's balance up to date after a statement was imported.
+     *
+     * The statement's closing balance is the bank's own figure, so when the
+     * statement reaches the account's balance date or beyond, that becomes
+     * the balance, as of the statement's last day. An older statement leaves
+     * the balance alone: everything in it is already inside the figure.
+     *
+     * An account that was never given a balance — made at £0 by an import —
+     * has only its history to go on, so when a statement without balances
+     * reaches back before its balance date, the date moves back to let those
+     * entries count.
+     *
+     * Returns what was done, for the import screen to say.
+     */
+    suspend fun updateFromStatement(
+        accountId: Long,
+        closingBalanceMinor: Long?,
+        lastDate: LocalDate?,
+        firstDate: LocalDate?,
+    ): String? {
+        val account = accountDao.getById(accountId) ?: return null
+        val now = Instant.now().toEpochMilli()
+        if (closingBalanceMinor != null && lastDate != null &&
+            !lastDate.isBefore(account.openingBalanceDate)
+        ) {
+            accountDao.setBalanceAsOf(accountId, closingBalanceMinor, lastDate, now)
+            return "${account.name}'s balance is now the statement's: " +
+                "${com.rhys.financetracker.core.money.Money.format(closingBalanceMinor)} " +
+                "on ${com.rhys.financetracker.core.time.DateUtils.format(lastDate)}"
         }
+        if (closingBalanceMinor == null && account.openingBalanceMinor == 0L && firstDate != null &&
+            !firstDate.isAfter(account.openingBalanceDate)
+        ) {
+            accountDao.setBalanceAsOf(accountId, 0L, firstDate.minusDays(1), now)
+            return null
+        }
+        if (lastDate != null && lastDate.isBefore(account.openingBalanceDate)) {
+            return "This statement ends before ${account.name}'s balance date " +
+                "(${com.rhys.financetracker.core.time.DateUtils.format(account.openingBalanceDate)}), " +
+                "so its rows are kept as history and the balance is unchanged."
+        }
+        return null
+    }
 
     /**
      * Says where an account's money counts — to spend, set aside, or owed.

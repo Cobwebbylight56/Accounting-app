@@ -3,7 +3,7 @@
 SQLite via Room. The schema is exported to `app/schemas/` on every build, so
 every change is reviewable and every migration is testable.
 
-Current version: **7**.
+Current version: **8**.
 
 | Version | Change |
 |---|---|
@@ -14,6 +14,7 @@ Current version: **7**.
 | 5 | The savings redesign. `accounts.counts_as_savings` is replaced by `accounts.holding` (`SPEND`, `SET_ASIDE`, `OWED`) — the one answer to where an account's money counts; the table is rebuilt, since older SQLite cannot drop a column. Each account keeps the answer it was effectively giving, and one whose name says savings is set aside. `AccountType.CASH` is removed: cash accounts become rows in the new `cash_pot_entries` table, and transfers between them and bank accounts become cash withdrawals or paying-ins on the bank side, so no bank balance moves. Rows the old importer filed under an ordinary category called "Savings" or "Cash" are pointed at the real one, and movements on set-aside accounts other than interest are filed as savings. `people` gains `gross_yearly_income_minor` and `net_yearly_income_minor`. |
 | 6 | `income_changes` — pay history: each pay rise, yearly review or new job, with pay before and after, the day it starts, and whether it has been applied. A person's own pay columns always hold what they earn now; a change dated later waits here until its day. Purely additive. |
 | 7 | `people.statement_names` — names a person's statements have been addressed to, learned when somebody confirms a statement is theirs, separated by `|`. Nullable and additive. |
+| 8 | No columns change. An account's `opening_balance_minor` becomes its balance **on** `opening_balance_date`: entries dated before it (and statement rows on it) are inside the figure and no longer added. Accounts never given a balance (£0) have their date moved back before their first entry, so their balance is unchanged. |
 
 ---
 

@@ -25,6 +25,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.UploadFile
 import androidx.compose.material3.Button
+import com.rhys.financetracker.core.time.DateUtils
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.background
+import com.rhys.financetracker.data.importer.StatementCheck
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.clickable
 import androidx.compose.material3.RadioButton
@@ -191,6 +195,8 @@ fun ImportScreen(
                     state = state,
                     onImportAnother = viewModel::reset,
                     onFinish = onFinished,
+                    onToggleBill = viewModel::toggleBill,
+                    onAddBills = viewModel::addChosenBills,
                 )
             }
         }
@@ -883,6 +889,9 @@ private fun ReviewStep(state: ImportState, viewModel: ImportViewModel) {
     var choosingFor by remember { mutableStateOf<ImportCandidate?>(null) }
     Column(modifier = Modifier.fillMaxSize()) {
         WrongAccountWarning(state = state, viewModel = viewModel)
+        if (state.canImportStatement) {
+            StatementCheckCard(state.check, onShowWhatWasRead = viewModel::showWhatWasRead)
+        }
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -1051,6 +1060,77 @@ private fun ReviewStep(state: ImportState, viewModel: ImportViewModel) {
     }
 }
 
+/**
+ * Whether the whole statement was read: the rows counted, the dates they
+ * cover, and — where the statement prints a running balance — proof that
+ * every row accounts for it, or exactly where it does not.
+ */
+@Composable
+private fun StatementCheckCard(check: StatementCheck, onShowWhatWasRead: () -> Unit) {
+    val colors = FinanceTheme.colors
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .background(
+                if (check.canBeChecked && !check.isProvenComplete) {
+                    colors.warningContainer
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainerHigh
+                },
+                androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+            )
+            .padding(12.dp),
+    ) {
+        Text(
+            text = "Read ${check.rows} rows" +
+                (
+                    if (check.firstDate != null && check.lastDate != null) {
+                        " from ${DateUtils.formatShort(check.firstDate)} to " +
+                            DateUtils.formatShort(check.lastDate)
+                    } else {
+                        ""
+                    }
+                    ) +
+                ": ${Money.format(check.moneyInMinor)} in, ${Money.format(check.moneyOutMinor)} out.",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Spacer(Modifier.height(4.dp))
+        when {
+            check.isProvenComplete -> Text(
+                text = "✓ Every row adds up to the statement's own balance: " +
+                    "${Money.format(check.startBalanceMinor ?: 0L)} at the start → " +
+                    "${Money.format(check.endBalanceMinor ?: 0L)} at the end. Nothing is missing.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.positive,
+                fontWeight = FontWeight.SemiBold,
+            )
+            check.canBeChecked -> {
+                check.gaps.take(3).forEach { gap ->
+                    Text(
+                        text = "⚠ ${Money.format(kotlin.math.abs(gap.unaccountedMinor))} isn't " +
+                            "accounted for between " +
+                            (gap.after?.let { DateUtils.formatShort(it) } ?: "the start") + " and " +
+                            (gap.before?.let { DateUtils.formatShort(it) } ?: "the end") +
+                            ". A row may not have been read, or one is the wrong way round " +
+                            "(tap its amount to swap it).",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.onWarningContainer,
+                    )
+                }
+                TextButton(onClick = onShowWhatWasRead) { Text("Show what was read") }
+            }
+            else -> Text(
+                text = "This statement doesn't print a running balance on its rows, so it " +
+                    "can't be checked against one. Compare the totals above with the " +
+                    "statement's own.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
 @Composable
 private fun DestinationOption(label: String, selected: Boolean, onClick: () -> Unit) {
     Row(
@@ -1163,11 +1243,16 @@ private fun DoneStep(
     state: ImportState,
     onImportAnother: () -> Unit,
     onFinish: () -> Unit,
+    onToggleBill: (String) -> Unit = {},
+    onAddBills: () -> Unit = {},
 ) {
     val outcome = state.outcome
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text("Import finished", style = MaterialTheme.typography.headlineSmall)
@@ -1175,6 +1260,61 @@ private fun DoneStep(
             text = outcome?.summary() ?: "Nothing was added",
             style = MaterialTheme.typography.bodyLarge,
         )
+
+        // The account's balance, brought up to the statement's own figure.
+        state.balanceNote?.let { note ->
+            Text(
+                text = note,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+
+        if (state.foundBills.isNotEmpty()) {
+            SectionCard(
+                title = "Regular payments found",
+                subtitle = "Tick the ones that are bills",
+            ) {
+                state.foundBills.forEach { bill ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onToggleBill(bill.name) },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(
+                            checked = bill.name in state.chosenBills,
+                            onCheckedChange = { onToggleBill(bill.name) },
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(bill.name, style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                text = "${bill.frequency.displayName}" +
+                                    (if (bill.isVariable) ", about " else ", ") +
+                                    Money.format(bill.amountMinor) + " · " + bill.reason,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Button(
+                    onClick = onAddBills,
+                    enabled = state.chosenBills.isNotEmpty(),
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Add ${state.chosenBills.size} as bills") }
+                Text(
+                    text = "They go on Bills with their next date. When the next statement " +
+                        "arrives it updates them rather than adding them twice.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        state.billsNote?.let { note ->
+            Text(note, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary)
+        }
 
         outcome?.let {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {

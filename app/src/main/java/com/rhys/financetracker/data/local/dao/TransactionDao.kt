@@ -20,6 +20,7 @@ import com.rhys.financetracker.data.local.projection.ExistingEntry
 import com.rhys.financetracker.data.local.projection.FingerprintCount
 import com.rhys.financetracker.data.local.projection.IncomeExpenseTotals
 import com.rhys.financetracker.data.local.projection.MonthTotals
+import com.rhys.financetracker.data.local.projection.PaymentOut
 import com.rhys.financetracker.data.local.projection.PersonPotFlow
 import com.rhys.financetracker.data.local.projection.PersonTotals
 import com.rhys.financetracker.data.local.projection.PotFlow
@@ -633,6 +634,24 @@ interface TransactionDao {
         """,
     )
     suspend fun existsForRuleOnDate(ruleId: Long, date: LocalDate): Boolean
+
+    /**
+     * Money out since [from] that no regular payment already accounts for,
+     * for finding the bills in a statement. [accountId] null reads every account.
+     */
+    @Query(
+        """
+        SELECT t.description AS description, t.amount_minor AS amount_minor, t.date AS date,
+               c.name AS category_name, t.account_id AS account_id
+        FROM transactions t
+        LEFT JOIN categories c ON c.id = t.category_id
+        WHERE t.is_archived = 0 AND t.type = 'EXPENSE' AND t.recurring_rule_id IS NULL
+          AND t.date >= :from
+          AND (:accountId IS NULL OR t.account_id = :accountId)
+        ORDER BY t.date ASC
+        """,
+    )
+    suspend fun paymentsOutSince(from: LocalDate, accountId: Long?): List<PaymentOut>
 
     /** Recent transfers into or out of [accountId], newest first; see OwnAccountMatcher. */
     @Query(

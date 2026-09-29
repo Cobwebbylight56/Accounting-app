@@ -165,6 +165,15 @@ data class FingerprintCount(
     @ColumnInfo(name = "occurrences") val occurrences: Int,
 )
 
+/** A payment out, as the bill finder reads it. */
+data class PaymentOut(
+    @ColumnInfo(name = "description") val description: String,
+    @ColumnInfo(name = "amount_minor") val amountMinor: Long,
+    @ColumnInfo(name = "date") val date: LocalDate,
+    @ColumnInfo(name = "category_name") val categoryName: String?,
+    @ColumnInfo(name = "account_id") val accountId: Long,
+)
+
 /** A transfer touching an account, used to learn which payee goes where. */
 data class TransferLink(
     @ColumnInfo(name = "description") val description: String,

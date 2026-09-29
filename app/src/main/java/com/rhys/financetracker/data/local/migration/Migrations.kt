@@ -319,8 +319,32 @@ object Migrations {
         db.execSQL("ALTER TABLE people ADD COLUMN statement_names TEXT")
     }
 
+    /**
+     * The balance an account is given becomes "the money in it on that day":
+     * entries dated before it are already inside the figure and no longer
+     * added on top. No columns change; the balance queries do.
+     *
+     * Accounts that were never given a balance — made at £0 when a
+     * statement was imported into them — have only their history to go on,
+     * so their balance date is moved back to before their first entry, and
+     * every entry keeps counting exactly as it did.
+     */
+    val MIGRATION_7_8 = Migration(7, 8) { db ->
+        db.execSQL(
+            "UPDATE accounts SET opening_balance_date = date((" +
+                "SELECT MIN(t.date) FROM transactions t WHERE t.is_archived = 0 " +
+                "AND (t.account_id = accounts.id OR t.transfer_account_id = accounts.id)" +
+                "), '-1 day') " +
+                "WHERE opening_balance_minor = 0 AND EXISTS (" +
+                "SELECT 1 FROM transactions t WHERE t.is_archived = 0 " +
+                "AND (t.account_id = accounts.id OR t.transfer_account_id = accounts.id) " +
+                "AND t.date <= accounts.opening_balance_date)",
+        )
+    }
+
     /** Registered with Room in `di/DatabaseModule.kt`. */
     val ALL: Array<Migration> = arrayOf(
         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+        MIGRATION_7_8,
     )
 }

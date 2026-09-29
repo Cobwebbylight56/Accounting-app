@@ -176,6 +176,8 @@ data class ImportCandidate(
      */
     val transferAccountId: Long? = null,
     val transferAccountName: String? = null,
+    /** The statement's running balance after this row, when it printed one. */
+    val balanceMinor: Long? = null,
     /** Why the row is not being added even though it is new here, for the review screen. */
     val alreadyNote: String? = null,
     /** Set when the row cannot be imported; it is shown but not selected. */

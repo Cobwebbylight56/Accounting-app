@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rhys.financetracker.core.money.Money
+import com.rhys.financetracker.data.importer.RecurringDetector
 import com.rhys.financetracker.core.time.DateUtils
 import com.rhys.financetracker.data.local.projection.RecurringRuleWithDetails
 import com.rhys.financetracker.data.local.projection.labelFor
@@ -85,8 +86,17 @@ fun RecurringScreen(
     viewModel: RecurringViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val found by viewModel.found.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var pendingDelete by remember { mutableLongStateOf(0L) }
+
+    found?.let { bills ->
+        FoundBillsDialog(
+            bills = bills,
+            onAdd = viewModel::addFound,
+            onDismiss = viewModel::closeFound,
+        )
+    }
 
     LaunchedEffect(state.message) {
         state.message?.let {
@@ -105,6 +115,7 @@ fun RecurringScreen(
                     }
                 },
                 actions = {
+                    TextButton(onClick = viewModel::findBills) { Text("Find bills") }
                     TextButton(onClick = viewModel::catchUpNow) { Text("Update now") }
                 },
             )
@@ -525,4 +536,56 @@ fun RecurringEditScreen(
             }
         }
     }
+}
+
+/** The regular payments found in the statements, to tick and add as bills. */
+@Composable
+private fun FoundBillsDialog(
+    bills: List<RecurringDetector.RegularPayment>,
+    onAdd: (List<RecurringDetector.RegularPayment>) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var chosen by remember { mutableStateOf(bills.map { it.name }.toSet()) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Bills found in your statements") },
+        text = {
+            LazyColumn {
+                items(bills.size) { index ->
+                    val bill = bills[index]
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                chosen = if (bill.name in chosen) chosen - bill.name else chosen + bill.name
+                            },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        androidx.compose.material3.Checkbox(
+                            checked = bill.name in chosen,
+                            onCheckedChange = { on ->
+                                chosen = if (on) chosen + bill.name else chosen - bill.name
+                            },
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(bill.name, style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                text = bill.frequency.displayName + (if (bill.isVariable) ", about " else ", ") +
+                                    Money.format(bill.amountMinor) + " · " + bill.reason,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onAdd(bills.filter { it.name in chosen }) },
+                enabled = chosen.isNotEmpty(),
+            ) { Text("Add ${chosen.size}") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Not now") } },
+    )
 }

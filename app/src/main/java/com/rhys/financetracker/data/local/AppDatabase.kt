@@ -76,7 +76,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun incomeChangeDao(): IncomeChangeDao
 
     companion object {
-        const val DATABASE_VERSION = 7
+        const val DATABASE_VERSION = 8
         const val DATABASE_NAME = "finance_tracker.db"
     }
 }

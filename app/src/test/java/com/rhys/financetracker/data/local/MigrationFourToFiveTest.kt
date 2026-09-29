@@ -103,6 +103,16 @@ class MigrationFourToFiveTest {
         entry(db, 5, 1_200L, "EXPENSE", "Chippy", account = 3, category = null)
         entry(db, 6, 3_000L, "EXPENSE", "TESCO", account = 1, category = 3)
 
+        // Made at £0 by importing a statement into it, with its balance date
+        // the day it was made — after the rows that were imported.
+        account(db, 6, "imported", "CURRENT", countsAsSavings = null, opening = 0L)
+        db.execSQL("UPDATE accounts SET opening_balance_date = '2026-10-30' WHERE id = 6")
+        db.execSQL(
+            "INSERT INTO transactions (id, amount_minor, type, date, description, account_id, " +
+                "is_confirmed, is_cleared, source, is_archived, created_at, updated_at) " +
+                "VALUES (7, 70000, 'INCOME', '2026-10-05', 'PAY', 6, 1, 1, 'STATEMENT', 0, 0, 0)",
+        )
+
         db.version = 4
         db.close()
     }
@@ -169,6 +179,41 @@ class MigrationFourToFiveTest {
         val saved = db.transactionDao().getPotFlow("SAVING", start, end, null, null)!!
         assertEquals(20_000L, saved.intoPotMinor)
         assertEquals(0L, saved.outOfPotMinor)
+    }
+
+    @Test
+    fun `a balance given on a day is not added to by anything older`() = runBlocking {
+        val db = openMigrated()
+        val dao = db.transactionDao()
+        fun balance(name: String) = runBlocking {
+            db.accountDao().observeActiveWithBalances().first()
+                .first { it.account.name == name }.balanceMinor
+        }
+        val before = balance("current")
+        // An older statement row: already inside the £1,000 given on 1 August.
+        dao.insert(
+            com.rhys.financetracker.data.local.entity.TransactionEntity(
+                amountMinor = 500L,
+                type = com.rhys.financetracker.domain.model.TransactionType.EXPENSE,
+                date = LocalDate.of(2026, 7, 20),
+                description = "OLDER",
+                accountId = 1L,
+                source = com.rhys.financetracker.domain.model.RecordSource.STATEMENT,
+            ),
+        )
+        assertEquals(before, balance("current"))
+        // Before the balance date the history is worked back from it.
+        assertEquals(100_500L, db.accountDao().getBalanceAsOf(1L, LocalDate.of(2026, 7, 10)))
+        assertEquals(100_000L, db.accountDao().getBalanceAsOf(1L, LocalDate.of(2026, 8, 1)))
+    }
+
+    @Test
+    fun `an account never given a balance keeps its history`() = runBlocking {
+        val db = openMigrated()
+        val imported = db.accountDao().observeActiveWithBalances().first()
+            .first { it.account.name == "imported" }
+        assertEquals(70_000L, imported.balanceMinor)
+        assertEquals(LocalDate.of(2026, 10, 4), imported.account.openingBalanceDate)
     }
 
     @Test

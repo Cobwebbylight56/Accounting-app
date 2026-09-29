@@ -348,6 +348,60 @@ statement is checked against that person:
 If the person has no account of the statement's kind, it offers to add one
 for them there and then.
 
+### Account balances and statements
+
+An account's balance is **the money in it on a day you give** — "on 21
+October there was £2,964.81". From then on:
+
+* **Anything dated before that day is already in the figure.** Importing an
+  older statement adds its rows to the history (spending, categories, reports)
+  but does **not** change the balance.
+* **Anything after that day moves it** — new entries, and rows from a newer
+  statement.
+* **A statement that reaches that day or later sets the balance to the
+  statement's own closing figure**, as of the statement's last day. So after
+  each import the balance is exactly what the bank says. The finished screen
+  tells you: "Current's balance is now the statement's: £1,164.45 on 30 Sep".
+
+An account made at £0 by an import, never given a balance, simply takes its
+balance from its statements.
+
+To set it by hand: open the account, type **Money in it** and **On this day**.
+
+### Did it read the whole statement?
+
+The review screen starts with a check: how many rows were read, the dates they
+cover, and the money in and out. Where the statement prints a running balance,
+every row is checked against it:
+
+* **✓ Every row adds up to the statement's own balance** — from the start
+  balance to the end balance. Nothing is missing.
+* **⚠ £45.00 isn't accounted for between 1 Sep and 5 Sep** — a row there wasn't
+  read, or one is the wrong way round (tap its amount to swap it). **Show what
+  was read** shows the text the app got from the file.
+
+A statement without a running balance can't be checked this way; compare the
+totals shown with the statement's own.
+
+### Bills found in statements
+
+After a statement is imported, the finished screen lists **regular payments
+found**, ticked, to add as bills with one tap:
+
+* **Direct Debits and standing orders** ("DD", "S/O" on the statement) —
+  Utility Warehouse, Samsung Finance, DVLA car tax — from a single payment,
+  taken as monthly.
+* **The same payee paid again and again** at a steady rhythm (weekly, every
+  4 weeks, monthly, quarterly, yearly) — if the amount is steady or it's a
+  bill-type category. Weekly shopping at varying amounts isn't a bill.
+
+Bills already set up aren't suggested again. A bill whose amount moves about
+asks to be confirmed each time; a fixed one is added on its day. Either way,
+when that month's statement is imported it updates the entry rather than adding
+a second one.
+
+**Bills → Find bills** looks through every statement imported so far.
+
 ### Where each row goes
 
 When a statement is read, every row is sorted into one of three:

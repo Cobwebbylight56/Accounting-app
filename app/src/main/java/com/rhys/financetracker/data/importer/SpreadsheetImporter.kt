@@ -185,6 +185,7 @@ class SpreadsheetImporter @Inject constructor(
         val dayColumn = columnFor(ColumnRole.DAY_OF_MONTH)
         val moneyInColumn = columnFor(ColumnRole.MONEY_IN)
         val moneyOutColumn = columnFor(ColumnRole.MONEY_OUT)
+        val balanceColumn = columnFor(ColumnRole.BALANCE)
 
         val range = mapping.firstDataRow..mapping.lastDataRow.coerceAtMost(sheet.rowCount - 1)
 
@@ -244,6 +245,10 @@ class SpreadsheetImporter @Inject constructor(
                 frequencyName = frequencyColumn?.let { normaliseFrequency(sheet.cell(row, it)) }
                     ?: mapping.defaultFrequency,
                 transactionType = directionFromSign,
+                // The statement's own running balance after this row, where it
+                // prints one: what proves the whole statement was read, and
+                // what the account's balance is set to afterwards.
+                balanceMinor = balanceColumn?.let { Money.parseOrNull(sheet.cell(row, it)) },
                 problem = problem,
                 isSelected = problem == null,
             )
@@ -698,15 +703,13 @@ class SpreadsheetImporter @Inject constructor(
         }
         val existing = accountDao.getByNameForPerson(candidate.name, personResult.first)
         if (existing != null) {
-            // A sheet states what is in the account *now*. The app derives that
-            // from the opening balance plus every transaction, so writing the
-            // stated figure straight into the opening balance counts every
-            // transaction on the account a second time — and does it again on
-            // the next import. The opening balance is set to whatever makes the
-            // derived balance equal what the sheet says.
-            val recorded = accountDao.getRecordedMovementMinor(existing.id)
-            accountDao.update(
-                existing.copy(openingBalanceMinor = candidate.amountMinor - recorded),
+            // A sheet states what is in the account *now*, so that is the
+            // balance as of today: entries before today are already in it.
+            accountDao.setBalanceAsOf(
+                existing.id,
+                candidate.amountMinor,
+                DateUtils.today(),
+                java.time.Instant.now().toEpochMilli(),
             )
             return personResult.second
         }

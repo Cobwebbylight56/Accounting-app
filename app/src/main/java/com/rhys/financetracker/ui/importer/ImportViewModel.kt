@@ -14,6 +14,8 @@ import com.rhys.financetracker.data.importer.ImportTarget
 import com.rhys.financetracker.data.importer.SheetData
 import com.rhys.financetracker.data.importer.SpreadsheetImporter
 import com.rhys.financetracker.data.importer.OwnAccountMatcher
+import com.rhys.financetracker.data.importer.RecurringDetector
+import com.rhys.financetracker.data.importer.StatementCheck
 import com.rhys.financetracker.data.importer.StatementKind
 import com.rhys.financetracker.data.importer.StatementOwner
 import com.rhys.financetracker.data.importer.WorkbookData
@@ -22,6 +24,7 @@ import com.rhys.financetracker.data.local.entity.PersonEntity
 import com.rhys.financetracker.data.local.projection.AccountOption
 import com.rhys.financetracker.data.local.seed.DefaultData
 import com.rhys.financetracker.data.repository.AccountRepository
+import com.rhys.financetracker.data.repository.BillFinderRepository
 import com.rhys.financetracker.data.repository.PeopleRepository
 import com.rhys.financetracker.domain.model.Holding
 import com.rhys.financetracker.domain.model.TransactionType
@@ -45,6 +48,7 @@ class ImportViewModel @Inject constructor(
     private val importer: SpreadsheetImporter,
     private val peopleRepository: PeopleRepository,
     private val accountRepository: AccountRepository,
+    private val billFinder: BillFinderRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ImportState())
@@ -74,6 +78,32 @@ class ImportViewModel @Inject constructor(
                 }
             },
         )
+    }
+
+    /** Ticks or unticks one of the bills found in the statement. */
+    fun toggleBill(name: String) {
+        val chosen = _state.value.chosenBills
+        _state.value = _state.value.copy(
+            chosenBills = if (name in chosen) chosen - name else chosen + name,
+        )
+    }
+
+    /** Sets up the ticked bills as regular payments. */
+    fun addChosenBills() {
+        val current = _state.value
+        val bills = current.foundBills.filter { it.name in current.chosenBills }
+        if (bills.isEmpty()) return
+        viewModelScope.launch {
+            val result = billFinder.addAsBills(bills)
+            _state.value = _state.value.copy(
+                foundBills = emptyList(),
+                billsNote = when (result) {
+                    is AppResult.Success -> "${result.data} " +
+                        (if (result.data == 1) "bill" else "bills") + " added to Bills"
+                    is AppResult.Failure -> result.message
+                },
+            )
+        }
     }
 
     /** The people a statement can be said to belong to. */
@@ -511,11 +541,32 @@ class ImportViewModel @Inject constructor(
         viewModelScope.launch {
             _state.value = _state.value.copy(isBusy = true)
             when (val result = importer.applyCandidates(_state.value.candidates)) {
-                is AppResult.Success -> _state.value = _state.value.copy(
-                    isBusy = false,
-                    step = ImportStep.DONE,
-                    outcome = result.data,
-                )
+                is AppResult.Success -> {
+                    val current = _state.value
+                    val account = current.chosenAccount
+                    // A statement brings the account's balance up to date
+                    // with the bank's own figure, and shows its bills.
+                    val balanceNote = if (account != null && current.canImportStatement) {
+                        val check = current.check
+                        accountRepository.updateFromStatement(
+                            accountId = account.id,
+                            closingBalanceMinor = check.endBalanceMinor.takeIf { check.balancesSeen > 0 },
+                            lastDate = check.lastDate,
+                            firstDate = check.firstDate,
+                        )
+                    } else {
+                        null
+                    }
+                    val bills = if (account != null) billFinder.find(account.id) else emptyList()
+                    _state.value = current.copy(
+                        isBusy = false,
+                        step = ImportStep.DONE,
+                        outcome = result.data,
+                        balanceNote = balanceNote,
+                        foundBills = bills,
+                        chosenBills = bills.map { it.name }.toSet(),
+                    )
+                }
                 is AppResult.Failure -> _state.value = _state.value.copy(
                     isBusy = false,
                     error = result.message,
@@ -695,6 +746,14 @@ data class ImportState(
     /** The name as printed on the statement, whether or not anybody matched it. */
     val printedName: String? = null,
 
+    /** What happened to the account's balance after the statement was imported. */
+    val balanceNote: String? = null,
+
+    /** Regular payments found after importing, offered as bills. */
+    val foundBills: List<RecurringDetector.RegularPayment> = emptyList(),
+    val chosenBills: Set<String> = emptySet(),
+    val billsNote: String? = null,
+
     /** The person whose page this import was started from, if any. */
     val expectedPersonId: Long? = null,
     val expectedPersonName: String? = null,
@@ -744,6 +803,12 @@ data class ImportState(
 
     /** True when the sheet is a bank statement and can be read as it stands. */
     val canImportStatement: Boolean get() = detectedStatement != null
+
+    /**
+     * Whether the whole statement was read: its rows checked against its own
+     * running balance. See [StatementCheck].
+     */
+    val check: StatementCheck get() = StatementCheck.of(candidates)
 
     /** How many rows move money between the person's own accounts. */
     val moveCount: Int

@@ -15,13 +15,31 @@ import kotlinx.coroutines.flow.Flow
 /**
  * Account queries.
  *
- * Balances are always computed in SQL from the opening balance plus every
- * transaction, so they cannot drift away from the entries that explain them.
+ * Balances are always computed in SQL: the balance given for the account on
+ * its balance date, plus every entry after that day; see [COUNTS]. They
+ * cannot drift away from the entries that explain them.
  * The `BALANCE_EXPRESSION` fragment is repeated verbatim in each query because
  * Room requires literal SQL — keep the copies in step when changing it.
  */
 @Dao
 interface AccountDao {
+
+    companion object {
+        /**
+         * Whether an entry moves an account's balance.
+         *
+         * The balance somebody gives for an account is the money in it on
+         * its balance date — "on 21 October there was £2,964.81". Anything
+         * dated before then is already inside that figure, so a statement
+         * reaching back further must not add it again. Anything after it
+         * moves the balance on. On the day itself, only what was typed in by
+         * hand counts: a statement's rows for that day are in the figure.
+         */
+        const val COUNTS = """(t.date > a.opening_balance_date OR (t.date = a.opening_balance_date AND t.source = 'MANUAL'))"""
+
+        /** [COUNTS], for the second alias used for transfers in. */
+        const val TRANSFER_IN_COUNTS = """(t2.date > a.opening_balance_date OR (t2.date = a.opening_balance_date AND t2.source = 'MANUAL'))"""
+    }
 
     @Query(
         """
@@ -30,12 +48,13 @@ interface AccountDao {
             + IFNULL((
                 SELECT SUM(CASE WHEN t.type = 'INCOME' THEN t.amount_minor ELSE -t.amount_minor END)
                 FROM transactions t
-                WHERE t.account_id = a.id AND t.is_archived = 0
+                WHERE t.account_id = a.id AND t.is_archived = 0 AND $COUNTS
             ), 0)
             + IFNULL((
                 SELECT SUM(t2.amount_minor)
                 FROM transactions t2
                 WHERE t2.transfer_account_id = a.id AND t2.type = 'TRANSFER' AND t2.is_archived = 0
+                  AND $TRANSFER_IN_COUNTS
             ), 0) AS balance_minor
         FROM accounts a
         LEFT JOIN people p ON p.id = a.person_id
@@ -52,12 +71,13 @@ interface AccountDao {
             + IFNULL((
                 SELECT SUM(CASE WHEN t.type = 'INCOME' THEN t.amount_minor ELSE -t.amount_minor END)
                 FROM transactions t
-                WHERE t.account_id = a.id AND t.is_archived = 0
+                WHERE t.account_id = a.id AND t.is_archived = 0 AND $COUNTS
             ), 0)
             + IFNULL((
                 SELECT SUM(t2.amount_minor)
                 FROM transactions t2
                 WHERE t2.transfer_account_id = a.id AND t2.type = 'TRANSFER' AND t2.is_archived = 0
+                  AND $TRANSFER_IN_COUNTS
             ), 0) AS balance_minor
         FROM accounts a
         LEFT JOIN people p ON p.id = a.person_id
@@ -68,22 +88,43 @@ interface AccountDao {
 
     /**
      * Balance as it stood at the close of [asOf], used by reports and by the
-     * monthly rollover.  Transactions dated after [asOf] are ignored.
+     * monthly rollover.
+     *
+     * The account's given balance is what it held at the close of its
+     * balance date. On or after that day, the movements since are added; for
+     * an earlier day, the movements between then and the balance date — the
+     * ones the given balance already includes — are taken back off.
      */
     @Query(
         """
         SELECT a.opening_balance_minor
-            + IFNULL((
-                SELECT SUM(CASE WHEN t.type = 'INCOME' THEN t.amount_minor ELSE -t.amount_minor END)
-                FROM transactions t
-                WHERE t.account_id = a.id AND t.is_archived = 0 AND t.date <= :asOf
-            ), 0)
-            + IFNULL((
-                SELECT SUM(t2.amount_minor)
-                FROM transactions t2
-                WHERE t2.transfer_account_id = a.id AND t2.type = 'TRANSFER'
-                  AND t2.is_archived = 0 AND t2.date <= :asOf
-            ), 0)
+            + CASE WHEN :asOf >= a.opening_balance_date THEN
+                IFNULL((
+                    SELECT SUM(CASE WHEN t.type = 'INCOME' THEN t.amount_minor ELSE -t.amount_minor END)
+                    FROM transactions t
+                    WHERE t.account_id = a.id AND t.is_archived = 0 AND $COUNTS
+                      AND t.date <= :asOf
+                ), 0)
+                + IFNULL((
+                    SELECT SUM(t2.amount_minor)
+                    FROM transactions t2
+                    WHERE t2.transfer_account_id = a.id AND t2.type = 'TRANSFER'
+                      AND t2.is_archived = 0 AND $TRANSFER_IN_COUNTS AND t2.date <= :asOf
+                ), 0)
+            ELSE
+                - IFNULL((
+                    SELECT SUM(CASE WHEN t.type = 'INCOME' THEN t.amount_minor ELSE -t.amount_minor END)
+                    FROM transactions t
+                    WHERE t.account_id = a.id AND t.is_archived = 0 AND NOT $COUNTS
+                      AND t.date > :asOf
+                ), 0)
+                - IFNULL((
+                    SELECT SUM(t2.amount_minor)
+                    FROM transactions t2
+                    WHERE t2.transfer_account_id = a.id AND t2.type = 'TRANSFER'
+                      AND t2.is_archived = 0 AND NOT $TRANSFER_IN_COUNTS AND t2.date > :asOf
+                ), 0)
+            END
         FROM accounts a
         WHERE a.id = :accountId
         """,
@@ -118,30 +159,24 @@ interface AccountDao {
     @Query("SELECT * FROM accounts WHERE name = :name COLLATE NOCASE LIMIT 1")
     suspend fun getByName(name: String): AccountEntity?
 
-    /**
-     * What this account's transactions add up to, without its opening balance.
-     *
-     * The difference between a balance somebody states and one the app works
-     * out. A spreadsheet says what is in the account *now*; the app derives
-     * that from the opening balance plus every transaction, so to make the two
-     * agree the opening balance has to be the stated figure less this.
-     */
+    /** The earliest entry into or out of an account, or null when it has none. */
     @Query(
         """
-        SELECT IFNULL((
-                SELECT SUM(CASE WHEN t.type = 'INCOME' THEN t.amount_minor ELSE -t.amount_minor END)
-                FROM transactions t
-                WHERE t.account_id = :accountId AND t.is_archived = 0
-            ), 0)
-            + IFNULL((
-                SELECT SUM(t2.amount_minor)
-                FROM transactions t2
-                WHERE t2.transfer_account_id = :accountId AND t2.type = 'TRANSFER'
-                  AND t2.is_archived = 0
-            ), 0)
+        SELECT MIN(date) FROM transactions
+        WHERE is_archived = 0 AND (account_id = :accountId OR transfer_account_id = :accountId)
         """,
     )
-    suspend fun getRecordedMovementMinor(accountId: Long): Long
+    suspend fun getEarliestEntryDate(accountId: Long): LocalDate?
+
+    /** Moves the day an account's balance is given for, and the balance itself. */
+    @Query(
+        """
+        UPDATE accounts SET opening_balance_minor = :balanceMinor,
+            opening_balance_date = :asOf, updated_at = :updatedAt
+        WHERE id = :accountId
+        """,
+    )
+    suspend fun setBalanceAsOf(accountId: Long, balanceMinor: Long, asOf: LocalDate, updatedAt: Long)
 
     /**
      * The account with this name belonging to this person.
