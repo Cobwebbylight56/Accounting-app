@@ -59,6 +59,13 @@ import com.rhys.financetracker.domain.income.PayRise
 import com.rhys.financetracker.domain.model.AccountType
 import com.rhys.financetracker.domain.model.Holding
 import com.rhys.financetracker.ui.components.ConfirmDialog
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.material3.FilterChip
+import com.rhys.financetracker.ui.components.LabelledTextField
+import com.rhys.financetracker.ui.components.DropdownField
+import com.rhys.financetracker.ui.components.DateField
+import com.rhys.financetracker.ui.components.AmountField
 import com.rhys.financetracker.ui.components.SectionCard
 import com.rhys.financetracker.ui.components.colorFromHex
 import com.rhys.financetracker.ui.navigation.Routes
@@ -79,6 +86,7 @@ data class PersonHubState(
     val account: AccountDraft = AccountDraft(),
     val loan: LoanDraft = LoanDraft(),
     val rise: PayRiseDraft = PayRiseDraft(),
+    val wage: com.rhys.financetracker.data.local.entity.RecurringRuleEntity? = null,
     val isBusy: Boolean = false,
 ) {
     val income: IncomeStats
@@ -113,13 +121,51 @@ class PersonHubViewModel @Inject constructor(
         peopleRepository.observe(personId),
         accountRepository.observeWithBalances(),
         incomeRepository.observeHistory(personId),
-    ) { current, person, accounts, history ->
+        incomeRepository.observeWage(personId),
+    ) { current, person, accounts, history, wage ->
         current.copy(
             person = person,
             theirs = accounts.filter { it.account.personId == personId },
             history = history,
+            wage = wage,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PersonHubState())
+
+    /** Pays their take-home into [accountId] on [day] every month. */
+    fun setWage(accountId: Long?, amountText: String, day: Int) {
+        if (accountId == null) {
+            message.value = "Choose the account it's paid into"
+            return
+        }
+        val amount = Money.parseOrNull(amountText) ?: state.value.income.netMonthlyMinor
+        viewModelScope.launch {
+            message.value = when (val result = incomeRepository.setWage(personId, accountId, amount ?: 0L, day)) {
+                is AppResult.Success -> "Wage set: ${Money.format(amount ?: 0L)} every month"
+                is AppResult.Failure -> result.message
+            }
+        }
+    }
+
+    fun stopWage() {
+        viewModelScope.launch {
+            message.value = incomeRepository.stopWage(personId).errorMessageOrNull() ?: "Wage stopped"
+        }
+    }
+
+    /** Records overtime or extra pay into the wage account. */
+    fun addOvertime(amountText: String, date: java.time.LocalDate, note: String) {
+        val amount = Money.parseOrNull(amountText)
+        val accountId = state.value.wage?.accountId
+            ?: state.value.accounts.firstOrNull { it.account.holding == Holding.SPEND }?.account?.id
+        if (amount == null || amount <= 0L || accountId == null) {
+            message.value = if (accountId == null) "Add an account first" else "Enter the amount"
+            return
+        }
+        viewModelScope.launch {
+            message.value = incomeRepository.addOvertime(personId, accountId, amount, date, note)
+                .errorMessageOrNull() ?: "${Money.format(amount)} overtime added"
+        }
+    }
 
     fun update(change: (PersonHubState) -> PersonHubState) {
         drafts.value = change(drafts.value)
@@ -334,6 +380,16 @@ fun PersonHubScreen(
                 }
             }
 
+            // --------------------------------------------------------- wage
+            item {
+                WageCard(
+                    state = state,
+                    onSetWage = viewModel::setWage,
+                    onStopWage = viewModel::stopWage,
+                    onAddOvertime = viewModel::addOvertime,
+                )
+            }
+
             // ----------------------------------------------------- accounts
             item {
                 SectionCard(title = "Accounts", subtitle = "What's theirs") {
@@ -496,4 +552,138 @@ private fun BalanceRow(
             color = if (amountMinor < 0L) FinanceTheme.colors.negative else MaterialTheme.colorScheme.onSurface,
         )
     }
+}
+
+/**
+ * Their wage, paid in by itself each month, and overtime on top.
+ *
+ * The wage lands on its day so the month is right before any statement
+ * arrives; the statement's wage then replaces it at the bank's figure, and
+ * any overtime typed in for that month is folded into it.
+ */
+@Composable
+private fun WageCard(
+    state: PersonHubState,
+    onSetWage: (Long?, String, Int) -> Unit,
+    onStopWage: () -> Unit,
+    onAddOvertime: (String, java.time.LocalDate, String) -> Unit,
+) {
+    val spendAccounts = state.accounts.filter { it.account.holding == Holding.SPEND }
+    val wage = state.wage
+    var editing by rememberSaveable { mutableStateOf(false) }
+    var accountId by rememberSaveable(wage?.accountId) {
+        mutableStateOf(wage?.accountId ?: spendAccounts.firstOrNull()?.account?.id)
+    }
+    var amountText by rememberSaveable(wage?.amountMinor) {
+        mutableStateOf(
+            (wage?.amountMinor ?: state.income.netMonthlyMinor)?.let { Money.formatPlain(it) }.orEmpty(),
+        )
+    }
+    var day by rememberSaveable(wage?.startDate) { mutableStateOf(wage?.startDate?.dayOfMonth ?: 31) }
+    var addingOvertime by rememberSaveable { mutableStateOf(false) }
+    var overtimeText by rememberSaveable { mutableStateOf("") }
+    var overtimeNote by rememberSaveable { mutableStateOf("") }
+    var overtimeDate by remember { mutableStateOf(DateUtils.today()) }
+
+    SectionCard(title = "Wage", subtitle = "Paid in each month") {
+        if (wage != null && !editing) {
+            val into = spendAccounts.firstOrNull { it.account.id == wage.accountId }?.account?.name
+            PayLine("Each month", Money.format(wage.amountMinor))
+            PayLine("Into", into ?: "an account")
+            PayLine("On", if ((wage.startDate.dayOfMonth) >= 31) "the last day of the month" else "the ${wage.startDate.dayOfMonth}${ordinal(wage.startDate.dayOfMonth)}")
+            PayLine("Next", DateUtils.format(wage.nextDueDate))
+            Text(
+                text = "It's added by itself on the day. When the statement comes, its wage " +
+                    "replaces this one at the bank's figure — overtime and all.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { editing = true }) { Text("Change") }
+                TextButton(onClick = onStopWage) { Text("Stop") }
+            }
+        } else if (spendAccounts.isEmpty()) {
+            Text(
+                text = "Add their current account below, then their wage can be paid into it.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            DropdownField(
+                label = "Paid into",
+                options = spendAccounts,
+                selected = spendAccounts.firstOrNull { it.account.id == accountId },
+                onSelect = { accountId = it.account.id },
+                optionLabel = { it.account.name },
+            )
+            Spacer(Modifier.height(8.dp))
+            AmountField(label = "Take-home each month", value = amountText, onValueChange = { amountText = it })
+            Spacer(Modifier.height(8.dp))
+            Text("Paid on", style = MaterialTheme.typography.labelLarge)
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                listOf(31, 28, 25, 20, 15, 1).forEach { option ->
+                    FilterChip(
+                        selected = day == option,
+                        onClick = { day = option },
+                        label = { Text(if (option == 31) "Last day" else "$option${ordinal(option)}") },
+                    )
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Button(
+                onClick = { onSetWage(accountId, amountText, day); editing = false },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text(if (wage == null) "Pay it in every month" else "Save") }
+        }
+
+        Spacer(Modifier.height(12.dp))
+        HorizontalDivider()
+        Spacer(Modifier.height(8.dp))
+        if (addingOvertime) {
+            AmountField(label = "Overtime or extra pay", value = overtimeText, onValueChange = { overtimeText = it })
+            Spacer(Modifier.height(8.dp))
+            DateField(label = "Paid on", date = overtimeDate, onDateChange = { overtimeDate = it })
+            Spacer(Modifier.height(8.dp))
+            LabelledTextField(
+                label = "What for? (optional)",
+                value = overtimeNote,
+                onValueChange = { overtimeNote = it },
+                placeholder = "Overtime, bonus, extra shift…",
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { addingOvertime = false }) { Text("Cancel") }
+                Button(
+                    onClick = {
+                        onAddOvertime(overtimeText, overtimeDate, overtimeNote)
+                        overtimeText = ""
+                        overtimeNote = ""
+                        addingOvertime = false
+                    },
+                    modifier = Modifier.weight(1f),
+                ) { Text("Add") }
+            }
+            Text(
+                text = "Counted straight away. When the statement's wage arrives with it included, " +
+                    "this is folded into it rather than counted twice.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            OutlinedButton(onClick = { addingOvertime = true }, modifier = Modifier.fillMaxWidth()) {
+                Text("Add overtime or extra pay")
+            }
+        }
+    }
+}
+
+private fun ordinal(day: Int): String = when {
+    day in 11..13 -> "th"
+    day % 10 == 1 -> "st"
+    day % 10 == 2 -> "nd"
+    day % 10 == 3 -> "rd"
+    else -> "th"
 }

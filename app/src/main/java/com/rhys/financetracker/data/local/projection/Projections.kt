@@ -165,6 +165,15 @@ data class FingerprintCount(
     @ColumnInfo(name = "occurrences") val occurrences: Int,
 )
 
+/** One entry for grouping by payee: who, how much, when, and how it is filed. */
+data class PayeeEntry(
+    @ColumnInfo(name = "id") val id: Long,
+    @ColumnInfo(name = "description") val description: String,
+    @ColumnInfo(name = "amount_minor") val amountMinor: Long,
+    @ColumnInfo(name = "date") val date: LocalDate,
+    @ColumnInfo(name = "category_name") val categoryName: String?,
+)
+
 /** A payment out, as the bill finder reads it. */
 data class PaymentOut(
     @ColumnInfo(name = "description") val description: String,

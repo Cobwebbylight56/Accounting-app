@@ -545,7 +545,7 @@ private fun FoundBillsDialog(
     onAdd: (List<RecurringDetector.RegularPayment>) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var chosen by remember { mutableStateOf(bills.map { it.name }.toSet()) }
+    var chosen by remember { mutableStateOf(bills.filter { it.isConfirmed }.map { it.name }.toSet()) }
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Bills found in your statements") },

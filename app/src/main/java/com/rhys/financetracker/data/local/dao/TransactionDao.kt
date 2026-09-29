@@ -21,6 +21,7 @@ import com.rhys.financetracker.data.local.projection.FingerprintCount
 import com.rhys.financetracker.data.local.projection.IncomeExpenseTotals
 import com.rhys.financetracker.data.local.projection.MonthTotals
 import com.rhys.financetracker.data.local.projection.PaymentOut
+import com.rhys.financetracker.data.local.projection.PayeeEntry
 import com.rhys.financetracker.data.local.projection.PersonPotFlow
 import com.rhys.financetracker.data.local.projection.PersonTotals
 import com.rhys.financetracker.data.local.projection.PotFlow
@@ -156,6 +157,8 @@ interface TransactionDao {
         """
         UPDATE transactions
         SET date = :date,
+            amount_minor = :amountMinor,
+            is_confirmed = 1,
             description = :description,
             category_id = :categoryId,
             notes = :notes,
@@ -169,6 +172,7 @@ interface TransactionDao {
     suspend fun applyStatementVersion(
         id: Long,
         date: LocalDate,
+        amountMinor: Long,
         description: String,
         categoryId: Long?,
         notes: String?,
@@ -652,6 +656,91 @@ interface TransactionDao {
         """,
     )
     suspend fun paymentsOutSince(from: LocalDate, accountId: Long?): List<PaymentOut>
+
+    /**
+     * Wage entries the app paid in by itself on [accountId] — made by the
+     * wage's regular payment, marked with [marker] — that no statement has
+     * replaced yet.
+     */
+    @Query(
+        """
+        SELECT t.id AS id, t.date AS date, t.amount_minor AS amount_minor, t.type AS type,
+               t.description AS description, t.category_id AS category_id, t.notes AS notes,
+               t.source AS source
+        FROM transactions t
+        JOIN recurring_rules r ON r.id = t.recurring_rule_id
+        WHERE t.account_id = :accountId AND t.is_archived = 0 AND t.type = 'INCOME'
+          AND r.notes = :marker AND t.source <> 'STATEMENT'
+          AND t.date BETWEEN :from AND :to
+        """,
+    )
+    suspend fun wageEntriesBetween(
+        accountId: Long,
+        marker: String,
+        from: LocalDate,
+        to: LocalDate,
+    ): List<ExistingEntry>
+
+    /**
+     * Overtime typed in by hand on [accountId] between two dates, which a
+     * statement's wage replaces: the bank's figure already includes it.
+     */
+    @Query(
+        """
+        UPDATE transactions SET is_archived = 1, updated_at = :updatedAt,
+            notes = TRIM(IFNULL(notes, '') || ' Included in the wage on the statement.')
+        WHERE account_id = :accountId AND is_archived = 0 AND type = 'INCOME'
+          AND source = 'MANUAL' AND date BETWEEN :from AND :to
+          AND category_id IN (SELECT id FROM categories WHERE name = :overtimeCategory)
+        """,
+    )
+    suspend fun foldOvertimeIntoWage(
+        accountId: Long,
+        overtimeCategory: String,
+        from: LocalDate,
+        to: LocalDate,
+        updatedAt: Long,
+    ): Int
+
+    /**
+     * Money out between two dates that is not properly sorted: no category,
+     * or only one that says a card was used ([vague] names).
+     */
+    @Query(
+        """
+        SELECT t.id AS id, t.description AS description, t.amount_minor AS amount_minor,
+               t.date AS date, c.name AS category_name
+        FROM transactions t
+        LEFT JOIN categories c ON c.id = t.category_id
+        WHERE t.is_archived = 0 AND t.type = 'EXPENSE'
+          AND (t.category_id IS NULL OR c.name IN (:vague))
+          AND t.date BETWEEN :from AND :to
+        ORDER BY t.date DESC
+        """,
+    )
+    fun observeUnsorted(from: LocalDate, to: LocalDate, vague: List<String>): Flow<List<PayeeEntry>>
+
+    /**
+     * Money out between two dates that went to people: filed under [people]
+     * categories, or unsorted.
+     */
+    @Query(
+        """
+        SELECT t.id AS id, t.description AS description, t.amount_minor AS amount_minor,
+               t.date AS date, c.name AS category_name
+        FROM transactions t
+        LEFT JOIN categories c ON c.id = t.category_id
+        WHERE t.is_archived = 0 AND t.type = 'EXPENSE'
+          AND (t.category_id IS NULL OR c.name IN (:people))
+          AND t.date BETWEEN :from AND :to
+        ORDER BY t.date DESC
+        """,
+    )
+    fun observeSentToPeople(from: LocalDate, to: LocalDate, people: List<String>): Flow<List<PayeeEntry>>
+
+    /** Files several entries under one category at once. */
+    @Query("UPDATE transactions SET category_id = :categoryId, updated_at = :updatedAt WHERE id IN (:ids)")
+    suspend fun setCategory(ids: List<Long>, categoryId: Long, updatedAt: Long)
 
     /** Recent transfers into or out of [accountId], newest first; see OwnAccountMatcher. */
     @Query(

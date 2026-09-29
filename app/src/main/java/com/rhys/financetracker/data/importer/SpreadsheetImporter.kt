@@ -351,9 +351,7 @@ class SpreadsheetImporter @Inject constructor(
             to = last.plusDays(CORRECTION_MARGIN_DAYS),
         )
         val corrections = StatementPriority.corrections(candidates, existing)
-        if (corrections.isEmpty()) return candidates
-
-        return candidates.map { candidate ->
+        val corrected = candidates.map { candidate ->
             val correction = corrections[candidate.id] ?: return@map candidate
             candidate.copy(
                 corrects = StatementCorrection(
@@ -361,6 +359,59 @@ class SpreadsheetImporter @Inject constructor(
                     existingDescription = correction.existing.description,
                     existingDateIso = correction.existing.date.toString(),
                     payeesAgreed = correction.payeesAgreed,
+                ),
+            )
+        }
+        return matchWages(corrected, accountId, first, last)
+    }
+
+    /**
+     * Pairs the wage on the statement with the one the app paid in by itself.
+     *
+     * The amounts need not agree — overtime, a bonus, a tax change — so the
+     * ordinary exact-amount match never finds it, and the month would count
+     * two wages. Money in within a few days of the app's wage, and not wildly
+     * different from it, is taken to be the real one and replaces it.
+     */
+    private suspend fun matchWages(
+        candidates: List<ImportCandidate>,
+        accountId: Long,
+        first: java.time.LocalDate,
+        last: java.time.LocalDate,
+    ): List<ImportCandidate> {
+        val wages = transactionDao.wageEntriesBetween(
+            accountId = accountId,
+            marker = WAGE_MARKER,
+            from = first.minusDays(WAGE_MARGIN_DAYS),
+            to = last.plusDays(WAGE_MARGIN_DAYS),
+        ).toMutableList()
+        if (wages.isEmpty()) return candidates
+        val claimed = candidates.mapNotNull { it.corrects?.existingId }.toSet()
+        wages.removeAll { it.id in claimed }
+        return candidates.map { candidate ->
+            if (!candidate.isImportable || candidate.corrects != null || candidate.isAlreadyPresent ||
+                candidate.transactionType != TransactionType.INCOME
+            ) {
+                return@map candidate
+            }
+            val date = candidate.dateIso?.let(DateUtils::parseIsoOrNull) ?: return@map candidate
+            val wage = wages
+                .filter { entry ->
+                    kotlin.math.abs(entry.date.toEpochDay() - date.toEpochDay()) <= WAGE_MARGIN_DAYS &&
+                        candidate.amountMinor * 2 >= entry.amountMinor &&
+                        candidate.amountMinor <= entry.amountMinor * 2
+                }
+                .minByOrNull { kotlin.math.abs(it.date.toEpochDay() - date.toEpochDay()) }
+                ?: return@map candidate
+            wages.remove(wage)
+            candidate.copy(
+                categoryName = candidate.categoryName ?: SALARY_CATEGORY,
+                correctsWage = true,
+                corrects = StatementCorrection(
+                    existingId = wage.id,
+                    existingDescription = wage.description,
+                    existingDateIso = wage.date.toString(),
+                    payeesAgreed = false,
                 ),
             )
         }
@@ -639,18 +690,33 @@ class SpreadsheetImporter @Inject constructor(
         transactionDao.applyStatementVersion(
             id = existing.id,
             date = date,
+            // The bank's figure. Only ever different for a wage the app paid
+            // in by itself, where the statement's amount includes overtime.
+            amountMinor = candidate.amountMinor,
             description = candidate.name,
             categoryId = categoryId,
             notes = mergedNotes(existing.description, existing.notes, candidate),
             importHash = TransactionFingerprint.of(
                 accountId = existing.accountId,
                 date = date,
-                amountMinor = existing.amountMinor,
+                amountMinor = candidate.amountMinor,
                 type = type,
                 description = candidate.name,
             ),
             updatedAt = System.currentTimeMillis(),
         )
+        // A wage from the statement already includes any overtime typed in
+        // for that month, so those entries are folded into it rather than
+        // counted a second time.
+        if (candidate.correctsWage) {
+            transactionDao.foldOvertimeIntoWage(
+                accountId = existing.accountId,
+                overtimeCategory = OVERTIME_CATEGORY,
+                from = date.minusDays(WAGE_PERIOD_DAYS),
+                to = date.plusDays(WAGE_MARGIN_DAYS),
+                updatedAt = System.currentTimeMillis(),
+            )
+        }
         return running.copy(transactionsUpdated = running.transactionsUpdated + 1)
     }
 
@@ -1002,7 +1068,20 @@ class SpreadsheetImporter @Inject constructor(
      */
     internal fun guessAccountType(name: String): AccountType = AccountNaming.typeFor(name)
 
-    private companion object {
+    companion object {
+        /** Marks the regular payment that is somebody's wage; see IncomeRepository. */
+        const val WAGE_MARKER = "Wage — paid in by the app each month until a statement replaces it."
+
+        /** The category overtime typed in by hand is filed under. */
+        const val OVERTIME_CATEGORY = "Overtime"
+        const val SALARY_CATEGORY = "Salary"
+
+        /** How far from its usual day a wage can land and still be the same one. */
+        private const val WAGE_MARGIN_DAYS = 5L
+
+        /** The stretch before a wage whose typed-in overtime it includes. */
+        private const val WAGE_PERIOD_DAYS = 31L
+
         /** How far apart two records of the same move between accounts can be dated. */
         const val TRANSFER_MARGIN_DAYS = 3L
 

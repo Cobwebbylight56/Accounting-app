@@ -75,6 +75,8 @@ fun DashboardScreen(
     onOpenSetup: () -> Unit,
     onOpenPerson: (Long) -> Unit,
     onOpenPeople: () -> Unit,
+    onOpenSortSpending: () -> Unit = {},
+    onOpenSentToPeople: () -> Unit = {},
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -169,6 +171,19 @@ fun DashboardScreen(
                 item { HomeTiles(state = state, onOpenAccounts = onOpenAccounts) }
 
                 item { MonthList(state = state) }
+
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        androidx.compose.material3.OutlinedButton(
+                            onClick = onOpenSortSpending,
+                            modifier = Modifier.weight(1f),
+                        ) { Text("Sort spending") }
+                        androidx.compose.material3.OutlinedButton(
+                            onClick = onOpenSentToPeople,
+                            modifier = Modifier.weight(1f),
+                        ) { Text("Sent to people") }
+                    }
+                }
 
                 item { LoansCard(state = state, onOpenAccounts = onOpenAccounts) }
 

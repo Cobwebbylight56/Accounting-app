@@ -564,7 +564,7 @@ class ImportViewModel @Inject constructor(
                         outcome = result.data,
                         balanceNote = balanceNote,
                         foundBills = bills,
-                        chosenBills = bills.map { it.name }.toSet(),
+                        chosenBills = bills.filter { it.isConfirmed }.map { it.name }.toSet(),
                     )
                 }
                 is AppResult.Failure -> _state.value = _state.value.copy(

@@ -139,6 +139,12 @@ object MerchantCategoriser {
             "kfc", "burger king", "subway", "pizza", "domino", "wagamama", "prezzo",
             "harvester", "toby carvery", "wetherspoon", "deliveroo", "just eat",
             "restaurant", "bistro", "cafe", "coffee", "takeaway", "chippy", "bakery",
+            "five guys", "tim hortons", "papa john", "frankie and benny", "zizzi", "ask italian",
+            "bella italia", "beefeater", "brewers fayre", "miller and carter", "chiquito",
+            "tgi friday", "taco bell", "wimpy", "leon ", "itsu", "yo sushi", "krispy kreme",
+            "pub ", "tavern", "bar and grill", "arms ", "brewdog", "slug and lettuce",
+            "all bar one", "greene king", "marstons", "stonegate", "chip shop", "fish bar",
+            "kebab", "curry house", "curry ", "indian ", "chinese ", "thai ", "diner", "grill ", "noodle",
         ),
 
         // -- motoring -------------------------------------------------------
@@ -179,6 +185,7 @@ object MerchantCategoriser {
         rule(
             "Energy",
             "octopus energy", "british gas", "e on", "eon ", "edf", "ovo energy",
+            "utility warehouse", "utilitywarehouse", "utility wareh",
             "scottish power", "bulb", "utilita", "sse ", "npower",
         ),
         rule(
@@ -229,6 +236,13 @@ object MerchantCategoriser {
             "Days out",
             "odeon", "vue cinema", "cineworld", "cinema", "national trust", "english heritage",
             "alton towers", "zoo", "theme park", "theatre",
+            "bowling", "hollywood bowl", "tenpin", "trampoline", "escape room", "laser quest",
+            "golf", "museum", "aquarium", "sea life", "legoland", "thorpe park", "chessington",
+            "drayton manor", "paultons", "merlin", "ticketmaster", "see tickets", "eventbrite",
+            "skiddle", "festival", "concert", "arena", "stadium", "soft play", "funfair",
+            "safari", "farm park", "go ape", "paintball", "karting", "arcade", "showcase",
+            "everyman", "picturehouse", "empire cinema", "ice rink", "climbing", "splash",
+            "water park", "adventure", "attraction", "tickets",
         ),
 
         // -- shopping -------------------------------------------------------
@@ -238,6 +252,20 @@ object MerchantCategoriser {
             "primark", "asos", "tk maxx", "sports direct", "john lewis", "currys",
             "very co uk", "shein", "temu", "ebay", "etsy", "wilko", "poundland",
             "home bargains", "b and m", "the range", "next retail", "matalan",
+            // the high street
+            "h and m", "zara", "new look", "river island", "jd sports", "footlocker",
+            "foot locker", "next ", "tkmaxx", "the works", "smyths", "the entertainer",
+            "hobbycraft", "waterstones", "whsmith", "wh smith", "superdry", "clarks", "schuh",
+            "deichmann", "mountain warehouse", "go outdoors", "decathlon", "hmv", "cex ",
+            "game ", "lush ", "the fragrance shop", "the perfume shop", "savers ", "pandora",
+            "h samuel", "ernest jones", "claires", "accessorize", "fat face", "fatface",
+            "joules", "white stuff", "primark", "b and m bargains", "poundstretcher",
+            "the card shop", "apple store", "samsung shop",
+            // websites
+            "amzn", "amazon co uk", "amazon eu", "amazon marketplace", "aliexpress",
+            "zalando", "boohoo", "pretty little thing", "prettylittlething", "wish com",
+            "littlewoods", "jd williams", "simply be", "studio retail", "notonthehighstreet",
+            "bargain max", "onbuy", "wayfair", "lookfantastic", "cult beauty",
         ),
 
         // -- health, pets, children ------------------------------------------

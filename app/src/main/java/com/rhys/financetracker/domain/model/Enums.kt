@@ -52,6 +52,9 @@ enum class AccountType(
     CURRENT("Current account", Holding.SPEND),
     SAVINGS("Savings account", Holding.SET_ASIDE),
     CREDIT_CARD("Credit card", Holding.OWED),
+
+    /** Buy now, pay later: PayPal Pay in 3, Klarna, Clearpay, Laybuy. */
+    PAY_LATER("Pay later (Pay in 3, Klarna…)", Holding.OWED),
     LOAN("Loan", Holding.OWED),
     MORTGAGE("Mortgage", Holding.OWED),
     INVESTMENT("Investment", Holding.SET_ASIDE),

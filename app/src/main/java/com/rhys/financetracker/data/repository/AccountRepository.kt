@@ -270,7 +270,9 @@ class AccountRepository @Inject constructor(
          */
         fun isPaidOffLoan(item: AccountWithBalance): Boolean {
             val account = item.account
-            val isLoan = account.type == AccountType.LOAN || account.type == AccountType.MORTGAGE
+            // Pay-later plans end too: the last of the three payments and it is done.
+            val isLoan = account.type == AccountType.LOAN || account.type == AccountType.MORTGAGE ||
+                account.type == AccountType.PAY_LATER
             val wasOwed = account.openingBalanceMinor < 0L || (account.creditLimitMinor ?: 0L) > 0L
             return isLoan && wasOwed && !account.isArchived && item.balanceMinor >= 0L
         }

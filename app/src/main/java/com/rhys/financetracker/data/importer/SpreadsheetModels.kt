@@ -176,6 +176,8 @@ data class ImportCandidate(
      */
     val transferAccountId: Long? = null,
     val transferAccountName: String? = null,
+    /** True when this row is the real wage replacing the one the app paid in by itself. */
+    val correctsWage: Boolean = false,
     /** The statement's running balance after this row, when it printed one. */
     val balanceMinor: Long? = null,
     /** Why the row is not being added even though it is new here, for the review screen. */

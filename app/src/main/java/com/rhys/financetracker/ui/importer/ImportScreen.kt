@@ -161,7 +161,8 @@ fun ImportScreen(
                 )
             }
 
-            state.unreadablePdfText?.let { text ->
+            // On the review page it scrolls with everything else instead.
+            state.unreadablePdfText?.takeIf { state.step != ImportStep.REVIEW }?.let { text ->
                 Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                     UnreadablePdfCard(
                         text = text,
@@ -888,10 +889,109 @@ private fun ReviewStep(state: ImportState, viewModel: ImportViewModel) {
     val targets by viewModel.ownTargets.collectAsStateWithLifecycle()
     var choosingFor by remember { mutableStateOf<ImportCandidate?>(null) }
     Column(modifier = Modifier.fillMaxSize()) {
-        WrongAccountWarning(state = state, viewModel = viewModel)
-        if (state.canImportStatement) {
-            StatementCheckCard(state.check, onShowWhatWasRead = viewModel::showWhatWasRead)
+        // Everything scrolls together — the check, the counts and every row —
+        // so the whole import can be read, not only what fits above the list.
+        LazyColumn(modifier = Modifier.weight(1f)) {
+            state.unreadablePdfText?.let { text ->
+                item {
+                    Box(modifier = Modifier.padding(16.dp)) {
+                        UnreadablePdfCard(text = text, onDismiss = viewModel::clearUnreadablePdf)
+                    }
+                }
+            }
+            item { WrongAccountWarning(state = state, viewModel = viewModel) }
+            if (state.canImportStatement) {
+                item {
+                    StatementCheckCard(
+                        check = state.check,
+                        candidates = state.candidates,
+                        onSwap = viewModel::toggleDirection,
+                        onShowWhatWasRead = viewModel::showWhatWasRead,
+                    )
+                }
+            }
+            item { ReviewSummary(state = state, viewModel = viewModel) }
+            items(state.candidates, key = { it.id }) { candidate ->
+                Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    CandidateRow(
+                        candidate = candidate,
+                        onToggle = { viewModel.toggleCandidate(candidate.id) },
+                        onFlip = { viewModel.toggleDirection(candidate.id) },
+                        onChooseDestination = if (targets.isNotEmpty()) {
+                            { choosingFor = candidate }
+                        } else {
+                            null
+                        },
+                    )
+                }
+            }
         }
+
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            OutlinedButton(
+                onClick = viewModel::mapByHand,
+                modifier = Modifier.weight(1f),
+            ) { Text("Change") }
+            Button(
+                onClick = viewModel::applyImport,
+                modifier = Modifier.weight(1f),
+                enabled = state.selectedCount > 0 && !state.isBusy,
+            ) { Text("Import") }
+        }
+    }
+
+    choosingFor?.let { candidate ->
+        val out = candidate.transactionType != TransactionType.INCOME
+        AlertDialog(
+            onDismissRequest = { choosingFor = null },
+            title = { Text(if (out) "Where did this go?" else "Where did this come from?") },
+            text = {
+                Column {
+                    Text(
+                        text = candidate.name,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    DestinationOption(
+                        label = if (out) "Spending — it's gone" else "Income — money earned",
+                        selected = candidate.transferAccountId == null,
+                        onClick = {
+                            viewModel.setDestination(candidate.id, null)
+                            choosingFor = null
+                        },
+                    )
+                    targets.forEach { target ->
+                        DestinationOption(
+                            label = (if (out) "Into " else "From ") + target.name +
+                                " · " + target.type.displayName,
+                            selected = candidate.transferAccountId == target.id,
+                            onClick = {
+                                viewModel.setDestination(candidate.id, target)
+                                choosingFor = null
+                            },
+                        )
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = "The app remembers this payee for next time.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
+            confirmButton = { TextButton(onClick = { choosingFor = null }) { Text("Close") } },
+        )
+    }
+}
+
+/** The counts above the rows: what will be added, skipped, corrected and moved. */
+@Composable
+private fun ReviewSummary(state: ImportState, viewModel: ImportViewModel) {
+    Column {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -981,82 +1081,6 @@ private fun ReviewStep(state: ImportState, viewModel: ImportViewModel) {
             Spacer(Modifier.height(8.dp))
         }
 
-        LazyColumn(
-            modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(horizontal = 16.dp),
-        ) {
-            items(state.candidates, key = { it.id }) { candidate ->
-                CandidateRow(
-                    candidate = candidate,
-                    onToggle = { viewModel.toggleCandidate(candidate.id) },
-                    onFlip = { viewModel.toggleDirection(candidate.id) },
-                    onChooseDestination = if (targets.isNotEmpty()) {
-                        { choosingFor = candidate }
-                    } else {
-                        null
-                    },
-                )
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            OutlinedButton(
-                onClick = viewModel::mapByHand,
-                modifier = Modifier.weight(1f),
-            ) { Text("Change") }
-            Button(
-                onClick = viewModel::applyImport,
-                modifier = Modifier.weight(1f),
-                enabled = state.selectedCount > 0 && !state.isBusy,
-            ) { Text("Import") }
-        }
-    }
-
-    choosingFor?.let { candidate ->
-        val out = candidate.transactionType != TransactionType.INCOME
-        AlertDialog(
-            onDismissRequest = { choosingFor = null },
-            title = { Text(if (out) "Where did this go?" else "Where did this come from?") },
-            text = {
-                Column {
-                    Text(
-                        text = candidate.name,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    DestinationOption(
-                        label = if (out) "Spending — it's gone" else "Income — money earned",
-                        selected = candidate.transferAccountId == null,
-                        onClick = {
-                            viewModel.setDestination(candidate.id, null)
-                            choosingFor = null
-                        },
-                    )
-                    targets.forEach { target ->
-                        DestinationOption(
-                            label = (if (out) "Into " else "From ") + target.name +
-                                " · " + target.type.displayName,
-                            selected = candidate.transferAccountId == target.id,
-                            onClick = {
-                                viewModel.setDestination(candidate.id, target)
-                                choosingFor = null
-                            },
-                        )
-                    }
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        text = "The app remembers this payee for next time.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            },
-            confirmButton = { TextButton(onClick = { choosingFor = null }) { Text("Close") } },
-        )
     }
 }
 
@@ -1066,7 +1090,12 @@ private fun ReviewStep(state: ImportState, viewModel: ImportViewModel) {
  * every row accounts for it, or exactly where it does not.
  */
 @Composable
-private fun StatementCheckCard(check: StatementCheck, onShowWhatWasRead: () -> Unit) {
+private fun StatementCheckCard(
+    check: StatementCheck,
+    candidates: List<ImportCandidate>,
+    onSwap: (String) -> Unit,
+    onShowWhatWasRead: () -> Unit,
+) {
     val colors = FinanceTheme.colors
     Column(
         modifier = Modifier
@@ -1106,17 +1135,29 @@ private fun StatementCheckCard(check: StatementCheck, onShowWhatWasRead: () -> U
                 fontWeight = FontWeight.SemiBold,
             )
             check.canBeChecked -> {
-                check.gaps.take(3).forEach { gap ->
+                check.gaps.forEach { gap ->
+                    val between = "between " +
+                        (gap.after?.let { DateUtils.formatShort(it) } ?: "the start") + " and " +
+                        (gap.before?.let { DateUtils.formatShort(it) } ?: "the end")
+                    val suspect = gap.suspectIds.singleOrNull()
+                        ?.let { id -> candidates.firstOrNull { it.id == id } }
                     Text(
                         text = "⚠ ${Money.format(kotlin.math.abs(gap.unaccountedMinor))} isn't " +
-                            "accounted for between " +
-                            (gap.after?.let { DateUtils.formatShort(it) } ?: "the start") + " and " +
-                            (gap.before?.let { DateUtils.formatShort(it) } ?: "the end") +
-                            ". A row may not have been read, or one is the wrong way round " +
-                            "(tap its amount to swap it).",
+                            "accounted for $between. " +
+                            if (suspect != null) {
+                                "It adds up if \"${suspect.name}\" " +
+                                    "(${Money.format(suspect.amountMinor)}) is the other way round."
+                            } else {
+                                "A row there wasn't read — check the statement for a payment " +
+                                    "of ${Money.format(kotlin.math.abs(gap.unaccountedMinor))} " +
+                                    "(or a few adding up to it)."
+                            },
                         style = MaterialTheme.typography.bodyMedium,
                         color = colors.onWarningContainer,
                     )
+                    if (suspect != null) {
+                        TextButton(onClick = { onSwap(suspect.id) }) { Text("Swap it") }
+                    }
                 }
                 TextButton(onClick = onShowWhatWasRead) { Text("Show what was read") }
             }
@@ -1201,10 +1242,10 @@ private fun CandidateRow(
                         "Updates \"${it.existingDescription}\" from ${it.existingDateIso}"
                     }
                     ?: listOfNotNull(
-                        candidate.categoryName,
-                        candidate.personName,
+                        candidate.dateIso?.let(DateUtils::parseIsoOrNull)?.let(DateUtils::formatShort),
+                        candidate.categoryName ?: "Not sorted yet",
                         candidate.accountName,
-                        candidate.dateIso,
+                        candidate.balanceMinor?.let { "balance after ${Money.format(it)}" },
                     ).joinToString(" · ").ifBlank { "Row ${candidate.sourceRow + 1}" },
                 style = MaterialTheme.typography.bodySmall,
                 color = when {
@@ -1212,7 +1253,7 @@ private fun CandidateRow(
                     candidate.corrects != null -> MaterialTheme.colorScheme.primary
                     else -> MaterialTheme.colorScheme.onSurfaceVariant
                 },
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }

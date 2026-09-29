@@ -52,6 +52,9 @@ object RecurringDetector {
         /** Why it is thought to be a bill, for the person to judge. */
         val reason: String,
     ) {
+        /** True when it has been seen more than once — worth ticking by default. */
+        val isConfirmed: Boolean get() = occurrences >= 2
+
         /** The next time it should be paid, on or after [today]. */
         fun nextDue(today: LocalDate): LocalDate {
             var next = step(lastDate)
@@ -86,11 +89,26 @@ object RecurringDetector {
     private const val STEADY_SPREAD = 0.05
     private const val MOST_SPREAD = 0.5
 
+    /**
+     * Words that mean a payment came back or was undone — "RETURNED DD",
+     * "UNPAID D/D", "REFUND". They carry the Direct Debit marker without
+     * being a bill, and one of them was set up as a £71 monthly "Returned".
+     */
+    private val NOT_A_BILL = setOf(
+        "returned", "return", "refund", "refunded", "reversal", "reversed", "unpaid",
+        "recalled", "recall", "cancelled", "rejected", "reclaim", "indemnity", "bounced",
+    )
+
     fun find(
         payments: List<Payment>,
         known: List<KnownBill>,
     ): List<RegularPayment> {
-        val groups = payments.groupBy { keyOf(it.description) to it.accountId }
+        val groups = payments
+            .filterNot { payment ->
+                TransactionFingerprint.normaliseDescription(payment.description)
+                    .split(' ').any { it in NOT_A_BILL }
+            }
+            .groupBy { keyOf(it.description) to it.accountId }
             .filterKeys { it.first.isNotBlank() }
         return groups.mapNotNull { (key, group) -> judge(key.first, group) }
             .filterNot { found -> known.any { isSameBill(found, it) } }
@@ -116,7 +134,7 @@ object RecurringDetector {
                 spread <= MOST_SPREAD && months >= 2 ->
                 "Paid ${sorted.size} times, ${frequency.displayName.lowercase()}" +
                     if (marked) ", by Direct Debit or standing order" else ""
-            marked -> "A Direct Debit or standing order"
+            marked -> "a Direct Debit or standing order, seen once — check it's a bill"
             else -> return null
         }
         return RegularPayment(

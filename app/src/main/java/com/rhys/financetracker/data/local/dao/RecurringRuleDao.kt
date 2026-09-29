@@ -139,6 +139,19 @@ interface RecurringRuleDao {
     )
     suspend fun pauseAllFor(accountId: Long, updatedAt: Long)
 
+    /** A person's wage — the regular payment carrying [marker] — if they have one. */
+    @Query(
+        "SELECT * FROM recurring_rules WHERE person_id = :personId AND notes = :marker " +
+            "AND is_archived = 0 LIMIT 1",
+    )
+    fun observeWage(personId: Long, marker: String): Flow<RecurringRuleEntity?>
+
+    @Query(
+        "SELECT * FROM recurring_rules WHERE person_id = :personId AND notes = :marker " +
+            "AND is_archived = 0 LIMIT 1",
+    )
+    suspend fun getWage(personId: Long, marker: String): RecurringRuleEntity?
+
     @Query("DELETE FROM recurring_rules")
     suspend fun deleteAll()
 }

@@ -31,7 +31,16 @@ data class StatementCheck(
     val gaps: List<Gap>,
 ) {
     /** Somewhere the rows do not add up to the change in the printed balance. */
-    data class Gap(val after: LocalDate?, val before: LocalDate?, val unaccountedMinor: Long)
+    data class Gap(
+        val after: LocalDate?,
+        val before: LocalDate?,
+        val unaccountedMinor: Long,
+        /**
+         * Rows in the gap that would close it exactly if they were the other
+         * way round — money in read as money out, or the reverse.
+         */
+        val suspectIds: List<String> = emptyList(),
+    )
 
     /** True when there were balances to check against and every row accounted for them. */
     val isProvenComplete: Boolean get() = balancesSeen >= 2 && gaps.isEmpty()
@@ -63,10 +72,12 @@ data class StatementCheck(
             var lastBalance: Long? = null
             var lastBalanceDate: LocalDate? = null
             var since = 0L
+            val window = mutableListOf<ImportCandidate>()
             var start: Long? = null
             ordered.forEach { row ->
                 val date = row.dateIso?.let(DateUtils::parseIsoOrNull)
                 since += signed(row)
+                window += row
                 val balance = row.balanceMinor
                 if (balance != null) {
                     seen++
@@ -75,11 +86,20 @@ data class StatementCheck(
                         start = balance - since
                     } else {
                         val unaccounted = balance - lastBalance!! - since
-                        if (unaccounted != 0L) gaps += Gap(lastBalanceDate, date, unaccounted)
+                        if (unaccounted != 0L) {
+                            // Swapping a row moves the sum by twice its amount.
+                            val suspects = window.filter { candidate ->
+                                val isIn = candidate.transactionType == TransactionType.INCOME
+                                (!isIn && unaccounted == 2 * candidate.amountMinor) ||
+                                    (isIn && unaccounted == -2 * candidate.amountMinor)
+                            }.map { it.id }
+                            gaps += Gap(lastBalanceDate, date, unaccounted, suspects)
+                        }
                     }
                     lastBalance = balance
                     lastBalanceDate = date
                     since = 0L
+                    window.clear()
                 }
             }
             // Rows after the last printed balance still move the end balance.

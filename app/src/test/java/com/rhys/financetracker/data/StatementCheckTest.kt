@@ -82,4 +82,18 @@ class StatementCheckTest {
         assertTrue(!check.isProvenComplete)
         assertEquals(null, check.endBalanceMinor)
     }
+
+    @Test
+    fun `a row the wrong way round is named`() {
+        val flipped = line(3, 2_500L, isIn = true, balance = null)
+        val check = StatementCheck.of(
+            listOf(
+                line(1, 20_000L, isIn = false, balance = 80_000L),
+                // Really £25 out, read as £25 in.
+                flipped,
+                line(5, 1_500L, isIn = false, balance = 76_000L),
+            ),
+        )
+        assertEquals(listOf(flipped.id), check.gaps.single().suspectIds)
+    }
 }

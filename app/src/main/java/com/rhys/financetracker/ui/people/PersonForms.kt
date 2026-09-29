@@ -45,6 +45,7 @@ val ACCOUNT_KINDS = listOf(
     AccountType.CURRENT,
     AccountType.SAVINGS,
     AccountType.CREDIT_CARD,
+    AccountType.PAY_LATER,
     AccountType.INVESTMENT,
     AccountType.PENSION,
     AccountType.OTHER,
@@ -85,7 +86,11 @@ fun AccountDraftForm(
             supportingText = "What the bank calls it, e.g. Nationwide FlexDirect or Start to Save.",
         )
         AmountField(
-            label = if (draft.type == AccountType.CREDIT_CARD) "Owed on it today" else "In it today",
+            label = if (draft.type.defaultHolding == com.rhys.financetracker.domain.model.Holding.OWED) {
+                "Owed on it today"
+            } else {
+                "In it today"
+            },
             value = draft.balanceText,
             onValueChange = { onChange(draft.copy(balanceText = it)) },
         )

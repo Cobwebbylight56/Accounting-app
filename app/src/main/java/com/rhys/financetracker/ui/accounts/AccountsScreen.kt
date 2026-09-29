@@ -565,6 +565,7 @@ fun AccountEditScreen(
             )
 
             if (state.form.type == AccountType.CREDIT_CARD ||
+                state.form.type == AccountType.PAY_LATER ||
                 state.form.type == AccountType.LOAN ||
                 state.form.type == AccountType.MORTGAGE
             ) {

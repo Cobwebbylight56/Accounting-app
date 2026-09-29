@@ -65,6 +65,12 @@ object AccountNaming {
 
     private val LIABILITY = listOf("mortgage", "loan", "finance", "overdraft")
 
+    /** Buy now, pay later. Before cards, so "PayPal Pay in 3" is not read as a card. */
+    private val PAY_LATER = listOf(
+        "pay in 3", "payin3", "pay in 4", "pay later", "klarna", "clearpay", "laybuy",
+        "zilch", "paypal pay", "monzo flex", "afterpay",
+    )
+
     /**
      * Cards, named rather than matched on the word.
      *
@@ -96,6 +102,7 @@ object AccountNaming {
             text.contains(" pension") -> AccountType.PENSION
             says(INVESTMENT) -> AccountType.INVESTMENT
             says(SAVINGS) -> AccountType.SAVINGS
+            says(PAY_LATER) -> AccountType.PAY_LATER
             says(CARDS) -> AccountType.CREDIT_CARD
             else -> AccountType.CURRENT
         }

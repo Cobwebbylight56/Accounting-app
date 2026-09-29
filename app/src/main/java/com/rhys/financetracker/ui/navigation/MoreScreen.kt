@@ -39,6 +39,8 @@ fun MoreScreen(
     onOpenCategories: () -> Unit,
     onOpenImport: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenSortSpending: () -> Unit = {},
+    onOpenSentToPeople: () -> Unit = {},
 ) {
     Scaffold(
         topBar = { TopAppBar(title = { Text("More") }) },
@@ -76,6 +78,18 @@ fun MoreScreen(
             )
 
             SettingsGroupHeader("Tools")
+            SettingsItem(
+                title = "Sort spending",
+                subtitle = "Unsorted payments by who they went to — file each in one tap",
+                icon = Icons.Outlined.Category,
+                onClick = onOpenSortSpending,
+            )
+            SettingsItem(
+                title = "Sent to people",
+                subtitle = "How much you have sent each person",
+                icon = Icons.Outlined.People,
+                onClick = onOpenSentToPeople,
+            )
             SettingsItem(
                 title = "Advice",
                 subtitle = "Where you could spend less, and what is coming",

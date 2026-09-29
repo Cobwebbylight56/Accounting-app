@@ -5,6 +5,17 @@ import com.rhys.financetracker.core.result.runCatchingApp
 import com.rhys.financetracker.core.time.DateUtils
 import com.rhys.financetracker.data.local.dao.IncomeChangeDao
 import com.rhys.financetracker.data.local.dao.PersonDao
+import com.rhys.financetracker.data.local.dao.RecurringRuleDao
+import com.rhys.financetracker.data.local.dao.TransactionDao
+import com.rhys.financetracker.data.local.entity.RecurringRuleEntity
+import com.rhys.financetracker.data.local.entity.TransactionEntity
+import com.rhys.financetracker.data.importer.SpreadsheetImporter
+import com.rhys.financetracker.domain.model.CategoryKind
+import com.rhys.financetracker.domain.model.Frequency
+import com.rhys.financetracker.domain.model.RecordSource
+import com.rhys.financetracker.domain.model.RecurrenceMode
+import com.rhys.financetracker.domain.model.TransactionType
+import java.time.YearMonth
 import com.rhys.financetracker.data.local.entity.IncomeChangeEntity
 import com.rhys.financetracker.domain.income.PayRise
 import java.time.Instant
@@ -25,7 +36,105 @@ import kotlinx.coroutines.flow.Flow
 class IncomeRepository @Inject constructor(
     private val incomeChangeDao: IncomeChangeDao,
     private val personDao: PersonDao,
+    private val recurringRuleDao: RecurringRuleDao,
+    private val transactionDao: TransactionDao,
+    private val categoryRepository: CategoryRepository,
 ) {
+
+    /** The regular payment that is [personId]'s wage, if one is set up. */
+    fun observeWage(personId: Long): Flow<RecurringRuleEntity?> =
+        recurringRuleDao.observeWage(personId, SpreadsheetImporter.WAGE_MARKER)
+
+    /**
+     * Pays [amountMinor] into [accountId] on [dayOfMonth] every month —
+     * 31 meaning the last day — as [personId]'s wage.
+     *
+     * It is posted by itself on the day, so the month's money in is right
+     * before any statement arrives. When the statement does arrive, its wage
+     * replaces this one — at the bank's figure, overtime and all.
+     */
+    suspend fun setWage(
+        personId: Long,
+        accountId: Long,
+        amountMinor: Long,
+        dayOfMonth: Int,
+        today: LocalDate = DateUtils.today(),
+    ): AppResult<Long> = runCatchingApp("Could not set up the wage") {
+        require(amountMinor > 0L) { "Enter the take-home for a month" }
+        val person = personDao.getById(personId) ?: error("That person no longer exists")
+        val day = dayOfMonth.coerceIn(1, 31)
+        // Anchored on a month that has the day, so "the 31st" means the last
+        // day of every month rather than drifting to the 30th.
+        var anchor = YearMonth.from(today)
+        while (anchor.lengthOfMonth() < day || anchor.atDay(day).isAfter(today)) {
+            anchor = anchor.minusMonths(1)
+        }
+        var next = DateUtils.safeDayOfMonth(YearMonth.from(today), day)
+        if (next.isBefore(today)) next = DateUtils.safeDayOfMonth(YearMonth.from(today).plusMonths(1), day)
+        val salary = categoryRepository.findOrCreate(
+            SpreadsheetImporter.SALARY_CATEGORY, CategoryKind.INCOME, SALARY_COLOUR,
+        )
+        val existing = recurringRuleDao.getWage(personId, SpreadsheetImporter.WAGE_MARKER)
+        val rule = RecurringRuleEntity(
+            id = existing?.id ?: 0L,
+            name = "${person.name.substringBefore(' ')}'s wage",
+            amountMinor = amountMinor,
+            type = TransactionType.INCOME,
+            frequency = Frequency.MONTHLY,
+            startDate = anchor.atDay(day),
+            nextDueDate = next,
+            lastGeneratedDate = existing?.lastGeneratedDate,
+            accountId = accountId,
+            categoryId = salary.id,
+            personId = personId,
+            mode = RecurrenceMode.AUTO_POST,
+            notes = SpreadsheetImporter.WAGE_MARKER,
+        )
+        if (existing == null) {
+            recurringRuleDao.insert(rule)
+        } else {
+            recurringRuleDao.update(rule)
+            existing.id
+        }
+    }
+
+    /** Stops paying the wage in by itself. */
+    suspend fun stopWage(personId: Long): AppResult<Unit> = runCatchingApp("Could not stop the wage") {
+        val wage = recurringRuleDao.getWage(personId, SpreadsheetImporter.WAGE_MARKER) ?: return@runCatchingApp
+        recurringRuleDao.setArchived(wage.id, true, Instant.now().toEpochMilli())
+    }
+
+    /**
+     * Records overtime or other extra pay for [personId], into [accountId].
+     *
+     * Kept as its own entry so the month is right straight away. When the
+     * statement's wage replaces the app's, it already includes the overtime,
+     * so this entry is folded into it rather than counted twice.
+     */
+    suspend fun addOvertime(
+        personId: Long,
+        accountId: Long,
+        amountMinor: Long,
+        date: LocalDate,
+        note: String?,
+    ): AppResult<Long> = runCatchingApp("Could not record the overtime") {
+        require(amountMinor > 0L) { "Enter the overtime" }
+        val overtime = categoryRepository.findOrCreate(
+            SpreadsheetImporter.OVERTIME_CATEGORY, CategoryKind.INCOME, OVERTIME_COLOUR,
+        )
+        transactionDao.insert(
+            TransactionEntity(
+                amountMinor = amountMinor,
+                type = TransactionType.INCOME,
+                date = date,
+                description = note?.trim()?.takeIf { it.isNotEmpty() } ?: "Overtime",
+                accountId = accountId,
+                categoryId = overtime.id,
+                personId = personId,
+                source = RecordSource.MANUAL,
+            ),
+        )
+    }
 
     fun observeHistory(personId: Long): Flow<List<IncomeChangeEntity>> =
         incomeChangeDao.observeForPerson(personId)
@@ -82,6 +191,12 @@ class IncomeRepository @Inject constructor(
                 ),
             )
             incomeChangeDao.update(change.copy(isApplied = true))
+            // The wage paid in each month follows the new take-home.
+            change.newNetMinor?.let { net ->
+                recurringRuleDao.getWage(change.personId, SpreadsheetImporter.WAGE_MARKER)?.let { wage ->
+                    recurringRuleDao.update(wage.copy(amountMinor = net / 12L))
+                }
+            }
         }
         return due.size
     }
@@ -106,4 +221,9 @@ class IncomeRepository @Inject constructor(
             }
             incomeChangeDao.delete(change)
         }
+
+    private companion object {
+        const val SALARY_COLOUR = "#2E7D32"
+        const val OVERTIME_COLOUR = "#558B2F"
+    }
 }

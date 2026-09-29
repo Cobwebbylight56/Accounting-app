@@ -376,9 +376,14 @@ every row is checked against it:
 
 * **✓ Every row adds up to the statement's own balance** — from the start
   balance to the end balance. Nothing is missing.
-* **⚠ £45.00 isn't accounted for between 1 Sep and 5 Sep** — a row there wasn't
-  read, or one is the wrong way round (tap its amount to swap it). **Show what
-  was read** shows the text the app got from the file.
+* **⚠ £45.00 isn't accounted for between 1 Sep and 5 Sep** — if one row being
+  the wrong way round explains it exactly, it's named with a **Swap it**
+  button. Otherwise a row there wasn't read: look on the statement for a payment
+  of that amount. **Show what was read** shows the text the app got from the
+  file, with **Copy all text** to send on so the reader can be fixed.
+
+The whole review page scrolls — the check, the counts and every row, each with
+its date, category and the statement's balance after it.
 
 A statement without a running balance can't be checked this way; compare the
 totals shown with the statement's own.
@@ -401,6 +406,52 @@ when that month's statement is imported it updates the entry rather than adding
 a second one.
 
 **Bills → Find bills** looks through every statement imported so far.
+
+A payment that was **returned, refunded or unpaid** ("RETURNED DD") is never
+offered as a bill. Bills seen only once are listed but left unticked — check
+they're real before adding them.
+
+### Wage and overtime
+
+On a person's page, **Wage**: choose the account it's paid into, the take-home
+each month (filled in from their yearly pay), and the day — **Last day** of the
+month or a date. It's then paid in by itself on that day, so the month is right
+before any statement arrives. A pay rise updates it.
+
+When the statement comes, **its wage replaces the app's** at the bank's own
+figure — even if it's different because of overtime, a bonus or a tax change —
+so the month never counts two wages.
+
+**Add overtime or extra pay** records it straight away. When the statement's
+wage arrives with the overtime in it, the overtime entry is folded into it
+(kept in history, not counted twice).
+
+### Cards, loans and pay later
+
+Accounts can be **Credit card** or **Pay later (Pay in 3, Klarna…)** as well as
+loans and mortgages. Home lists them all under **Cards, loans and pay later**:
+a card shows what's owed and how much of its limit is used; a pay-later plan or
+loan shows what's left and how much is paid off. A pay-later plan or loan
+disappears once it's paid off; a card stays.
+
+### Sort spending
+
+**More → Sort spending** (or the button on Home) lists everything with no
+category, or only "Card spending", grouped by who it went to, biggest first.
+Tap a payee to see its payments, then **File all under a category** — shops,
+websites, outings, bills. Every payment to them is sorted at once, and new
+statements sort them the same way.
+
+The app also now knows many more shops, websites and outings by name — high
+street chains, online shops (Amazon, eBay, Shein, Temu, ASOS…), cinemas,
+bowling, theme parks, ticket sites, pubs and takeaways.
+
+### Sent to people
+
+**More → Sent to people** adds up the money you've sent to each person — bank
+transfers, standing orders, payments to someone — for this month, 3 months,
+this year or all time. Tap a person to see each payment. If something there
+isn't a person, file it under the right category from the same place.
 
 ### Where each row goes
 

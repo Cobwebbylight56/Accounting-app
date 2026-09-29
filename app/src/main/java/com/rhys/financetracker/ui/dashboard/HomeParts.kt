@@ -455,66 +455,85 @@ private fun MonthRow(icon: ImageVector, title: String, subtitle: String, amountM
 }
 
 /**
- * The loans still being paid, with how far through each one is.
+ * Everything owed, in one place: credit cards, pay-later plans (PayPal Pay
+ * in 3, Klarna…) and loans, each with what is left and how far through it is.
  *
- * A loan leaves this list — and the app — the day it is paid off.
+ * A loan or pay-later plan leaves this list — and the app — the day it is
+ * paid off. A card stays: £0 is its normal state.
  */
 @Composable
 internal fun LoansCard(state: DashboardState, onOpenAccounts: () -> Unit) {
-    val loans = state.accounts.filter {
-        it.account.type == AccountType.LOAN || it.account.type == AccountType.MORTGAGE
-    }
-    if (loans.isEmpty()) return
+    val owed = state.accounts.filter { it.isLiability }
+    if (owed.isEmpty()) return
+    val order = listOf(AccountType.CREDIT_CARD, AccountType.PAY_LATER, AccountType.LOAN, AccountType.MORTGAGE)
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = "Loans to pay",
+                text = "Cards, loans and pay later",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f),
             )
             TextButton(onClick = onOpenAccounts) { Text("All") }
         }
-        loans.forEach { loan ->
-            val left = (-loan.balanceMinor).coerceAtLeast(0L)
-            val original = loan.account.creditLimitMinor?.takeIf { it > 0L }
-                ?: (-loan.account.openingBalanceMinor).takeIf { it > 0L }
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = FinanceTheme.colors.tileBlush.copy(alpha = 0.45f),
-                onClick = onOpenAccounts,
-            ) {
-                Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = loan.account.name,
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Text(
-                            text = "${Money.format(left)} left",
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                    }
-                    if (original != null && original >= left) {
-                        val paid = (original - left).toFloat() / original
-                        Spacer(Modifier.height(8.dp))
-                        LinearProgressIndicator(
-                            progress = { paid.coerceIn(0f, 1f) },
-                            modifier = Modifier.fillMaxWidth().height(6.dp),
-                            color = FinanceTheme.colors.tileBlue,
-                            trackColor = MaterialTheme.colorScheme.surface,
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = "${(paid * 100).toInt()}% paid off of ${Money.format(original)}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+        owed.sortedBy { order.indexOf(it.account.type).let { i -> if (i < 0) order.size else i } }
+            .forEach { item ->
+                val left = (-item.balanceMinor).coerceAtLeast(0L)
+                val limit = item.account.creditLimitMinor?.takeIf { it > 0L }
+                val isCard = item.account.type == AccountType.CREDIT_CARD
+                val original = if (isCard) {
+                    null
+                } else {
+                    limit ?: (-item.account.openingBalanceMinor).takeIf { it > 0L }
+                }
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = FinanceTheme.colors.tileBlush.copy(alpha = 0.45f),
+                    onClick = onOpenAccounts,
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(item.account.name, style = MaterialTheme.typography.bodyLarge)
+                                Text(
+                                    text = item.account.type.displayName,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Text(
+                                text = if (isCard) "${Money.format(left)} owed" else "${Money.format(left)} left",
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                        }
+                        val total = if (isCard) limit else original
+                        if (total != null && total >= left && total > 0L) {
+                            val share = if (isCard) {
+                                left.toFloat() / total
+                            } else {
+                                (total - left).toFloat() / total
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            LinearProgressIndicator(
+                                progress = { share.coerceIn(0f, 1f) },
+                                modifier = Modifier.fillMaxWidth().height(6.dp),
+                                color = FinanceTheme.colors.tileBlue,
+                                trackColor = MaterialTheme.colorScheme.surface,
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = if (isCard) {
+                                    "${(share * 100).toInt()}% of the ${Money.format(total)} limit used"
+                                } else {
+                                    "${(share * 100).toInt()}% paid off of ${Money.format(total)}"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
             }
-        }
     }
 }
 

@@ -28,6 +28,8 @@ object Routes {
     const val PEOPLE = "people"
     const val PERSON_EDIT = "person/edit"
     const val PERSON_HUB = "person/view"
+    const val SORT_SPENDING = "spending/sort"
+    const val SENT_TO_PEOPLE = "spending/people"
     const val SETUP = "setup"
     const val CATEGORIES = "categories"
     const val CATEGORY_EDIT = "category/edit"

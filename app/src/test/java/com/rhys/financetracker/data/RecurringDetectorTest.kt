@@ -67,4 +67,22 @@ class RecurringDetectorTest {
         )
         assertTrue(found.isEmpty())
     }
+
+    @Test
+    fun `a returned direct debit is not a bill`() {
+        val found = RecurringDetector.find(
+            listOf(
+                pay("RETURNED DD", 7_100L, 9, 28),
+                pay("UNPAID D/D SKY", 4_500L, 9, 2),
+            ),
+            known = emptyList(),
+        )
+        assertTrue(found.isEmpty())
+    }
+
+    @Test
+    fun `a bill seen once is offered but not ticked`() {
+        val once = RecurringDetector.find(listOf(pay("SKY DIGITAL DD", 4_500L, 9, 2)), emptyList()).single()
+        assertTrue(!once.isConfirmed)
+    }
 }
