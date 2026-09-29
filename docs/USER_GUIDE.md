@@ -381,7 +381,7 @@ every row is checked against it:
   button. Otherwise a row there wasn't read: look on the statement for a payment
   of that amount. **Show what was read** opens every line the app got from the
   file, full screen and numbered (for a spreadsheet or CSV, every row), with
-  **Copy all text** to send on so the reader can be fixed. If a payment isn't
+  **Copy all text** at the top to send on so the reader can be fixed. If a payment isn't
   in those lines, the file itself didn't hold it as text.
 
 The whole review page scrolls — the check, the counts and every row, each with

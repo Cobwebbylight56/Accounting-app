@@ -284,6 +284,7 @@ private fun UnreadablePdfCard(text: String, onDismiss: () -> Unit, onShowAll: ()
 private fun WhatWasReadPage(text: String, onClose: () -> Unit) {
     val clipboard = LocalClipboardManager.current
     val lines = remember(text) { text.split("\n").map { it.trimEnd() }.filter { it.isNotBlank() } }
+    var copied by remember(text) { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text("What was read", style = MaterialTheme.typography.titleLarge)
         Text(
@@ -292,7 +293,20 @@ private fun WhatWasReadPage(text: String, onClose: () -> Unit) {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(8.dp))
+        // At the top, not the bottom: at the bottom they could end up under
+        // the phone's own buttons, where they cannot be pressed.
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = {
+                    clipboard.setText(AnnotatedString(text))
+                    copied = true
+                },
+                modifier = Modifier.weight(1f),
+            ) { Text(if (copied) "Copied" else "Copy all text") }
+            OutlinedButton(onClick = onClose, modifier = Modifier.weight(1f)) { Text("Close") }
+        }
+        Spacer(Modifier.height(8.dp))
         LazyColumn(
             modifier = Modifier
                 .weight(1f)
@@ -302,6 +316,9 @@ private fun WhatWasReadPage(text: String, onClose: () -> Unit) {
                     RoundedCornerShape(12.dp),
                 )
                 .padding(8.dp),
+            // Room below the last line, so it can be scrolled clear of the
+            // phone's own buttons.
+            contentPadding = PaddingValues(bottom = 64.dp),
         ) {
             items(lines.size) { index ->
                 Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
@@ -320,14 +337,6 @@ private fun WhatWasReadPage(text: String, onClose: () -> Unit) {
                     )
                 }
             }
-        }
-        Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                onClick = { clipboard.setText(AnnotatedString(text)) },
-                modifier = Modifier.weight(1f),
-            ) { Text("Copy all text") }
-            OutlinedButton(onClick = onClose, modifier = Modifier.weight(1f)) { Text("Close") }
         }
     }
 }
