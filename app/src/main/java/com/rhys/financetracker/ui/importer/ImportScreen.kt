@@ -1,6 +1,7 @@
 package com.rhys.financetracker.ui.importer
 
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.horizontalScroll
@@ -64,8 +65,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rhys.financetracker.core.money.Money
@@ -139,7 +138,9 @@ fun ImportScreen(
                 navigationIcon = {
                     IconButton(
                         onClick = {
-                            if (state.step == ImportStep.REVIEW) {
+                            if (state.whatWasRead != null) {
+                                viewModel.closeWhatWasRead()
+                            } else if (state.step == ImportStep.REVIEW) {
                                 viewModel.goToMapping()
                             } else {
                                 onBack()
@@ -175,11 +176,13 @@ fun ImportScreen(
                 Spacer(Modifier.height(12.dp))
             }
 
-            state.whatWasRead?.let { text ->
-                WhatWasReadDialog(text = text, onClose = viewModel::closeWhatWasRead)
-            }
-
-            when (state.step) {
+            // Shown in place of the step, inside this page, so it sits
+            // between the top bar and the phone's own buttons like any page.
+            val whatWasRead = state.whatWasRead
+            if (whatWasRead != null) {
+                BackHandler(onBack = viewModel::closeWhatWasRead)
+                WhatWasReadPage(text = whatWasRead, onClose = viewModel::closeWhatWasRead)
+            } else when (state.step) {
                 ImportStep.CHOOSE_FILE -> ChooseFileStep(
                     onChoose = {
                         pickFile.launch(
@@ -273,64 +276,58 @@ private fun UnreadablePdfCard(text: String, onDismiss: () -> Unit, onShowAll: ()
  * Every line read from the file, full screen, numbered so a missing row is
  * easy to point at.
  *
- * A dialog rather than a card in the list, so it opens where the user is
- * looking instead of at the top of a long review page.
+ * It takes the place of the page rather than being a card in the list, so
+ * it opens where the user is looking instead of at the top of a long
+ * review page, and its buttons stay clear of the phone's own.
  */
 @Composable
-private fun WhatWasReadDialog(text: String, onClose: () -> Unit) {
+private fun WhatWasReadPage(text: String, onClose: () -> Unit) {
     val clipboard = LocalClipboardManager.current
     val lines = remember(text) { text.split("\n").map { it.trimEnd() }.filter { it.isNotBlank() } }
-    Dialog(
-        onDismissRequest = onClose,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
-            Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-                Text("What was read", style = MaterialTheme.typography.titleLarge)
-                Text(
-                    text = "${lines.size} lines — every one the app got out of the file. " +
-                        "If a payment is missing here, the file itself did not contain it as text.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        Text("What was read", style = MaterialTheme.typography.titleLarge)
+        Text(
+            text = "${lines.size} lines — every one the app got out of the file. " +
+                "If a payment is missing here, the file itself did not contain it as text.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(12.dp))
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .background(
+                    MaterialTheme.colorScheme.surfaceContainerHighest,
+                    RoundedCornerShape(12.dp),
                 )
-                Spacer(Modifier.height(12.dp))
-                LazyColumn(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .background(
-                            MaterialTheme.colorScheme.surfaceContainerHighest,
-                            RoundedCornerShape(12.dp),
-                        )
-                        .padding(8.dp),
-                ) {
-                    items(lines.size) { index ->
-                        Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
-                            Text(
-                                text = "${index + 1}".padStart(4),
-                                style = MaterialTheme.typography.bodySmall,
-                                fontFamily = FontFamily.Monospace,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                text = lines[index],
-                                style = MaterialTheme.typography.bodySmall,
-                                fontFamily = FontFamily.Monospace,
-                                softWrap = false,
-                            )
-                        }
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(
-                        onClick = { clipboard.setText(AnnotatedString(text)) },
-                        modifier = Modifier.weight(1f),
-                    ) { Text("Copy all text") }
-                    OutlinedButton(onClick = onClose, modifier = Modifier.weight(1f)) { Text("Close") }
+                .padding(8.dp),
+        ) {
+            items(lines.size) { index ->
+                Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                    Text(
+                        text = "${index + 1}".padStart(4),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = lines[index],
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        softWrap = false,
+                    )
                 }
             }
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = { clipboard.setText(AnnotatedString(text)) },
+                modifier = Modifier.weight(1f),
+            ) { Text("Copy all text") }
+            OutlinedButton(onClick = onClose, modifier = Modifier.weight(1f)) { Text("Close") }
         }
     }
 }

@@ -42,6 +42,37 @@ object PayeeNames {
         return "${first.first()} $second"
     }
 
+    /** Words that are never part of a person's name. */
+    private val NOT_A_NAME = setOf(
+        "paypal", "ltd", "limited", "plc", "llp", "inc", "co", "uk", "services", "service", "shop",
+        "store", "stores", "finance", "insurance", "energy", "council", "club", "group", "trading",
+        "centre", "center", "school", "college", "pharmacy", "garage", "motors", "cars", "taxi",
+        "taxis", "cafe", "restaurant", "bar", "pub", "hotel", "travel", "pay", "loan", "loans",
+        "mortgage", "water", "gas", "electric", "broadband", "gym", "fitness", "market",
+        "marketplace", "amazon", "ebay", "vinted", "depop", "apple", "google", "uber", "trust",
+        "charity", "society", "church", "savings", "saver", "isa", "account", "cash", "atm",
+        "withdrawal", "interest", "fee", "fees", "charge", "charges", "refund", "deposit",
+        "salary", "wages", "wage", "hmrc", "dvla", "tv", "licence", "returned", "reversal",
+        "purchase", "revolut", "monzo", "starling", "wise", "klarna", "clearpay", "laybuy",
+        "sumup", "zettle", "square", "stripe", "www", "com", "net", "org", "international",
+        "solutions", "holdings", "company", "and", "of", "the", "for",
+    )
+
+    /**
+     * True when a tidy payee name (see [of]) looks like a person's rather
+     * than a business's: a few plain words, none of them a business word,
+     * and not a shop or service the app knows by name. PayPal, "Tesco
+     * Stores" and "Sky Digital" are not people; "J Smith" and "Hannah" are.
+     */
+    fun isPersonName(name: String): Boolean {
+        val words = name.lowercase().split(' ').filter { it.isNotBlank() }
+        if (words.isEmpty() || words.size > 4) return false
+        if (words.any { word -> word.any { !it.isLetter() && it != '\'' && it != '-' } }) return false
+        if (words.any { it in NOT_A_NAME }) return false
+        if (words.none { it.length >= 2 }) return false
+        return MerchantCategoriser.categoryFor(name) == null
+    }
+
     /** True when money in reads like it came from somebody: a transfer, or "from" a name. */
     fun looksLikeFromAPerson(description: String): Boolean {
         val text = " ${TransactionFingerprint.normaliseDescription(description)} "

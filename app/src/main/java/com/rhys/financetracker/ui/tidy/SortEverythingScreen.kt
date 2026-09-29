@@ -119,6 +119,11 @@ fun SortEverythingScreen(
                         "Unsorted payments and \"Card spending\" get a category from what you " +
                             "have filed before, then from the app's list of shops, websites and outings.",
                     )
+                    Step(
+                        "Payments the app filed by itself follow how you filed the same payee — " +
+                            "change one and the rest follow.",
+                    )
+                    Step("Regular payments seen at least twice and still being paid are set up as bills.")
                     Step("Loans that are paid off are put away.")
                 }
             }
@@ -157,14 +162,29 @@ private fun ResultCard(result: TidyUpResult, onOpenSortSpending: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
-                text = if (result.changedAnything) "Done" else "Everything was already in place",
+                text = if (result.changedAnything) "Done" else "Everything was already in the right place",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
+            Text(
+                text = "Checked ${result.entriesChecked} entries on ${result.accountsChecked} " +
+                    (if (result.accountsChecked == 1) "account." else "accounts."),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             Line("Given a category", result.categorised)
+            Line("Moved to match how you filed that payee", result.refiled)
             Line("Turned into moves between your accounts", result.linkedToAccounts)
             Line("Filed as savings", result.filedAsSavings)
             Line("Pay rises applied", result.payRisesApplied)
+            Line("Regular payments set up as bills", result.billsAdded.size)
+            if (result.billsAdded.isNotEmpty()) {
+                Text(
+                    text = result.billsAdded.joinToString(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             if (result.loansCleared.isNotEmpty()) {
                 Text(
                     text = "Paid off and put away: ${result.loansCleared.joinToString()}",

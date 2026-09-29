@@ -47,6 +47,9 @@ import androidx.lifecycle.viewModelScope
 import com.rhys.financetracker.core.money.Money
 import com.rhys.financetracker.core.result.AppResult
 import com.rhys.financetracker.core.time.DateUtils
+import com.rhys.financetracker.data.repository.PayeeRepository
+import com.rhys.financetracker.data.repository.PeopleMoney
+import com.rhys.financetracker.ui.spending.PeopleMoneyCard
 import com.rhys.financetracker.data.local.entity.IncomeChangeEntity
 import com.rhys.financetracker.data.local.entity.PersonEntity
 import com.rhys.financetracker.data.local.projection.AccountWithBalance
@@ -106,11 +109,17 @@ class PersonHubViewModel @Inject constructor(
     accountRepository: AccountRepository,
     private val incomeRepository: IncomeRepository,
     private val setup: HouseholdSetupRepository,
+    payeeRepository: PayeeRepository,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
     private val personId: Long =
         savedStateHandle.get<String>(Routes.ARG_ID)?.toLongOrNull() ?: Routes.NEW_ID
+
+    /** Money sent to and from people this month, from this person's accounts. */
+    val peopleMoney: StateFlow<PeopleMoney?> = DateUtils.monthRange(DateUtils.currentYearMonth()).let { month ->
+        payeeRepository.observeMoneyWithPeople(month.start, month.endInclusive, setOf(personId))
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private val drafts = MutableStateFlow(PersonHubState())
     private val message = MutableStateFlow<String?>(null)
@@ -262,9 +271,11 @@ fun PersonHubScreen(
     onEditDetails: (Long) -> Unit,
     onOpenAccount: (Long) -> Unit,
     onImportStatement: (Long) -> Unit,
+    onOpenPeopleMoney: (Long) -> Unit = {},
     viewModel: PersonHubViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val peopleMoney by viewModel.peopleMoney.collectAsStateWithLifecycle()
     val message by viewModel.messages.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     var adding by rememberSaveable { mutableStateOf(Adding.NONE) }
@@ -352,6 +363,15 @@ fun PersonHubScreen(
                         ) { Text(if (income.hasAny) "Add a pay rise" else "Add their pay") }
                     }
                 }
+            }
+
+            // ------------------------------------------------------- people
+            item {
+                PeopleMoneyCard(
+                    money = peopleMoney,
+                    monthLabel = DateUtils.formatMonth(DateUtils.currentYearMonth()),
+                    onSeeAll = { person?.let { onOpenPeopleMoney(it.id) } },
+                )
             }
 
             // --------------------------------------------------- statements

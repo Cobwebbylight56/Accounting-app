@@ -55,6 +55,7 @@ import com.rhys.financetracker.data.local.entity.CategoryEntity
 import com.rhys.financetracker.data.local.projection.PayeeEntry
 import com.rhys.financetracker.data.repository.CategoryRepository
 import com.rhys.financetracker.data.repository.PayeeRepository
+import com.rhys.financetracker.data.repository.PeopleMoney
 import com.rhys.financetracker.data.repository.PersonLedger
 import com.rhys.financetracker.domain.model.CategoryKind
 import com.rhys.financetracker.ui.components.ColorDot
@@ -68,6 +69,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -83,10 +85,30 @@ class SentToPeopleViewModel @Inject constructor(
     val month = MutableStateFlow(DateUtils.currentYearMonth())
     val message = MutableStateFlow<String?>(null)
 
-    val ledgers: StateFlow<List<PersonLedger>?> = month.flatMapLatest { chosen ->
-        val range = DateUtils.monthRange(chosen)
-        payeeRepository.observeMoneyWithPeople(range.start, range.endInclusive)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    /** Whose accounts; null for everybody's. */
+    private val personIds = MutableStateFlow<Set<Long>?>(null)
+
+    val money: StateFlow<PeopleMoney?> = combine(month, personIds) { chosen, ids -> chosen to ids }
+        .flatMapLatest { (chosen, ids) ->
+            val range = DateUtils.monthRange(chosen)
+            payeeRepository.observeMoneyWithPeople(range.start, range.endInclusive, ids)
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    fun showPerson(personId: Long?) {
+        personIds.value = personId?.let { setOf(it) }
+    }
+
+    /** Takes [ledger] off the people list, or puts it back; remembered for every month. */
+    fun setIsPerson(ledger: PersonLedger, isPerson: Boolean) {
+        viewModelScope.launch {
+            payeeRepository.setIsPerson(ledger.key, isPerson)
+            message.value = if (isPerson) {
+                "${ledger.name} will always show as a person."
+            } else {
+                "${ledger.name} is no longer shown as a person."
+            }
+        }
+    }
 
     val expenseCategories: StateFlow<List<CategoryEntity>> =
         categoryRepository.observeByKind(CategoryKind.EXPENSE)
@@ -119,8 +141,14 @@ class SentToPeopleViewModel @Inject constructor(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SentToPeopleScreen(onBack: () -> Unit, viewModel: SentToPeopleViewModel = hiltViewModel()) {
-    val ledgers by viewModel.ledgers.collectAsStateWithLifecycle()
+fun SentToPeopleScreen(
+    onBack: () -> Unit,
+    /** Only this person's accounts; null for everybody's. */
+    personId: Long? = null,
+    viewModel: SentToPeopleViewModel = hiltViewModel(),
+) {
+    LaunchedEffect(personId) { viewModel.showPerson(personId) }
+    val money by viewModel.money.collectAsStateWithLifecycle()
     val month by viewModel.month.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val expenseCategories by viewModel.expenseCategories.collectAsStateWithLifecycle()
@@ -128,6 +156,7 @@ fun SentToPeopleScreen(onBack: () -> Unit, viewModel: SentToPeopleViewModel = hi
     val snackbar = remember { SnackbarHostState() }
     var open by rememberSaveable { mutableStateOf<String?>(null) }
     var filing by remember { mutableStateOf<Filing?>(null) }
+    var showNotPeople by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(message) {
         message?.let {
@@ -157,7 +186,7 @@ fun SentToPeopleScreen(onBack: () -> Unit, viewModel: SentToPeopleViewModel = hi
             item {
                 MonthPicker(month = month, onPrevious = viewModel::previousMonth, onNext = viewModel::nextMonth)
             }
-            val list = ledgers
+            val list = money?.people
             if (list != null && list.isEmpty()) {
                 item {
                     EmptyState(
@@ -169,24 +198,41 @@ fun SentToPeopleScreen(onBack: () -> Unit, viewModel: SentToPeopleViewModel = hi
             }
             if (!list.isNullOrEmpty()) {
                 item { Totals(list) }
-                items(list, key = { it.name }) { ledger ->
+                items(list, key = { it.key }) { ledger ->
                     LedgerCard(
                         ledger = ledger,
-                        isOpen = open == ledger.name,
-                        onToggle = { open = if (open == ledger.name) null else ledger.name },
+                        isOpen = open == ledger.key,
+                        onToggle = { open = if (open == ledger.key) null else ledger.key },
                         onFileSent = { filing = Filing(ledger.name, ledger.sent, isMoneyIn = false) },
                         onFileReceived = { filing = Filing(ledger.name, ledger.received, isMoneyIn = true) },
+                        onNotAPerson = { viewModel.setIsPerson(ledger, isPerson = false) },
                     )
                 }
+            }
+            val notPeople = money?.notPeople.orEmpty()
+            if (notPeople.isNotEmpty()) {
                 item {
-                    Text(
-                        text = "Money in is counted as from a person when it reads like a transfer " +
-                            "from someone, or comes from a name money was sent to. If one here is " +
-                            "not a person — a wage, a refund — file it elsewhere and it drops off.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    TextButton(onClick = { showNotPeople = !showNotPeople }) {
+                        Text(
+                            (if (showNotPeople) "Hide" else "Show") +
+                                " ${notPeople.size} left out as not people (PayPal, shops…)",
+                        )
+                    }
                 }
+                if (showNotPeople) {
+                    items(notPeople, key = { "not-" + it.key }) { ledger ->
+                        NotAPersonRow(ledger = ledger, onKeep = { viewModel.setIsPerson(ledger, isPerson = true) })
+                    }
+                }
+            }
+            item {
+                Text(
+                    text = "Only people's names are shown — PayPal, shops and services are left " +
+                        "out. Tap a person and \"Not a person\" to leave one out, or keep one the " +
+                        "app left out from the list above. Your choice is remembered.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }
@@ -269,6 +315,7 @@ private fun LedgerCard(
     onToggle: () -> Unit,
     onFileSent: () -> Unit,
     onFileReceived: () -> Unit,
+    onNotAPerson: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onToggle)) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -312,12 +359,13 @@ private fun LedgerCard(
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                 Row(modifier = Modifier.fillMaxWidth()) {
                     if (ledger.sent.isNotEmpty()) {
-                        TextButton(onClick = onFileSent, modifier = Modifier.weight(1f)) { Text("Not a person? File sent") }
+                        TextButton(onClick = onFileSent, modifier = Modifier.weight(1f)) { Text("File sent") }
                     }
                     if (ledger.received.isNotEmpty()) {
                         TextButton(onClick = onFileReceived, modifier = Modifier.weight(1f)) { Text("File received") }
                     }
                 }
+                TextButton(onClick = onNotAPerson) { Text("Not a person — leave out") }
             }
         }
     }
@@ -358,3 +406,130 @@ private fun Side(
         }
     }
 }
+
+/** A payee left out as not a person, with a way to bring them back. */
+@Composable
+private fun NotAPersonRow(ledger: PersonLedger, onKeep: () -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(ledger.name, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = "Sent ${Money.format(ledger.sentMinor)} · got ${Money.format(ledger.receivedMinor)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        TextButton(onClick = onKeep) { Text("It's a person") }
+    }
+}
+
+/**
+ * The people money was sent to this month, side by side with what they
+ * sent back — for Home and a person's page. Shows the biggest few.
+ */
+@Composable
+fun PeopleMoneyCard(
+    money: PeopleMoney?,
+    monthLabel: String,
+    onSeeAll: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(modifier = modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("People", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        text = "Sent and received in $monthLabel",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                TextButton(onClick = onSeeAll) { Text("See all") }
+            }
+            val people = money?.people.orEmpty()
+            if (people.isEmpty()) {
+                Text(
+                    text = "No money sent to or from people this month.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                return@Column
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "You sent",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.width(88.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                )
+                Text(
+                    "They sent",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.width(88.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                )
+            }
+            people.take(HOME_PEOPLE).forEach { ledger ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = ledger.name,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = Money.format(ledger.sentMinor),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = FinanceTheme.colors.expense,
+                        modifier = Modifier.width(88.dp),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                    )
+                    Text(
+                        text = Money.format(ledger.receivedMinor),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = FinanceTheme.colors.income,
+                        modifier = Modifier.width(88.dp),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                    )
+                }
+            }
+            if (people.size > HOME_PEOPLE) {
+                Text(
+                    text = "and ${people.size - HOME_PEOPLE} more",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Text("Total", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                Text(
+                    Money.format(money?.sentMinor ?: 0L),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.width(88.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                )
+                Text(
+                    Money.format(money?.receivedMinor ?: 0L),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.width(88.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                )
+            }
+        }
+    }
+}
+
+/** How many people the Home card lists before "See all". */
+private const val HOME_PEOPLE = 5

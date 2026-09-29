@@ -729,14 +729,22 @@ interface TransactionDao {
         SELECT t.id AS id, t.description AS description, t.amount_minor AS amount_minor,
                t.date AS date, c.name AS category_name
         FROM transactions t
+        JOIN accounts a ON a.id = t.account_id
         LEFT JOIN categories c ON c.id = t.category_id
         WHERE t.is_archived = 0 AND t.type = 'EXPENSE'
           AND (t.category_id IS NULL OR c.name IN (:people))
           AND t.date BETWEEN :from AND :to
+          AND (:everyone = 1 OR COALESCE(t.person_id, a.person_id) IN (:personIds))
         ORDER BY t.date DESC
         """,
     )
-    fun observeSentToPeople(from: LocalDate, to: LocalDate, people: List<String>): Flow<List<PayeeEntry>>
+    fun observeSentToPeople(
+        from: LocalDate,
+        to: LocalDate,
+        people: List<String>,
+        everyone: Boolean,
+        personIds: List<Long>,
+    ): Flow<List<PayeeEntry>>
 
     /**
      * Money in between two dates that could have come from people: filed
@@ -747,14 +755,22 @@ interface TransactionDao {
         SELECT t.id AS id, t.description AS description, t.amount_minor AS amount_minor,
                t.date AS date, c.name AS category_name
         FROM transactions t
+        JOIN accounts a ON a.id = t.account_id
         LEFT JOIN categories c ON c.id = t.category_id
         WHERE t.is_archived = 0 AND t.type = 'INCOME'
           AND (t.category_id IS NULL OR c.name IN (:people))
           AND t.date BETWEEN :from AND :to
+          AND (:everyone = 1 OR COALESCE(t.person_id, a.person_id) IN (:personIds))
         ORDER BY t.date DESC
         """,
     )
-    fun observeReceivedFromPeople(from: LocalDate, to: LocalDate, people: List<String>): Flow<List<PayeeEntry>>
+    fun observeReceivedFromPeople(
+        from: LocalDate,
+        to: LocalDate,
+        people: List<String>,
+        everyone: Boolean,
+        personIds: List<Long>,
+    ): Flow<List<PayeeEntry>>
 
     /** Files several entries under one category at once. */
     @Query("UPDATE transactions SET category_id = :categoryId, updated_at = :updatedAt WHERE id IN (:ids)")
@@ -824,6 +840,43 @@ interface TransactionDao {
         """,
     )
     suspend fun getUnsortedEntries(vague: List<String>): List<TransactionEntity>
+
+    /**
+     * Entries a statement or spreadsheet filed by itself and nobody has
+     * changed since: updated within [marginMillis] of being added.
+     */
+    @Query(
+        """
+        SELECT t.* FROM transactions t
+        JOIN categories c ON c.id = t.category_id
+        WHERE t.is_archived = 0 AND t.type IN ('INCOME', 'EXPENSE')
+          AND t.source IN ('STATEMENT', 'SPREADSHEET')
+          AND c.kind IN ('INCOME', 'EXPENSE')
+          AND (t.updated_at - t.created_at) < :marginMillis
+        """,
+    )
+    suspend fun getAutoFiled(marginMillis: Long): List<TransactionEntity>
+
+    /**
+     * Payees the user filed themselves — typed in, or changed after they
+     * arrived — commonest first.
+     */
+    @Query(
+        """
+        SELECT t.description AS description, c.name AS category_name
+        FROM transactions t
+        JOIN categories c ON c.id = t.category_id
+        WHERE t.is_archived = 0 AND t.description != '' AND c.kind IN ('INCOME', 'EXPENSE')
+          AND (t.source = 'MANUAL' OR (t.updated_at - t.created_at) >= :marginMillis)
+        GROUP BY t.description, c.name
+        ORDER BY COUNT(*) DESC
+        LIMIT :limit
+        """,
+    )
+    suspend fun getUserFiledDescriptions(marginMillis: Long, limit: Int): List<DescriptionCategory>
+
+    @Query("SELECT COUNT(*) FROM transactions WHERE is_archived = 0")
+    suspend fun countActive(): Int
 
     /** How much money out is still unfiled, or filed only under a [vague] name. */
     @Query(

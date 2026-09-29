@@ -211,6 +211,7 @@ private fun NavGraphBuilder.topLevelDestinations(
             onOpenPeople = { navController.navigate(Routes.PEOPLE) },
             onOpenSortSpending = { navController.navigate(Routes.SORT_SPENDING) },
             onOpenSentToPeople = { navController.navigate(Routes.SENT_TO_PEOPLE) },
+            onOpenPeopleMoneyFor = { navController.navigate(Routes.sentToPeople(it)) },
         )
     }
 
@@ -260,8 +261,20 @@ private fun NavGraphBuilder.topLevelDestinations(
         SortSpendingScreen(onBack = { navController.popBackStack() })
     }
 
-    composable(Routes.SENT_TO_PEOPLE) {
-        SentToPeopleScreen(onBack = { navController.popBackStack() })
+    composable(
+        route = Routes.SENT_TO_PEOPLE_PATTERN,
+        arguments = listOf(
+            navArgument(Routes.ARG_PERSON_ID) {
+                type = NavType.LongType
+                defaultValue = Routes.NEW_ID
+            },
+        ),
+    ) { entry ->
+        val personId = entry.arguments?.getLong(Routes.ARG_PERSON_ID) ?: Routes.NEW_ID
+        SentToPeopleScreen(
+            onBack = { navController.popBackStack() },
+            personId = personId.takeIf { it != Routes.NEW_ID },
+        )
     }
 }
 
@@ -318,6 +331,7 @@ private fun NavGraphBuilder.editorDestinations(
             onEditDetails = { navController.navigate(Routes.personEdit(it)) },
             onOpenAccount = { navController.navigate(Routes.accountEdit(it)) },
             onImportStatement = { navController.navigate(Routes.importForPerson(it)) },
+            onOpenPeopleMoney = { navController.navigate(Routes.sentToPeople(it)) },
         )
     }
 

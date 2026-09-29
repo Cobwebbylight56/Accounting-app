@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rhys.financetracker.core.money.Money
 import com.rhys.financetracker.core.time.DateUtils
+import com.rhys.financetracker.data.repository.PayeeRepository
+import com.rhys.financetracker.data.repository.PeopleMoney
 import com.rhys.financetracker.data.local.dao.DashboardWidgetDao
 import com.rhys.financetracker.data.local.dao.TransactionFilter
 import com.rhys.financetracker.data.local.dao.TransactionSort
@@ -79,6 +81,7 @@ class DashboardViewModel @Inject constructor(
     private val cashPotRepository: CashPotRepository,
     private val incomeRepository: IncomeRepository,
     private val settingsRepository: SettingsRepository,
+    private val payeeRepository: PayeeRepository,
 ) : ViewModel() {
 
     /** Which tab is picked; null until somebody picks, meaning the first person. */
@@ -138,6 +141,12 @@ class DashboardViewModel @Inject constructor(
     private val monthFlow = combine(visibleMonth, scope) { month, currentScope ->
         month to currentScope
     }
+
+    /** Money sent to and from people in the month and tab on screen. */
+    val peopleMoney: StateFlow<PeopleMoney?> = monthFlow.flatMapLatest { (month, currentScope) ->
+        val range = DateUtils.monthRange(month)
+        payeeRepository.observeMoneyWithPeople(range.start, range.endInclusive, currentScope.personIds)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private val totals = monthFlow.flatMapLatest { (month, currentScope) ->
         val range = DateUtils.monthRange(month)

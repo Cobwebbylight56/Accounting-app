@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.rhys.financetracker.core.money.Money
 import com.rhys.financetracker.domain.model.LockMethod
@@ -59,6 +60,8 @@ class SettingsRepository @Inject constructor(
         val DEFAULT_ACCOUNT_ID = longPreferencesKey("default_account_id")
         val LARGE_TEXT = booleanPreferencesKey("large_text")
         val SHARED_PEOPLE = stringPreferencesKey("shared_people")
+        val PAYEES_KEPT = stringSetPreferencesKey("payees_kept_as_people")
+        val PAYEES_HIDDEN = stringSetPreferencesKey("payees_not_people")
     }
 
     /** Defaults chosen so a fresh install is immediately usable and private. */
@@ -120,6 +123,8 @@ class SettingsRepository @Inject constructor(
             sharedPeopleIds = prefs[Keys.SHARED_PEOPLE]?.let { stored ->
                 stored.split(',').mapNotNull { it.trim().toLongOrNull() }.toSet()
             },
+            payeesKeptAsPeople = prefs[Keys.PAYEES_KEPT].orEmpty(),
+            payeesNotPeople = prefs[Keys.PAYEES_HIDDEN].orEmpty(),
         )
     }
 
@@ -158,6 +163,20 @@ class SettingsRepository @Inject constructor(
     /** Who the Shared tab on Home covers; see [AppSettings.sharedPeopleIds]. */
     suspend fun setSharedPeople(ids: Set<Long>) =
         put(Keys.SHARED_PEOPLE, ids.sorted().joinToString(","))
+
+    /**
+     * Settles whether a payee is a person, overriding the app's own guess:
+     * true keeps them on the people pages, false takes them off, null goes
+     * back to guessing. [key] is PayeeNames.personKey of their name.
+     */
+    suspend fun setPayeeIsPerson(key: String, isPerson: Boolean?) {
+        context.dataStore.edit { prefs ->
+            val kept = prefs[Keys.PAYEES_KEPT].orEmpty() - key
+            val hidden = prefs[Keys.PAYEES_HIDDEN].orEmpty() - key
+            prefs[Keys.PAYEES_KEPT] = if (isPerson == true) kept + key else kept
+            prefs[Keys.PAYEES_HIDDEN] = if (isPerson == false) hidden + key else hidden
+        }
+    }
 
     private suspend fun <T> put(key: Preferences.Key<T>, value: T) {
         context.dataStore.edit { it[key] = value }
@@ -199,6 +218,10 @@ data class AppSettings(
      * means everybody.
      */
     val sharedPeopleIds: Set<Long>? = null,
+    /** Payees the user said are people, whatever the app guessed. */
+    val payeesKeptAsPeople: Set<String> = emptySet(),
+    /** Payees the user said are not people — PayPal, a shop. */
+    val payeesNotPeople: Set<String> = emptySet(),
 ) {
     val isLockEnabled: Boolean get() = lockMethod != LockMethod.NONE
     val requiresPin: Boolean

@@ -36,17 +36,26 @@ object MerchantCategoriser {
         val text = TransactionFingerprint.normaliseDescription(description)
         if (text.isBlank()) return null
 
-        learned[text]?.let { return it }
-
-        // A payee remembered under a longer reference still counts: banks add
-        // and drop trailing numbers between exports.
-        learned.entries.firstOrNull { (merchant, _) ->
-            merchant.length >= MIN_LEARNED_PREFIX &&
-                (text.startsWith(merchant) || merchant.startsWith(text))
-        }?.let { return it.value }
+        learnedCategory(description, learned)?.let { return it }
 
         val rules = if (type == TransactionType.INCOME) INCOME_RULES else EXPENSE_RULES
         return rules.firstOrNull { rule -> rule.keywords.any { matches(text, it) } }?.category
+    }
+
+    /**
+     * What the user has already filed [description] under, or null. Only
+     * [learned] is consulted — never the built-in rules.
+     */
+    fun learnedCategory(description: String, learned: Map<String, String>): String? {
+        val text = TransactionFingerprint.normaliseDescription(description)
+        if (text.isBlank()) return null
+        learned[text]?.let { return it }
+        // A payee remembered under a longer reference still counts: banks add
+        // and drop trailing numbers between exports.
+        return learned.entries.firstOrNull { (merchant, _) ->
+            merchant.length >= MIN_LEARNED_PREFIX &&
+                (text.startsWith(merchant) || merchant.startsWith(text))
+        }?.value
     }
 
     /**

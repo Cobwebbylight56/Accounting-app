@@ -1,5 +1,6 @@
 package com.rhys.financetracker.data
 
+import com.rhys.financetracker.data.importer.PayeeNames
 import com.rhys.financetracker.data.local.entity.TransactionEntity
 import com.rhys.financetracker.data.local.projection.PayeeEntry
 import com.rhys.financetracker.data.repository.PayeeRepository
@@ -26,7 +27,7 @@ class MoneyWithPeopleTest {
                 entry(2, "Payment to JOHN SMITH", 2_000),
             ),
             received = listOf(entry(3, "BANK CREDIT SMITH J", 3_000)),
-        )
+        ).people
         assertEquals(1, ledgers.size)
         val smith = ledgers.single()
         assertEquals(7_000L, smith.sentMinor)
@@ -43,9 +44,38 @@ class MoneyWithPeopleTest {
                 entry(1, "ACME LTD SALARY", 200_000),
                 entry(2, "FASTER PAYMENT FROM HANNAH EVANS", 1_500),
             ),
-        )
+        ).people
         assertEquals(listOf("Hannah Evans"), ledgers.map { it.name })
         assertEquals(0L, ledgers.single().sentMinor)
+    }
+
+    @Test
+    fun `PayPal and shops are left out, and the user's answer outranks the guess`() {
+        val sent = listOf(
+            entry(1, "PAYPAL *EBAY", 2_500, category = "Transfers & payments"),
+            entry(2, "FASTER PAYMENT TO J SMITH", 5_000),
+            entry(3, "FASTER PAYMENT TO RUBY COOPER", 1_000),
+        )
+        val guessed = PayeeRepository.ledgers(sent, emptyList())
+        assertEquals(listOf("J Smith"), guessed.people.map { it.name })
+        assertTrue(guessed.notPeople.any { it.name.startsWith("Paypal") })
+
+        val answered = PayeeRepository.ledgers(
+            sent,
+            emptyList(),
+            kept = setOf("r cooper"),
+            hidden = setOf("j smith"),
+        )
+        assertEquals(listOf("Ruby Cooper"), answered.people.map { it.name })
+    }
+
+    @Test
+    fun `a person's name is told apart from a business`() {
+        assertTrue(PayeeNames.isPersonName("J Smith"))
+        assertTrue(PayeeNames.isPersonName("Hannah Evans"))
+        assertTrue(!PayeeNames.isPersonName("Paypal Ebay"))
+        assertTrue(!PayeeNames.isPersonName("Tesco Stores"))
+        assertTrue(!PayeeNames.isPersonName("Acme Ltd"))
     }
 
     @Test

@@ -77,6 +77,7 @@ fun DashboardScreen(
     onOpenPeople: () -> Unit,
     onOpenSortSpending: () -> Unit = {},
     onOpenSentToPeople: () -> Unit = {},
+    onOpenPeopleMoneyFor: (Long) -> Unit = {},
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -85,6 +86,7 @@ fun DashboardScreen(
     val individuals = state.people.filterNot { it.isShared }
     val categoryDetail by viewModel.categoryDetail.collectAsStateWithLifecycle()
     val message by viewModel.messages.collectAsStateWithLifecycle()
+    val peopleMoney by viewModel.peopleMoney.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
 
     // The cash buttons change a number further up the card, which is easy to
@@ -173,16 +175,21 @@ fun DashboardScreen(
                 item { MonthList(state = state) }
 
                 item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        androidx.compose.material3.OutlinedButton(
-                            onClick = onOpenSortSpending,
-                            modifier = Modifier.weight(1f),
-                        ) { Text("Sort spending") }
-                        androidx.compose.material3.OutlinedButton(
-                            onClick = onOpenSentToPeople,
-                            modifier = Modifier.weight(1f),
-                        ) { Text("Sent & received") }
-                    }
+                    com.rhys.financetracker.ui.spending.PeopleMoneyCard(
+                        money = peopleMoney,
+                        monthLabel = com.rhys.financetracker.core.time.DateUtils.formatMonth(state.month),
+                        onSeeAll = {
+                            val person = state.scope.personId
+                            if (person != null) onOpenPeopleMoneyFor(person) else onOpenSentToPeople()
+                        },
+                    )
+                }
+
+                item {
+                    androidx.compose.material3.OutlinedButton(
+                        onClick = onOpenSortSpending,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Sort spending") }
                 }
 
                 item { LoansCard(state = state, onOpenAccounts = onOpenAccounts) }

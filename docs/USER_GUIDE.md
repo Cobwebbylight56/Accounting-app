@@ -450,17 +450,26 @@ bowling, theme parks, ticket sites, pubs and takeaways.
 
 ### Money with people
 
-**More → Money with people** (or **Sent & received** on Home) shows, for each
-person, **what you sent them and what they sent you side by side** for one
-month — use the arrows to move between months. Each card says who is up
-("You sent £20.00 more"), and the top shows the month's totals both ways.
+Home has a **People** card, under the month's figures: each person you sent
+money to or got money from this month, **what you sent** and **what they sent**
+side by side, with the totals. It follows the tab you're on — a person's tab
+shows their accounts, the Shared tab the shared ones — and the month you're
+looking at. A person's own page has the same card for their accounts.
 
-Money sent counts bank transfers, standing orders and payments to someone.
-Money in counts when it reads like a transfer from someone, or comes from a
-name you've sent money to. Names are matched however the bank writes them —
-"J Smith", "John Smith", "Smith J" — so both sides land on one card. Tap a card
-to see every payment on each side; if one isn't a person (a wage, a refund),
-file it elsewhere and it drops off.
+**See all** (or **More → Money with people**) opens every person for the
+month, with arrows to change month. Each card says who is up ("You sent £20.00
+more"); tap it to see every payment on both sides.
+
+Only **people's names** are shown. PayPal, shops, websites and services are
+left out, even when they arrive as a transfer. Where the app guesses wrong:
+
+* tap a person and **Not a person — leave out** to take them off;
+* **Show … left out as not people** at the bottom lists what was left out —
+  tap **It's a person** to keep one.
+
+Your choice is remembered for every month. Names are matched however the bank
+writes them — "J Smith", "John Smith", "Smith J" — so both sides land on one
+card.
 
 ### Sort everything
 
@@ -475,9 +484,14 @@ you don't have to move things by hand:
   already has the same movement, so nothing is counted twice);
 * unsorted payments and "Card spending" get a category from what you've filed
   before, then from the app's list of shops, websites and outings;
+* payments the app filed by itself follow how **you** filed the same payee —
+  change one Sainsbury's fuel stop to Fuel, run it, and the rest follow;
+* regular payments seen at least twice and still being paid are set up as
+  bills;
 * paid-off loans are put away.
 
-Anything you filed yourself is left alone. It finishes with what it changed and
+Anything you filed yourself is left alone. It finishes with how many entries
+and accounts it checked, what it changed and
 how many payments it couldn't place, with **Sort the rest** to file those by
 payee. Run it again any time — after importing old statements, or after
 teaching it a few payees.

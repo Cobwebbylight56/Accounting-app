@@ -71,6 +71,9 @@ object Routes {
      */
     fun importForAccount(accountId: Long = NEW_ID): String = "$IMPORT?$ARG_ACCOUNT_ID=$accountId"
 
+    /** Money with people for one person's accounts. */
+    fun sentToPeople(personId: Long): String = "$SENT_TO_PEOPLE?$ARG_PERSON_ID=$personId"
+
     /** The importer, started from a person's page: their name is checked against the statement's. */
     fun importForPerson(personId: Long): String = "$IMPORT?$ARG_PERSON_ID=$personId"
 
@@ -87,6 +90,7 @@ object Routes {
     /** Optional so the plain `import` route still matches. */
     const val ARG_ACCOUNT_ID = "accountId"
     const val ARG_PERSON_ID = "personId"
+    const val SENT_TO_PEOPLE_PATTERN = "$SENT_TO_PEOPLE?$ARG_PERSON_ID={$ARG_PERSON_ID}"
     const val IMPORT_PATTERN =
         "$IMPORT?$ARG_ACCOUNT_ID={$ARG_ACCOUNT_ID}&$ARG_PERSON_ID={$ARG_PERSON_ID}"
 }

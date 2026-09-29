@@ -1,5 +1,6 @@
 package com.rhys.financetracker.data.repository
 
+import com.rhys.financetracker.core.time.DateUtils
 import com.rhys.financetracker.data.importer.MerchantCategoriser
 import com.rhys.financetracker.data.importer.OwnAccountMatcher
 import com.rhys.financetracker.data.importer.SpreadsheetImporter
@@ -28,14 +29,21 @@ data class TidyUpResult(
     val linkedToAccounts: Int = 0,
     /** Entries given a category. */
     val categorised: Int = 0,
+    /** Entries moved to follow how the user filed the same payee. */
+    val refiled: Int = 0,
+    /** Regular payments set up as bills. */
+    val billsAdded: List<String> = emptyList(),
+    /** How much was looked at, so "nothing to do" can be believed. */
+    val entriesChecked: Int = 0,
+    val accountsChecked: Int = 0,
     /** Paid-off loans put away. */
     val loansCleared: List<String> = emptyList(),
     /** Money out that still has no proper category. */
     val stillUnsorted: Int = 0,
 ) {
     val changedAnything: Boolean
-        get() = payRisesApplied + filedAsSavings + linkedToAccounts + categorised > 0 ||
-            loansCleared.isNotEmpty()
+        get() = payRisesApplied + filedAsSavings + linkedToAccounts + categorised + refiled > 0 ||
+            loansCleared.isNotEmpty() || billsAdded.isNotEmpty()
 }
 
 /**
@@ -53,10 +61,15 @@ data class TidyUpResult(
  *    account's own statement already has the same movement.
  * 4. Unfiled payments, and ones filed only as "Card spending", are given a
  *    category from what has been filed before, then the built-in shop list.
- * 5. Paid-off loans are put away.
+ * 5. Entries a statement filed by itself follow the user's own filing of the
+ *    same payee: move one Sainsbury's fuel stop to Fuel, and every other
+ *    one the importer called Groceries follows.
+ * 6. Regular payments seen at least twice and still being paid are set up
+ *    as bills.
+ * 7. Paid-off loans are put away.
  *
- * Nothing the user chose is overridden: only entries with no category, or
- * one that says nothing about what was bought, are touched.
+ * Nothing the user chose is overridden: only entries with no category, a
+ * vague one, or one the importer picked and nobody has touched since.
  */
 @Singleton
 class TidyUpRepository @Inject constructor(
@@ -67,6 +80,7 @@ class TidyUpRepository @Inject constructor(
     private val accountRepository: AccountRepository,
     private val incomeRepository: IncomeRepository,
     private val importer: SpreadsheetImporter,
+    private val billFinder: BillFinderRepository,
 ) {
 
     suspend fun sortEverything(): TidyUpResult {
@@ -81,6 +95,8 @@ class TidyUpRepository @Inject constructor(
         }
 
         val categorised = categoriseUnsorted()
+        val refiled = followUserFiling()
+        val bills = addStillPaidBills()
 
         val cleared = accountRepository.archivePaidOffLoans(
             accountDao.observeActiveWithBalances().first(),
@@ -91,6 +107,10 @@ class TidyUpRepository @Inject constructor(
             filedAsSavings = filed,
             linkedToAccounts = linked,
             categorised = categorised,
+            refiled = refiled,
+            billsAdded = bills,
+            entriesChecked = transactionDao.countActive(),
+            accountsChecked = accounts.size,
             loansCleared = cleared,
             stillUnsorted = transactionDao.countUnsorted(VAGUE),
         )
@@ -183,6 +203,47 @@ class TidyUpRepository @Inject constructor(
         return byCategory.values.sumOf { it.size }
     }
 
+    /**
+     * Moves entries the importer filed by itself to where the user filed the
+     * same payee. Only the user's own filings count as the answer — the
+     * built-in list never overrules a category that is already there.
+     */
+    private suspend fun followUserFiling(): Int {
+        val learned = transactionDao.getUserFiledDescriptions(UNTOUCHED_MILLIS, SpreadsheetImporter.LEARNED_PAYEE_LIMIT)
+            .filterNot { it.categoryName in VAGUE }
+            .associate { TransactionFingerprint.normaliseDescription(it.description) to it.categoryName }
+        if (learned.isEmpty()) return 0
+        val names = categoryDao.getAll().associate { it.id to it.name }
+        val byCategory = mutableMapOf<Long, MutableList<Long>>()
+        transactionDao.getAutoFiled(UNTOUCHED_MILLIS).forEach { row ->
+            val decided = MerchantCategoriser.learnedCategory(row.description, learned) ?: return@forEach
+            if (decided.equals(names[row.categoryId], ignoreCase = true)) return@forEach
+            val id = categoryIdFor(decided, row.type) ?: return@forEach
+            if (id == row.categoryId) return@forEach
+            byCategory.getOrPut(id) { mutableListOf() }.add(row.id)
+        }
+        val now = Instant.now().toEpochMilli()
+        byCategory.forEach { (categoryId, ids) ->
+            ids.chunked(BATCH).forEach { transactionDao.setCategory(it, categoryId, now) }
+        }
+        return byCategory.values.sumOf { it.size }
+    }
+
+    /**
+     * Sets up as bills the regular payments seen at least twice that are
+     * still being paid. One that has stopped — its next payment long overdue
+     * — is left alone.
+     */
+    private suspend fun addStillPaidBills(): List<String> {
+        val today = DateUtils.today()
+        val bills = billFinder.find().filter { bill ->
+            bill.isConfirmed &&
+                !bill.nextDue(bill.lastDate.plusDays(1)).isBefore(today.minusDays(STOPPED_AFTER_DAYS))
+        }
+        if (bills.isEmpty()) return emptyList()
+        return if (billFinder.addAsBills(bills).isSuccess) bills.map { it.name } else emptyList()
+    }
+
     /** The category called [name], preferring the savings and cash kinds, as the importer does. */
     private suspend fun categoryIdFor(name: String, type: TransactionType): Long? {
         for (kind in listOf(CategoryKind.SAVING, CategoryKind.CASH)) {
@@ -205,6 +266,15 @@ class TidyUpRepository @Inject constructor(
         val LOOSE = listOf("Transfers & payments", "Credit & loans", "Car finance", "Mortgage")
 
         private const val BATCH = 400
+
+        /**
+         * An entry changed less than this long after it was added was filed
+         * by the importer, not by a person.
+         */
+        private const val UNTOUCHED_MILLIS = 60_000L
+
+        /** How overdue a regular payment can be before it counts as stopped. */
+        private const val STOPPED_AFTER_DAYS = 10L
 
         /**
          * [row] as a move between accounts. Money out stays on its account and
