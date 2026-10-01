@@ -43,7 +43,7 @@ import kotlin.math.sin
 import kotlinx.coroutines.launch
 
 /**
- * The opening animation, about two seconds long: a badge springs up, its
+ * The opening animation, about four and a half seconds long: a badge springs up, its
  * bars rise one after another, a line climbs across their tops to a glowing
  * point, and the name slides in under it while sparks drift upward. Then it
  * fades into the app.
@@ -66,10 +66,14 @@ fun IntroScreen(onFinished: () -> Unit) {
     }
     LaunchedEffect(Unit) { playFrom(0f) }
     val t = time.value
+    /** Progress through one step, eased. The script's times are stretched by [PACE]. */
     fun phase(start: Float, end: Float): Float =
+        FastOutSlowInEasing.transform(((t - start * PACE) / ((end - start) * PACE)).coerceIn(0f, 1f))
+    /** The same on the real clock, for the hold and the fade. */
+    fun clock(start: Float, end: Float): Float =
         FastOutSlowInEasing.transform(((t - start) / (end - start)).coerceIn(0f, 1f))
 
-    val fadeOut = 1f - phase(FADE_START_MS, TOTAL_MS)
+    val fadeOut = 1f - clock(FADE_START_MS, TOTAL_MS)
 
     Box(
         modifier = Modifier
@@ -139,6 +143,20 @@ fun IntroScreen(onFinished: () -> Unit) {
                     brush = Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.18f), Color.Transparent), endY = size.height * 0.6f),
                     cornerRadius = CornerRadius(corner, corner),
                 )
+                // Once it is all built, a band of light sweeps across the badge.
+                val shine = clock(SHINE_START_MS, SHINE_START_MS + 900f)
+                if (shine > 0f && shine < 1f) {
+                    val band = size.width * 0.45f
+                    val x = -band + (size.width + band * 2) * shine
+                    drawRoundRect(
+                        brush = Brush.linearGradient(
+                            colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.32f), Color.Transparent),
+                            start = Offset(x - band / 2f, 0f),
+                            end = Offset(x + band / 2f, size.height),
+                        ),
+                        cornerRadius = CornerRadius(corner, corner),
+                    )
+                }
 
                 val inset = size.width * 0.2f
                 val floor = size.height * 0.78f
@@ -176,6 +194,11 @@ fun IntroScreen(onFinished: () -> Unit) {
                     val end = measure.getPosition(measure.length * draw)
                     val burst = phase(1400f, 1700f)
                     drawCircle(Gold.copy(alpha = 0.35f * (1f - burst * 0.6f)), radius = (6f + 10f * burst).dp.toPx(), center = end)
+                    // While it holds, the point keeps glowing gently.
+                    if (burst >= 1f) {
+                        val pulse = (sin(t / 220f) + 1f) / 2f
+                        drawCircle(Gold.copy(alpha = 0.18f + 0.14f * pulse), radius = (12f + 6f * pulse).dp.toPx(), center = end)
+                    }
                     drawCircle(Gold, radius = 4.5.dp.toPx(), center = end)
                 }
             }
@@ -222,8 +245,15 @@ private val SPARKS = listOf(
 /** Bar heights inside the badge, as a share of the room: a rising month. */
 private val BARS = listOf(0.38f, 0.58f, 0.47f, 0.86f)
 
-private const val TOTAL_MS = 2400f
-private const val FADE_START_MS = 2000f
+/**
+ * Four and a half seconds in all: the build-up, slowed by [PACE] so each
+ * step can be seen, then a moment holding the finished picture — the light
+ * sweeps across the badge and the point glows — before it fades.
+ */
+private const val PACE = 1.4f
+private const val SHINE_START_MS = 2750f
+private const val TOTAL_MS = 4400f
+private const val FADE_START_MS = 3900f
 private const val SPARK_LIFE_MS = 3600f
 
 private val Navy = Color(0xFF0E1A2B)

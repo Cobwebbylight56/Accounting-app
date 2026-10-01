@@ -80,6 +80,7 @@ class MainActivity : FragmentActivity() {
             val isLocked by appLockManager.isLocked.collectAsStateWithLifecycle()
             var introDone by rememberSaveable { mutableStateOf(!freshStart) }
             val reduceMotion = com.rhys.financetracker.ui.components.rememberReduceMotion()
+            val introPlaying = !introDone && settings.showIntro && !reduceMotion
 
             FinanceTrackerTheme(
                 themeMode = settings.themeMode,
@@ -104,7 +105,11 @@ class MainActivity : FragmentActivity() {
                             color = MaterialTheme.colorScheme.background,
                         ) {
                             if (isLocked) {
-                                LockScreen(
+                                // Held back until the intro has played: the
+                                // fingerprint prompt is the system's own window
+                                // and would cover it. Nothing of the app's
+                                // money is drawn underneath meanwhile.
+                                if (!introPlaying) LockScreen(
                                     onUnlocked = { /* The lock manager drives this state. */ },
                                     onRequestBiometric = { onSuccess, onError ->
                                         BiometricAuthenticator.authenticate(
@@ -127,7 +132,7 @@ class MainActivity : FragmentActivity() {
                         }
                         // Drawn over everything, the lock screen included, and
                         // gone for good once it has played.
-                        if (!introDone && settings.showIntro && !reduceMotion) {
+                        if (introPlaying) {
                             IntroScreen(onFinished = { introDone = true })
                         }
                     }

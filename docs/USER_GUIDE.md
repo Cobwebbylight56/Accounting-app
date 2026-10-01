@@ -887,7 +887,9 @@ with **Allow notifications** — none of the reminders can appear until then.
 
 ## Making it yours
 
-**Opening animation.** The app opens with a short intro. Tap it to skip, or turn
+**Opening animation.** The app opens with a short intro, about four and a half
+seconds; with a PIN or fingerprint lock, it plays first and the lock comes up
+straight after. Tap it to skip, or turn
 it off in **Settings → Appearance → Opening animation**. It never plays when
 your phone's animations are switched off (Accessibility → Remove animations),
 and the charts then appear straight away instead of drawing themselves in.
