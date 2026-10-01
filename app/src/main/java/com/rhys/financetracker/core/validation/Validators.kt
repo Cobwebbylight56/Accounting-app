@@ -11,6 +11,14 @@ import java.time.LocalDate
 object Validators {
 
     const val MAX_NAME_LENGTH = 80
+
+    /**
+     * A payment's description is the bank's own text — "Contactless Payment
+     * NYX*SelectSimulation Crediton GB" and longer — not a name somebody
+     * chose, so it gets far more room. At 80, statement rows imported whole
+     * could not be saved again from the editor.
+     */
+    const val MAX_DESCRIPTION_LENGTH = 500
     const val MAX_NOTES_LENGTH = 1_000
 
     /** The furthest into the past/future a record may be dated (sanity guard). */
@@ -21,6 +29,13 @@ object Validators {
         value.isBlank() -> ValidationResult.invalid("$field cannot be empty")
         value.length > MAX_NAME_LENGTH ->
             ValidationResult.invalid("$field must be $MAX_NAME_LENGTH characters or fewer")
+        else -> ValidationResult.Valid
+    }
+
+    fun validateDescription(value: String): ValidationResult = when {
+        value.isBlank() -> ValidationResult.invalid("Description cannot be empty")
+        value.length > MAX_DESCRIPTION_LENGTH ->
+            ValidationResult.invalid("Description must be $MAX_DESCRIPTION_LENGTH characters or fewer")
         else -> ValidationResult.Valid
     }
 

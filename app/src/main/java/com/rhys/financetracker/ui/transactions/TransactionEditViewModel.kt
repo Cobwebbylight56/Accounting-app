@@ -248,7 +248,7 @@ class TransactionEditViewModel @Inject constructor(
     /** Field-level checks, reported against the field they belong to. */
     private fun validate(current: TransactionForm): String? {
         val amountError = Validators.validateAmount(current.amountText).errorOrNull
-        val nameError = Validators.validateName(current.description, "Description").errorOrNull
+        val nameError = Validators.validateDescription(current.description).errorOrNull
         val dateError = Validators.validateDate(current.date).errorOrNull
 
         form.value = current.copy(

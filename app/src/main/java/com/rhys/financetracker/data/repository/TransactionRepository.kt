@@ -201,7 +201,7 @@ class TransactionRepository @Inject constructor(
      * cannot enter the database from a form, an import or a restore.
      */
     private fun validate(transaction: TransactionEntity) {
-        Validators.validateName(transaction.description, "Description").errorOrNull
+        Validators.validateDescription(transaction.description).errorOrNull
             ?.let { error(it) }
         Validators.validateNotes(transaction.notes).errorOrNull?.let { error(it) }
         Validators.validateDate(transaction.date).errorOrNull?.let { error(it) }

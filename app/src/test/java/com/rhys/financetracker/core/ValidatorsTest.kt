@@ -24,6 +24,15 @@ class ValidatorsTest {
     }
 
     @Test
+    fun `a bank's long description is accepted, a runaway one is not`() {
+        val bank = "Contactless Payment NYX*SelectSimulation Crediton GB 4462 ref 9981234 card ending 1234 on 10 Aug"
+        assertTrue(bank.length > Validators.MAX_NAME_LENGTH)
+        assertTrue(Validators.validateDescription(bank).isValid)
+        assertFalse(Validators.validateDescription("x".repeat(Validators.MAX_DESCRIPTION_LENGTH + 1)).isValid)
+        assertFalse(Validators.validateDescription(" ").isValid)
+    }
+
+    @Test
     fun `zero is rejected unless it is allowed`() {
         assertFalse(Validators.validateAmount("0").isValid)
         assertTrue(Validators.validateAmount("0", allowZero = true).isValid)
