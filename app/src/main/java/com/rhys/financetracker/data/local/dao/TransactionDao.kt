@@ -878,6 +878,20 @@ interface TransactionDao {
     @Query("SELECT COUNT(*) FROM transactions WHERE is_archived = 0")
     suspend fun countActive(): Int
 
+    /**
+     * The months ("2026-01") that hold entries read from a statement for
+     * [accountId], oldest first — which months of statements are in.
+     */
+    @Query(
+        """
+        SELECT DISTINCT substr(t.date, 1, 7) AS month FROM transactions t
+        WHERE t.is_archived = 0 AND t.source = 'STATEMENT'
+          AND (t.account_id = :accountId OR t.transfer_account_id = :accountId)
+        ORDER BY month ASC
+        """,
+    )
+    fun observeStatementMonths(accountId: Long): Flow<List<String>>
+
     /** How much money out is still unfiled, or filed only under a [vague] name. */
     @Query(
         """

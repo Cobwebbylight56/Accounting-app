@@ -223,6 +223,8 @@ data class ImportOutcome(
     /** Rows that were already in the ledger — the cost of overlapping statements. */
     val duplicatesSkipped: Int = 0,
     val problems: List<String> = emptyList(),
+    /** The payments this import added, so it can be recorded and undone. */
+    val createdTransactionIds: List<Long> = emptyList(),
 ) {
     val totalCreated: Int
         get() = peopleCreated + accountsCreated + categoriesCreated +

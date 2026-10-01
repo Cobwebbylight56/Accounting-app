@@ -86,6 +86,8 @@ fun AccountsScreen(
     onAddAccount: () -> Unit,
     onOpenPeople: () -> Unit,
     onImportStatement: (Long) -> Unit,
+    /** The account's own page; tapping a row opens it, Edit is in the menu. */
+    onOpenAccount: (Long) -> Unit = onEditAccount,
     viewModel: AccountsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -198,7 +200,8 @@ fun AccountsScreen(
                             group.accounts.forEach { account ->
                                 AccountRow(
                                     account = account,
-                                    onClick = { onEditAccount(account.account.id) },
+                                    onClick = { onOpenAccount(account.account.id) },
+                                    onEdit = { onEditAccount(account.account.id) },
                                     onImportStatement = {
                                         onImportStatement(account.account.id)
                                     },
@@ -365,6 +368,7 @@ private fun OwnerChips(people: List<PersonEntity>, onPick: (PersonEntity) -> Uni
 private fun AccountRow(
     account: AccountWithBalance,
     onClick: () -> Unit,
+    onEdit: () -> Unit,
     onImportStatement: () -> Unit,
     onDuplicate: () -> Unit,
     onArchive: () -> Unit,
@@ -417,7 +421,7 @@ private fun AccountRow(
         DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
             DropdownMenuItem(
                 text = { Text("Edit") },
-                onClick = { onClick(); showMenu = false },
+                onClick = { onEdit(); showMenu = false },
             )
             // Reached from the account itself, so there is nothing to choose:
             // the statement is filed here.

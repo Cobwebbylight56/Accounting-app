@@ -920,7 +920,7 @@ class SpreadsheetImporter @Inject constructor(
         // other, or the other way round. Both balances move with one entry.
         val other = candidate.transferAccountId
         val isMove = other != null && other != accountId
-        transactionDao.insert(
+        val newId = transactionDao.insert(
             TransactionEntity(
                 amountMinor = candidate.amountMinor,
                 type = if (isMove) TransactionType.TRANSFER else type,
@@ -950,7 +950,10 @@ class SpreadsheetImporter @Inject constructor(
                 ),
             ),
         )
-        return running.copy(transactionsCreated = running.transactionsCreated + 1)
+        return running.copy(
+            transactionsCreated = running.transactionsCreated + 1,
+            createdTransactionIds = running.createdTransactionIds + newId,
+        )
     }
 
     // ------------------------------------------------------------ resolvers

@@ -49,6 +49,7 @@ class ImportViewModel @Inject constructor(
     private val peopleRepository: PeopleRepository,
     private val accountRepository: AccountRepository,
     private val billFinder: BillFinderRepository,
+    private val importHistory: com.rhys.financetracker.data.repository.ImportHistoryRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ImportState())
@@ -236,6 +237,9 @@ class ImportViewModel @Inject constructor(
                         preselectedAccountId = before.preselectedAccountId,
                         expectedPersonId = before.expectedPersonId,
                         expectedPersonName = before.expectedPersonName,
+                        // The rest of a pile of statements picked together.
+                        queue = before.queue,
+                        queueTotal = before.queueTotal,
                         workbook = workbook,
                         selectedSheetIndex = 0,
                         detectedLayout = detected,
@@ -544,6 +548,7 @@ class ImportViewModel @Inject constructor(
                 is AppResult.Success -> {
                     val current = _state.value
                     val account = current.chosenAccount
+                    val before = account?.let { accountRepository.get(it.id) }
                     // A statement brings the account's balance up to date
                     // with the bank's own figure, and shows its bills.
                     val balanceNote = if (account != null && current.canImportStatement) {
@@ -557,10 +562,34 @@ class ImportViewModel @Inject constructor(
                     } else {
                         null
                     }
+                    // Kept as a record of what came in, so it can be listed
+                    // on the account and taken back out in one go.
+                    val batchId = if (account != null &&
+                        (result.data.createdTransactionIds.isNotEmpty() || result.data.transactionsUpdated > 0)
+                    ) {
+                        val after = accountRepository.get(account.id)
+                        val check = current.check
+                        runCatching {
+                            importHistory.record(
+                                accountId = account.id,
+                                fileName = current.workbook?.fileName ?: "Statement",
+                                addedIds = result.data.createdTransactionIds,
+                                rowsUpdated = result.data.transactionsUpdated,
+                                firstDate = check.firstDate,
+                                lastDate = check.lastDate,
+                                balanceBefore = before?.let { it.openingBalanceMinor to it.openingBalanceDate },
+                                balanceAfter = after?.let { it.openingBalanceMinor to it.openingBalanceDate },
+                            )
+                        }.getOrNull()
+                    } else {
+                        null
+                    }
                     val bills = if (account != null) billFinder.find(account.id) else emptyList()
                     _state.value = current.copy(
                         isBusy = false,
                         step = ImportStep.DONE,
+                        importBatchId = batchId,
+                        undoneNote = null,
                         outcome = result.data,
                         balanceNote = balanceNote,
                         foundBills = bills,
@@ -657,6 +686,45 @@ class ImportViewModel @Inject constructor(
             expectedPersonId = before.expectedPersonId,
             expectedPersonName = before.expectedPersonName,
         )
+    }
+
+    /**
+     * Several statements picked at once. The first is opened now; each of
+     * the others is offered in turn from the finished screen.
+     */
+    fun openFiles(uris: List<Uri>) {
+        if (uris.isEmpty()) return
+        _state.value = _state.value.copy(queue = uris.drop(1), queueTotal = uris.size)
+        openFile(uris.first())
+    }
+
+    /** Opens the next statement in the pile, filed against the same account as before. */
+    fun openNext() {
+        val current = _state.value
+        val next = current.queue.firstOrNull() ?: return
+        _state.value = current.copy(
+            queue = current.queue.drop(1),
+            preselectedAccountId = current.chosenAccount?.id ?: current.preselectedAccountId,
+        )
+        openFile(next)
+    }
+
+    /** Takes the import just finished back out; see ImportHistoryRepository.undo. */
+    fun undoImport() {
+        val batchId = _state.value.importBatchId ?: return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isBusy = true)
+            when (val result = importHistory.undo(batchId)) {
+                is AppResult.Success -> _state.value = _state.value.copy(
+                    isBusy = false,
+                    importBatchId = null,
+                    undoneNote = "Import undone: ${result.data.removed} " +
+                        (if (result.data.removed == 1) "payment" else "payments") + " taken out" +
+                        (if (result.data.balanceRestored) ", and the balance put back as it was." else "."),
+                )
+                is AppResult.Failure -> _state.value = _state.value.copy(isBusy = false, error = result.message)
+            }
+        }
     }
 
     /**
@@ -778,6 +846,14 @@ data class ImportState(
     val usingDetectedLayout: Boolean = false,
     val candidates: List<ImportCandidate> = emptyList(),
     val outcome: ImportOutcome? = null,
+    /** The record of the import just finished, while it can still be undone. */
+    val importBatchId: Long? = null,
+    /** Said once an import has been undone. */
+    val undoneNote: String? = null,
+    /** Statements picked together that are still to be opened. */
+    val queue: List<Uri> = emptyList(),
+    /** How many were picked together, for "2 of 5". */
+    val queueTotal: Int = 0,
     val isBusy: Boolean = false,
     val error: String? = null,
 ) {

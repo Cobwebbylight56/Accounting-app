@@ -343,8 +343,47 @@ object Migrations {
     }
 
     /** Registered with Room in `di/DatabaseModule.kt`. */
+    /**
+     * 8 → 9: a record of each statement imported into an account, and of the
+     * payments it added, so an import can be listed and taken back out.
+     * New tables only; nothing already stored changes.
+     */
+    val MIGRATION_8_9 = Migration(8, 9) { db ->
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `import_batches` (" +
+                "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "`account_id` INTEGER NOT NULL, " +
+                "`file_name` TEXT NOT NULL, " +
+                "`imported_at` INTEGER NOT NULL, " +
+                "`first_date` TEXT, " +
+                "`last_date` TEXT, " +
+                "`rows_added` INTEGER NOT NULL, " +
+                "`rows_updated` INTEGER NOT NULL, " +
+                "`balance_before_minor` INTEGER, " +
+                "`balance_date_before` TEXT, " +
+                "`balance_after_minor` INTEGER, " +
+                "`balance_date_after` TEXT, " +
+                "FOREIGN KEY(`account_id`) REFERENCES `accounts`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_import_batches_account_id` ON `import_batches` (`account_id`)",
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `import_batch_entries` (" +
+                "`batch_id` INTEGER NOT NULL, " +
+                "`transaction_id` INTEGER NOT NULL, " +
+                "PRIMARY KEY(`batch_id`, `transaction_id`), " +
+                "FOREIGN KEY(`batch_id`) REFERENCES `import_batches`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE, " +
+                "FOREIGN KEY(`transaction_id`) REFERENCES `transactions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_import_batch_entries_transaction_id` " +
+                "ON `import_batch_entries` (`transaction_id`)",
+        )
+    }
+
     val ALL: Array<Migration> = arrayOf(
         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
-        MIGRATION_7_8,
+        MIGRATION_7_8, MIGRATION_8_9,
     )
 }

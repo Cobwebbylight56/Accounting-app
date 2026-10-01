@@ -266,3 +266,9 @@ fun List<AccountOption>.labelFor(option: AccountOption): String {
         option.name
     }
 }
+
+/** An import with how many of the payments it added are still in the app. */
+data class ImportBatchWithRemaining(
+    @androidx.room.Embedded val batch: com.rhys.financetracker.data.local.entity.ImportBatchEntity,
+    @ColumnInfo(name = "remaining_rows") val remainingRows: Int,
+)

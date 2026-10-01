@@ -344,3 +344,18 @@ financial history in production.
 
 Enum constants are persisted **by name**. Adding a constant is safe; renaming
 one silently breaks every existing row that used it.
+
+## Version 9: import history
+
+`import_batches` — one row per statement imported into an account: `account_id`
+(cascade on delete), `file_name`, `imported_at`, `first_date`/`last_date`,
+`rows_added`, `rows_updated`, and the account's given balance before and after
+(`balance_before_minor`/`balance_date_before`, `balance_after_minor`/
+`balance_date_after`).
+
+`import_batch_entries` — (`batch_id`, `transaction_id`), the payments a batch
+added; both foreign keys cascade, so deleting a payment drops its line.
+
+Undo deletes the batch's payments and, if the account's given balance is still
+the one the import set, puts the earlier one back. Migration 8 → 9 only creates
+the two tables.

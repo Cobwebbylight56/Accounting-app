@@ -40,6 +40,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.rhys.financetracker.data.export.ExportedFile
+import com.rhys.financetracker.ui.accounts.AccountDetailScreen
 import com.rhys.financetracker.ui.accounts.AccountEditScreen
 import com.rhys.financetracker.ui.accounts.AccountsScreen
 import com.rhys.financetracker.ui.categories.CategoriesScreen
@@ -298,6 +299,20 @@ private fun NavGraphBuilder.editorDestinations(
             onAddAccount = { navController.navigate(Routes.accountEdit()) },
             onOpenPeople = { navController.navigate(Routes.PEOPLE) },
             onImportStatement = { navController.navigate(Routes.importForAccount(it)) },
+            onOpenAccount = { navController.navigate(Routes.accountView(it)) },
+        )
+    }
+
+    composable(
+        route = Routes.ACCOUNT_VIEW_PATTERN,
+        arguments = listOf(navArgument(Routes.ARG_ID) { type = NavType.StringType }),
+    ) {
+        AccountDetailScreen(
+            onBack = { navController.popBackStack() },
+            onEdit = { navController.navigate(Routes.accountEdit(it)) },
+            onImportStatement = { navController.navigate(Routes.importForAccount(it)) },
+            onOpenTransaction = { navController.navigate(Routes.transactionEdit(it)) },
+            onOpenLedger = { navController.navigateToTab(Routes.TRANSACTIONS) },
         )
     }
 
@@ -329,7 +344,7 @@ private fun NavGraphBuilder.editorDestinations(
         PersonHubScreen(
             onBack = { navController.popBackStack() },
             onEditDetails = { navController.navigate(Routes.personEdit(it)) },
-            onOpenAccount = { navController.navigate(Routes.accountEdit(it)) },
+            onOpenAccount = { navController.navigate(Routes.accountView(it)) },
             onImportStatement = { navController.navigate(Routes.importForPerson(it)) },
             onOpenPeopleMoney = { navController.navigate(Routes.sentToPeople(it)) },
         )

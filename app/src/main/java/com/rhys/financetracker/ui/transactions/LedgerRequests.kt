@@ -32,6 +32,11 @@ class LedgerRequests @Inject constructor() {
         )
     }
 
+    /** Everything on one account, in and out. */
+    fun openAccount(accountId: Long) {
+        pending.value = TransactionFilter(accountIds = setOf(accountId))
+    }
+
     fun consumed() {
         pending.value = null
     }

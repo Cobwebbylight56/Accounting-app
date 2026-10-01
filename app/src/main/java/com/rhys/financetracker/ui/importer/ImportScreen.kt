@@ -134,9 +134,11 @@ fun ImportScreen(
         onBack = viewModel::goToMapping,
     )
 
+    // Several can be picked at once — a year of monthly statements — and
+    // are then worked through one after another.
     val pickFile = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument(),
-    ) { uri -> uri?.let(viewModel::openFile) }
+        contract = ActivityResultContracts.OpenMultipleDocuments(),
+    ) { uris -> viewModel.openFiles(uris) }
 
     Scaffold(
         topBar = {
@@ -215,6 +217,8 @@ fun ImportScreen(
                     onFinish = onFinished,
                     onToggleBill = viewModel::toggleBill,
                     onAddBills = viewModel::addChosenBills,
+                    onUndo = viewModel::undoImport,
+                    onNext = viewModel::openNext,
                 )
             }
         }
@@ -361,8 +365,8 @@ private fun ChooseFileStep(onChoose: () -> Unit) {
             icon = Icons.Outlined.UploadFile,
             title = "Bank statement or spreadsheet",
             message = "Choose a statement downloaded from your bank — PDF or CSV — or an " +
-                ".xlsx budget. Nothing is changed until you have seen exactly what will " +
-                "be created.",
+                ".xlsx budget. Pick several at once to go through them one after another. " +
+                "Nothing is changed until you have seen exactly what will be created.",
             actionLabel = "Choose a file",
             onAction = onChoose,
         )
@@ -1377,8 +1381,31 @@ private fun DoneStep(
     onFinish: () -> Unit,
     onToggleBill: (String) -> Unit = {},
     onAddBills: () -> Unit = {},
+    onUndo: () -> Unit = {},
+    onNext: () -> Unit = {},
 ) {
     val outcome = state.outcome
+    var confirmingUndo by remember { mutableStateOf(false) }
+
+    if (confirmingUndo) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirmingUndo = false },
+            title = { Text("Undo this import?") },
+            text = {
+                Text(
+                    "The ${outcome?.transactionsCreated ?: 0} payments it added are taken out, " +
+                        "and the account's balance goes back to what it was before. Entries it " +
+                        "updated keep the statement's version.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { confirmingUndo = false; onUndo() }) {
+                    Text("Undo import", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = { TextButton(onClick = { confirmingUndo = false }) { Text("Keep it") } },
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -1387,11 +1414,27 @@ private fun DoneStep(
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("Import finished", style = MaterialTheme.typography.headlineSmall)
         Text(
-            text = outcome?.summary() ?: "Nothing was added",
-            style = MaterialTheme.typography.bodyLarge,
+            text = if (state.undoneNote != null) "Import undone" else "Import finished",
+            style = MaterialTheme.typography.headlineSmall,
         )
+        state.undoneNote?.let { note ->
+            Text(note, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary)
+        }
+        if (state.undoneNote == null) {
+            Text(
+                text = outcome?.summary() ?: "Nothing was added",
+                style = MaterialTheme.typography.bodyLarge,
+            )
+        }
+
+        // Several statements picked together: the next one is a tap away.
+        if (state.queue.isNotEmpty()) {
+            val position = state.queueTotal - state.queue.size + 1
+            Button(onClick = onNext, modifier = Modifier.fillMaxWidth().height(52.dp)) {
+                Text("Next statement ($position of ${state.queueTotal})")
+            }
+        }
 
         // The account's balance, brought up to the statement's own figure.
         state.balanceNote?.let { note ->
@@ -1498,10 +1541,17 @@ private fun DoneStep(
 
         Spacer(Modifier.height(8.dp))
         Button(onClick = onFinish, modifier = Modifier.fillMaxWidth().height(52.dp)) {
-            Text("Done")
+            Text(if (state.queue.isNotEmpty()) "Stop here" else "Done")
         }
         OutlinedButton(onClick = onImportAnother, modifier = Modifier.fillMaxWidth()) {
-            Text("Import another block")
+            Text("Import another file")
+        }
+        // A statement in the wrong account, or read the wrong way round, used
+        // to mean deleting its rows one at a time.
+        if (state.importBatchId != null) {
+            TextButton(onClick = { confirmingUndo = true }, modifier = Modifier.fillMaxWidth()) {
+                Text("Undo this import", color = MaterialTheme.colorScheme.error)
+            }
         }
     }
 }

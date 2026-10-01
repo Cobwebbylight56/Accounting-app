@@ -406,6 +406,31 @@ its date, category and the statement's balance after it.
 A statement without a running balance can't be checked this way; compare the
 totals shown with the statement's own.
 
+### Several statements at once, and taking one back out
+
+Pick as many statements as you like in the file chooser — a year of monthly
+PDFs — and they are gone through one after another: after each one, **Next
+statement (2 of 12)** opens the next, filed against the same account unless
+you change it. **Stop here** leaves the rest.
+
+Every statement imported into an account is recorded. The finished screen has
+**Undo this import**: the payments it added are taken out, and the account's
+balance goes back to what it was before (unless a later statement has set it
+since). Entries the statement updated keep the statement's version.
+
+### An account's own page
+
+Tap an account (in Accounts, or on a person's page) to open its page:
+
+* its balance, and the given balance it's counted from;
+* **Statements** — the last year of months, each ✓ or *missing*, so a gap is
+  obvious, and every statement imported with what it added and an **Undo**;
+* the balance at each of the last six month ends;
+* its latest payments, with **All payments** opening the Money tab on just
+  this account.
+
+The pencil at the top edits the account; **Import statements** adds to it.
+
 ### Statements with a side panel (Nationwide and others)
 
 Some statements print account details down the right-hand side — IBAN, sort
