@@ -340,8 +340,8 @@ private fun MonthlyChartCard(
     series: List<com.rhys.financetracker.domain.report.MonthPoint>,
 ) {
     val (view, setView) = com.rhys.financetracker.ui.components.rememberCardView(
-        "reports_trend",
-        com.rhys.financetracker.ui.components.BreakdownView.BARS,
+        "reports_trend_line",
+        com.rhys.financetracker.ui.components.BreakdownView.LINE,
     )
     SectionCard(
         title = "Month by month",

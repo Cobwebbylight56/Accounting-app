@@ -894,8 +894,8 @@ internal fun IncomeVsExpenseCard(
     onMonthClick: (java.time.YearMonth) -> Unit,
 ) {
     val (view, setView) = com.rhys.financetracker.ui.components.rememberCardView(
-        "home_trend",
-        com.rhys.financetracker.ui.components.BreakdownView.BARS,
+        "home_trend_line",
+        com.rhys.financetracker.ui.components.BreakdownView.LINE,
     )
     SectionCard(
         title = "Income against spending",

@@ -197,7 +197,7 @@ fun SpendingScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val (whereView, setWhereView) = rememberCardView("spending_where", BreakdownView.CHART)
-    val (trendView, setTrendView) = rememberCardView("spending_trend", BreakdownView.BARS)
+    val (trendView, setTrendView) = rememberCardView("spending_trend_line", BreakdownView.LINE)
     val (payeeView, setPayeeView) = rememberCardView("spending_payees", BreakdownView.BARS)
 
     Scaffold(topBar = { TopAppBar(title = { Text("Spending") }) }) { padding ->

@@ -121,6 +121,16 @@ class SentToPeopleViewModel @Inject constructor(
         payeeRepository.observeMoneyWithPeople(from, to, ids)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    /** The whole year the shown month is in, for the graph — shown in both views. */
+    val yearMoney: StateFlow<PeopleMoney?> = combine(month, personIds) { chosen, ids -> chosen.year to ids }
+        .flatMapLatest { (year, ids) ->
+            payeeRepository.observeMoneyWithPeople(
+                java.time.LocalDate.of(year, 1, 1),
+                java.time.LocalDate.of(year, 12, 31),
+                ids,
+            )
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
     fun setPeriod(length: PeoplePeriod) {
         period.value = length
     }
@@ -185,6 +195,7 @@ fun SentToPeopleScreen(
     val money by viewModel.money.collectAsStateWithLifecycle()
     val month by viewModel.month.collectAsStateWithLifecycle()
     val period by viewModel.period.collectAsStateWithLifecycle()
+    val yearMoney by viewModel.yearMoney.collectAsStateWithLifecycle()
     /** Whose year the graph shows, by key; null for everyone together. */
     var graphed by rememberSaveable { mutableStateOf<String?>(null) }
     val message by viewModel.message.collectAsStateWithLifecycle()
@@ -244,22 +255,21 @@ fun SentToPeopleScreen(
             }
             if (!list.isNullOrEmpty()) {
                 item { Totals(list) }
-                if (period == PeoplePeriod.YEAR) {
-                    item {
-                        YearGraphCard(
-                            year = month.year,
-                            people = list,
-                            graphed = graphed?.takeIf { key -> list.any { it.key == key } },
-                            onGraph = { graphed = it },
-                        )
-                    }
-                } else {
-                    item {
-                        TextButton(onClick = { viewModel.setPeriod(PeoplePeriod.YEAR) }) {
-                            Text("See the whole of ${month.year} on a graph")
-                        }
-                    }
+            }
+            // The year's graph, in both views; in a month it picks that month out.
+            val yearPeople = yearMoney?.people.orEmpty()
+            if (yearPeople.isNotEmpty()) {
+                item {
+                    YearGraphCard(
+                        year = month.year,
+                        people = yearPeople,
+                        graphed = graphed?.takeIf { key -> yearPeople.any { it.key == key } },
+                        onGraph = { graphed = it },
+                        highlightMonth = month.monthValue.takeIf { period == PeoplePeriod.MONTH },
+                    )
                 }
+            }
+            if (!list.isNullOrEmpty()) {
                 items(list, key = { it.key }) { ledger ->
                     LedgerCard(
                         ledger = ledger,
@@ -663,8 +673,11 @@ private fun YearGraphCard(
     people: List<PersonLedger>,
     graphed: String?,
     onGraph: (String?) -> Unit,
+    /** The month being looked at, 1 to 12, to pick out on the graph. */
+    highlightMonth: Int? = null,
 ) {
     val (view, setView) = rememberCardView("people_year", BreakdownView.LINE)
+    val picked = highlightMonth?.let { it - 1 }
     val now = DateUtils.currentYearMonth()
     // The current year stops at this month, so the lines do not fall to
     // nothing across months that have not happened yet.
@@ -709,6 +722,7 @@ private fun YearGraphCard(
                 TrendLineChart(
                     labels = labels,
                     series = listOf(LineSeries("Who's up", balance, MaterialTheme.colorScheme.primary)),
+                    selectedIndex = picked,
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(
@@ -729,6 +743,7 @@ private fun YearGraphCard(
                             ),
                         )
                     },
+                    selectedIndex = picked?.takeIf { it < labels.size },
                 )
                 Spacer(Modifier.height(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -764,6 +779,7 @@ private fun YearGraphCard(
                     LineSeries("You sent", sent.toList(), colors.chartOut),
                     LineSeries("They sent you", received.toList(), colors.chartIn, dashed = true, marker = MarkerShape.SQUARE),
                 ),
+                selectedIndex = picked,
             )
         }
         Spacer(Modifier.height(8.dp))

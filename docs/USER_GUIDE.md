@@ -553,8 +553,8 @@ shows their accounts, the Shared tab the shared ones — and the month you're
 looking at. A person's own page has the same card for their accounts.
 
 **See all** (or **More → Money with people**) opens every person for the
-month, with arrows to change month. Switch to **Whole year** to see the year at
-once: the totals say who sent more over the year, and **Through the year** draws
+month, with arrows to change month, and the year's graph under the totals with
+that month picked out. Switch to **Whole year** to see the year at once: the totals say who sent more over the year, and **Through the year** draws
 it month by month — for everyone, or tap a name to see just them. The button in
 its corner changes the graph: two lines (what you sent, and what they sent
 you), the **running balance** between you (above the line, they've sent you
