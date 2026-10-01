@@ -296,7 +296,7 @@ internal fun HomeTiles(state: DashboardState, onOpenAccounts: () -> Unit) {
             ) {
                 HomeTile(
                     icon = Icons.Outlined.AccountBalanceWallet,
-                    value = Money.format(summary.totalBalanceMinor),
+                    value = com.rhys.financetracker.ui.components.animatedMoney(summary.totalBalanceMinor),
                     label = "Available",
                     color = colors.tileBlue,
                     height = SHORT_TILE,
@@ -304,7 +304,7 @@ internal fun HomeTiles(state: DashboardState, onOpenAccounts: () -> Unit) {
                 )
                 HomeTile(
                     icon = Icons.Outlined.CreditCard,
-                    value = Money.format(owed.coerceAtLeast(0L)),
+                    value = com.rhys.financetracker.ui.components.animatedMoney(owed.coerceAtLeast(0L)),
                     label = if (owed > 0L) "Owed on loans and cards" else "Nothing owed",
                     color = colors.tileBlush,
                     height = TALL_TILE,
@@ -317,7 +317,7 @@ internal fun HomeTiles(state: DashboardState, onOpenAccounts: () -> Unit) {
             ) {
                 HomeTile(
                     icon = Icons.Outlined.Savings,
-                    value = Money.format(summary.totalSavingsMinor),
+                    value = com.rhys.financetracker.ui.components.animatedMoney(summary.totalSavingsMinor),
                     label = when {
                         summary.savingsNetMinor > 0L ->
                             "Saved · ${Money.formatCompact(summary.savingsNetMinor)} put aside this month"
@@ -330,7 +330,7 @@ internal fun HomeTiles(state: DashboardState, onOpenAccounts: () -> Unit) {
                 val monthly = income.netMonthlyMinor
                 HomeTile(
                     icon = Icons.Outlined.Payments,
-                    value = Money.format(monthly ?: summary.monthIncomeMinor),
+                    value = com.rhys.financetracker.ui.components.animatedMoney(monthly ?: summary.monthIncomeMinor),
                     label = if (monthly != null) "Take-home a month" else "Money in this month",
                     color = colors.tileMist,
                     height = SHORT_TILE,

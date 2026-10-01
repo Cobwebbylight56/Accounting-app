@@ -59,6 +59,7 @@ class SettingsRepository @Inject constructor(
         val ONBOARDING_COMPLETE = booleanPreferencesKey("onboarding_complete")
         val DEFAULT_ACCOUNT_ID = longPreferencesKey("default_account_id")
         val LARGE_TEXT = booleanPreferencesKey("large_text")
+        val SHOW_INTRO = booleanPreferencesKey("show_intro")
         val SHARED_PEOPLE = stringPreferencesKey("shared_people")
         val PAYEES_KEPT = stringSetPreferencesKey("payees_kept_as_people")
         val PAYEES_HIDDEN = stringSetPreferencesKey("payees_not_people")
@@ -128,6 +129,7 @@ class SettingsRepository @Inject constructor(
             onboardingComplete = prefs[Keys.ONBOARDING_COMPLETE] ?: false,
             defaultAccountId = prefs[Keys.DEFAULT_ACCOUNT_ID]?.takeIf { it > 0L },
             largeText = prefs[Keys.LARGE_TEXT] ?: Defaults.LARGE_TEXT,
+            showIntro = prefs[Keys.SHOW_INTRO] ?: true,
             sharedPeopleIds = prefs[Keys.SHARED_PEOPLE]?.let { stored ->
                 stored.split(',').mapNotNull { it.trim().toLongOrNull() }.toSet()
             },
@@ -177,6 +179,8 @@ class SettingsRepository @Inject constructor(
     suspend fun setOnboardingComplete(complete: Boolean) = put(Keys.ONBOARDING_COMPLETE, complete)
     suspend fun setDefaultAccountId(id: Long?) = put(Keys.DEFAULT_ACCOUNT_ID, id ?: 0L)
     suspend fun setLargeText(enabled: Boolean) = put(Keys.LARGE_TEXT, enabled)
+
+    suspend fun setShowIntro(enabled: Boolean) = put(Keys.SHOW_INTRO, enabled)
 
     /** Who the Shared tab on Home covers; see [AppSettings.sharedPeopleIds]. */
     suspend fun setSharedPeople(ids: Set<Long>) =
@@ -277,6 +281,8 @@ data class AppSettings(
     val onboardingComplete: Boolean = false,
     val defaultAccountId: Long? = null,
     val largeText: Boolean = false,
+    /** The short animation when the app opens. */
+    val showIntro: Boolean = true,
     /**
      * The people the Shared tab on Home covers. Null until chosen, which
      * means everybody.

@@ -100,6 +100,9 @@ fun DonutChart(
         }
     }
 
+    // The ring sweeps round once when it first appears or its figures change.
+    val reveal = rememberReveal(visible.map { it.value })
+
     val description = "Donut chart. " + visible.joinToString(", ") {
         "${it.label} ${it.displayValue}, ${percent(it.value, total)}"
     } + if (onSliceClick != null) ". Tap a slice for a breakdown." else ""
@@ -136,7 +139,10 @@ fun DonutChart(
                 x = (size.width - diameter) / 2f,
                 y = (size.height - diameter) / 2f,
             )
-            sweeps.forEachIndexed { index, (startAngle, sweep) ->
+            val shownTo = -90f + 360f * reveal
+            sweeps.forEachIndexed { index, (startAngle, fullSweep) ->
+                if (startAngle >= shownTo) return@forEachIndexed
+                val sweep = minOf(fullSweep, shownTo - startAngle)
                 val isSelected = index == selectedIndex
                 val width = if (isSelected) strokeWidth * 1.28f else strokeWidth
                 drawArc(
@@ -311,6 +317,8 @@ fun GroupedBarChart(
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
     val highlightColor = MaterialTheme.colorScheme.primary
 
+    val reveal = rememberReveal(groups.flatMap { group -> group.bars.map { it.value } })
+
     val description = "Bar chart. " + groups.joinToString("; ") { group ->
         group.label + ": " + group.bars.joinToString(", ") { "${it.label} ${it.displayValue}" }
     } + if (onGroupClick != null) ". Tap a column to open that month." else ""
@@ -362,7 +370,7 @@ fun GroupedBarChart(
                 }
                 val groupStart = groupIndex * groupWidth + (groupWidth - barWidth * barCount) / 2f
                 group.bars.forEachIndexed { barIndex, bar ->
-                    val barHeight = (abs(bar.value) / maxValue) * (bottom - 8f)
+                    val barHeight = (abs(bar.value) / maxValue) * (bottom - 8f) * reveal
                     drawRect(
                         color = bar.color,
                         topLeft = Offset(groupStart + barIndex * barWidth, bottom - barHeight),
@@ -575,4 +583,23 @@ fun colorFromHex(hex: String?, fallbackIndex: Int = 0): Color {
     val fallback = chartColorAt(fallbackIndex)
     if (hex.isNullOrBlank()) return fallback
     return runCatching { Color(android.graphics.Color.parseColor(hex)) }.getOrDefault(fallback)
+}
+
+/**
+ * 0 to 1 over a moment when a chart first appears or its [figures] change,
+ * for drawing it in; straight to 1 when the phone's animations are off.
+ */
+@Composable
+internal fun rememberReveal(figures: List<Float>): Float {
+    val reduceMotion = rememberReduceMotion()
+    val progress = remember { androidx.compose.animation.core.Animatable(if (reduceMotion) 1f else 0f) }
+    androidx.compose.runtime.LaunchedEffect(figures) {
+        if (reduceMotion) return@LaunchedEffect
+        progress.snapTo(0f)
+        progress.animateTo(
+            1f,
+            androidx.compose.animation.core.tween(durationMillis = 750, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+        )
+    }
+    return progress.value
 }

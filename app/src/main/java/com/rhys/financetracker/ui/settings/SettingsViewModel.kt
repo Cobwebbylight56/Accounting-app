@@ -89,6 +89,8 @@ class SettingsViewModel @Inject constructor(
         settingsRepository.setDynamicColor(enabled)
     }
     fun setLargeText(enabled: Boolean) = launch { settingsRepository.setLargeText(enabled) }
+
+    fun setShowIntro(enabled: Boolean) = launch { settingsRepository.setShowIntro(enabled) }
     fun setCurrency(code: String) = launch { settingsRepository.setCurrencyCode(code) }
 
     // -------------------------------------------------------------- security

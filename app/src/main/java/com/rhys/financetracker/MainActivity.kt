@@ -5,12 +5,16 @@ import android.net.Uri
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.core.content.IntentCompat
@@ -23,6 +27,7 @@ import com.rhys.financetracker.data.prefs.AppSettings
 import com.rhys.financetracker.data.prefs.SettingsRepository
 import com.rhys.financetracker.security.AppLockManager
 import com.rhys.financetracker.security.BiometricAuthenticator
+import com.rhys.financetracker.ui.intro.IntroScreen
 import com.rhys.financetracker.ui.lock.LockScreen
 import com.rhys.financetracker.ui.navigation.FinanceNavHost
 import com.rhys.financetracker.ui.theme.FinanceTrackerTheme
@@ -65,11 +70,16 @@ class MainActivity : FragmentActivity() {
 
         appLockManager.attach(lifecycleScope)
         incomingFile.value = fileFrom(intent)
+        // Only on a fresh start: not after rotating, and not when Android
+        // brings the app back from the background.
+        val freshStart = savedInstanceState == null
 
         setContent {
             val settings by settingsRepository.settings
                 .collectAsState(initial = com.rhys.financetracker.data.prefs.AppSettings())
             val isLocked by appLockManager.isLocked.collectAsStateWithLifecycle()
+            var introDone by rememberSaveable { mutableStateOf(!freshStart) }
+            val reduceMotion = com.rhys.financetracker.ui.components.rememberReduceMotion()
 
             FinanceTrackerTheme(
                 themeMode = settings.themeMode,
@@ -88,30 +98,37 @@ class MainActivity : FragmentActivity() {
                 }
 
                 CompositionLocalProvider(LocalDensity provides scaledDensity) {
-                    Surface(
-                        modifier = Modifier.fillMaxSize(),
-                        color = MaterialTheme.colorScheme.background,
-                    ) {
-                        if (isLocked) {
-                            LockScreen(
-                                onUnlocked = { /* The lock manager drives this state. */ },
-                                onRequestBiometric = { onSuccess, onError ->
-                                    BiometricAuthenticator.authenticate(
-                                        activity = this@MainActivity,
-                                        onSuccess = onSuccess,
-                                        onFailure = onError,
-                                    )
-                                },
-                            )
-                        } else {
-                            val pendingFile by incomingFile.collectAsStateWithLifecycle()
-                            FinanceNavHost(
-                                onShareFile = ::shareFile,
-                                // Consumed once, so returning to the app later
-                                // does not re-open the same statement.
-                                importFile = pendingFile,
-                                onImportFileHandled = { incomingFile.value = null },
-                            )
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        Surface(
+                            modifier = Modifier.fillMaxSize(),
+                            color = MaterialTheme.colorScheme.background,
+                        ) {
+                            if (isLocked) {
+                                LockScreen(
+                                    onUnlocked = { /* The lock manager drives this state. */ },
+                                    onRequestBiometric = { onSuccess, onError ->
+                                        BiometricAuthenticator.authenticate(
+                                            activity = this@MainActivity,
+                                            onSuccess = onSuccess,
+                                            onFailure = onError,
+                                        )
+                                    },
+                                )
+                            } else {
+                                val pendingFile by incomingFile.collectAsStateWithLifecycle()
+                                FinanceNavHost(
+                                    onShareFile = ::shareFile,
+                                    // Consumed once, so returning to the app later
+                                    // does not re-open the same statement.
+                                    importFile = pendingFile,
+                                    onImportFileHandled = { incomingFile.value = null },
+                                )
+                            }
+                        }
+                        // Drawn over everything, the lock screen included, and
+                        // gone for good once it has played.
+                        if (!introDone && settings.showIntro && !reduceMotion) {
+                            IntroScreen(onFinished = { introDone = true })
                         }
                     }
                 }

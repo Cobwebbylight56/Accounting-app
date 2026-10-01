@@ -340,7 +340,7 @@ private fun BalanceHeader(item: AccountWithBalance) {
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                text = Money.format(item.balanceMinor),
+                text = com.rhys.financetracker.ui.components.animatedMoney(item.balanceMinor),
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = FinanceTheme.colors.onTile,

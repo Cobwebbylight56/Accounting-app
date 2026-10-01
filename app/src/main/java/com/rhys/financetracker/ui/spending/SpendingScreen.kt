@@ -318,7 +318,7 @@ private fun SpentHeadline(state: SpendingState) {
     val diff = spent - state.lastMonthSpentMinor
     Column {
         Text(
-            text = Money.format(spent),
+            text = com.rhys.financetracker.ui.components.animatedMoney(spent),
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.SemiBold,
         )

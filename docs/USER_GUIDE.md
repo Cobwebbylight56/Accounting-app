@@ -520,7 +520,8 @@ The second tab is all about where the money goes, for one month at a time
   to look at it.
 * **Who it went to** — the ten biggest payees; tap one to see their payments.
 
-**The button in each card's top corner changes how it's drawn**: a chart, bars
+**The button in each card's top corner changes how it's drawn**: a line graph
+(month-by-month cards — tap or slide along it to read a month), a chart, bars
 (with ▲/▼ against last month), tiles or a list — one tap moves to the next. It's
 on every card like this, here, on Home ("Where it went", "Spending by
 category", "Income against spending") and in Reports, and each card remembers
@@ -552,7 +553,17 @@ shows their accounts, the Shared tab the shared ones — and the month you're
 looking at. A person's own page has the same card for their accounts.
 
 **See all** (or **More → Money with people**) opens every person for the
-month, with arrows to change month. Each card says who is up ("You sent £20.00
+month, with arrows to change month. Switch to **Whole year** to see the year at
+once: the totals say who sent more over the year, and **Through the year** draws
+it month by month — for everyone, or tap a name to see just them. The button in
+its corner changes the graph: two lines (what you sent, and what they sent
+you), the **running balance** between you (above the line, they've sent you
+more; below it, you've sent them more), bars, or a plain list. Tap the graph,
+or slide along it, to read any month.
+
+**Changing a payment from here:** tap a person to open their card, then tap any
+payment in it to edit it — the amount, the category, or "it's not money to
+them at all". Each card says who is up ("You sent £20.00
 more"); tap it to see every payment on both sides.
 
 Only **people's names** are shown. PayPal, shops, websites and services are
@@ -875,6 +886,11 @@ with **Allow notifications** — none of the reminders can appear until then.
 ---
 
 ## Making it yours
+
+**Opening animation.** The app opens with a short intro. Tap it to skip, or turn
+it off in **Settings → Appearance → Opening animation**. It never plays when
+your phone's animations are switched off (Accessibility → Remove animations),
+and the charts then appear straight away instead of drawing themselves in.
 
 - **Settings → What Home shows** — turn cards on and off and change their
   order.

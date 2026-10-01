@@ -122,6 +122,12 @@ fun AppearanceSettingsScreen(
             checked = state.settings.largeText,
             onCheckedChange = viewModel::setLargeText,
         )
+        SettingsSwitch(
+            title = "Opening animation",
+            subtitle = "The short intro when the app opens. Tap it to skip; it never plays when the phone's animations are off.",
+            checked = state.settings.showIntro,
+            onCheckedChange = viewModel::setShowIntro,
+        )
 
         SettingsGroupHeader("Currency")
         Column(modifier = Modifier.padding(horizontal = 16.dp)) {

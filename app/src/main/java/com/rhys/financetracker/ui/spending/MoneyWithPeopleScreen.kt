@@ -4,6 +4,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.ui.text.style.TextAlign
 import com.rhys.financetracker.ui.components.BarGroup
 import com.rhys.financetracker.ui.components.BreakdownView
@@ -336,12 +339,12 @@ private data class Filing(val name: String, val entries: List<PayeeEntry>, val i
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PeriodSwitch(period: PeoplePeriod, onPeriod: (PeoplePeriod) -> Unit) {
-    androidx.compose.material3.SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
         PeoplePeriod.entries.forEachIndexed { index, option ->
-            androidx.compose.material3.SegmentedButton(
+            SegmentedButton(
                 selected = option == period,
                 onClick = { onPeriod(option) },
-                shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(index, PeoplePeriod.entries.size),
+                shape = SegmentedButtonDefaults.itemShape(index, PeoplePeriod.entries.size),
             ) {
                 Text(if (option == PeoplePeriod.MONTH) "Month" else "Whole year")
             }
@@ -399,7 +402,12 @@ private fun whoIsUp(netMinor: Long): String = when {
 private fun Figure(label: String, minor: Long, color: Color, modifier: Modifier = Modifier) {
     Column(modifier = modifier) {
         Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(Money.format(minor), style = MaterialTheme.typography.titleMedium, color = color, fontWeight = FontWeight.SemiBold)
+        Text(
+            com.rhys.financetracker.ui.components.animatedMoney(minor),
+            style = MaterialTheme.typography.titleMedium,
+            color = color,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }
 

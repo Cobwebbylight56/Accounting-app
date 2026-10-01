@@ -112,6 +112,26 @@ fun FinanceNavHost(
                 navController = navController,
                 startDestination = Routes.DASHBOARD,
                 modifier = Modifier.fillMaxSize(),
+                // A page opening glides in a little from the side and fades
+                // up; going back reverses it. Short, so it never holds you up.
+                enterTransition = {
+                    androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220)) +
+                        slideIntoContainer(
+                            androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection.Start,
+                            androidx.compose.animation.core.tween(260),
+                            initialOffset = { it / 10 },
+                        )
+                },
+                exitTransition = { androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(160)) },
+                popEnterTransition = { androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220)) },
+                popExitTransition = {
+                    androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(160)) +
+                        slideOutOfContainer(
+                            androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection.End,
+                            androidx.compose.animation.core.tween(240),
+                            targetOffset = { it / 10 },
+                        )
+                },
             ) {
                 topLevelDestinations(navController, onShareFile)
                 editorDestinations(navController, importFile, onImportFileHandled)
