@@ -283,7 +283,7 @@ fun SpendingScreen(
                 SectionCard(
                     title = "Who it went to",
                     subtitle = "The ${state.payees.size} biggest this month",
-                    action = { ViewSwitchButton(payeeView, TREND_VIEWS, setPayeeView) },
+                    action = { ViewSwitchButton(payeeView, listOf(BreakdownView.BARS, BreakdownView.LIST), setPayeeView) },
                 ) {
                     if (state.payees.isEmpty()) {
                         Text(

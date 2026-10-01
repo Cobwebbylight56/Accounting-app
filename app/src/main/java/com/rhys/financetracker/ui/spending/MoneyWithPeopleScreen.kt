@@ -1,6 +1,20 @@
 package com.rhys.financetracker.ui.spending
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.FilterChip
+import androidx.compose.ui.text.style.TextAlign
+import com.rhys.financetracker.ui.components.BarGroup
+import com.rhys.financetracker.ui.components.BreakdownView
+import com.rhys.financetracker.ui.components.ChartEntry
+import com.rhys.financetracker.ui.components.GroupedBarChart
+import com.rhys.financetracker.ui.components.LineSeries
+import com.rhys.financetracker.ui.components.MarkerShape
+import com.rhys.financetracker.ui.components.SectionCard
+import com.rhys.financetracker.ui.components.TrendLineChart
+import com.rhys.financetracker.ui.components.ViewSwitchButton
+import com.rhys.financetracker.ui.components.rememberCardView
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -11,6 +25,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -19,6 +34,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -63,7 +79,6 @@ import com.rhys.financetracker.ui.components.EmptyState
 import com.rhys.financetracker.ui.components.colorFromHex
 import com.rhys.financetracker.ui.theme.FinanceTheme
 import dagger.hilt.android.lifecycle.HiltViewModel
-import java.time.YearMonth
 import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -74,7 +89,10 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-/** Money sent to people and money they sent back, one month at a time. */
+/** Looking at one month, or a whole year. */
+enum class PeoplePeriod { MONTH, YEAR }
+
+/** Money sent to people and money they sent back, a month or a year at a time. */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class SentToPeopleViewModel @Inject constructor(
@@ -82,17 +100,27 @@ class SentToPeopleViewModel @Inject constructor(
     categoryRepository: CategoryRepository,
 ) : ViewModel() {
 
+    /** The month shown, or in a year view any month of the year shown. */
     val month = MutableStateFlow(DateUtils.currentYearMonth())
+    val period = MutableStateFlow(PeoplePeriod.MONTH)
     val message = MutableStateFlow<String?>(null)
 
     /** Whose accounts; null for everybody's. */
     private val personIds = MutableStateFlow<Set<Long>?>(null)
 
-    val money: StateFlow<PeopleMoney?> = combine(month, personIds) { chosen, ids -> chosen to ids }
-        .flatMapLatest { (chosen, ids) ->
-            val range = DateUtils.monthRange(chosen)
-            payeeRepository.observeMoneyWithPeople(range.start, range.endInclusive, ids)
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    val money: StateFlow<PeopleMoney?> = combine(month, period, personIds) { chosen, length, ids ->
+        Triple(chosen, length, ids)
+    }.flatMapLatest { (chosen, length, ids) ->
+        val (from, to) = when (length) {
+            PeoplePeriod.MONTH -> DateUtils.monthRange(chosen).let { it.start to it.endInclusive }
+            PeoplePeriod.YEAR -> java.time.LocalDate.of(chosen.year, 1, 1) to java.time.LocalDate.of(chosen.year, 12, 31)
+        }
+        payeeRepository.observeMoneyWithPeople(from, to, ids)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    fun setPeriod(length: PeoplePeriod) {
+        period.value = length
+    }
 
     fun showPerson(personId: Long?) {
         personIds.value = personId?.let { setOf(it) }
@@ -118,12 +146,12 @@ class SentToPeopleViewModel @Inject constructor(
         categoryRepository.observeByKind(CategoryKind.INCOME)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    fun previousMonth() {
-        month.value = month.value.minusMonths(1)
+    fun previous() {
+        month.value = if (period.value == PeoplePeriod.YEAR) month.value.minusYears(1) else month.value.minusMonths(1)
     }
 
-    fun nextMonth() {
-        month.value = month.value.plusMonths(1)
+    fun next() {
+        month.value = if (period.value == PeoplePeriod.YEAR) month.value.plusYears(1) else month.value.plusMonths(1)
     }
 
     fun file(name: String, entries: List<PayeeEntry>, category: CategoryEntity) {
@@ -136,13 +164,16 @@ class SentToPeopleViewModel @Inject constructor(
 }
 
 /**
- * For each person, what was sent to them and what they sent back this
- * month, side by side, with who is up. Tap a person to see every payment.
+ * For each person, what was sent to them and what they sent back, for a
+ * month or a whole year, side by side, with who is up. The year has a graph
+ * of both sides month by month. Tap a person to see every payment, and a
+ * payment to change it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SentToPeopleScreen(
     onBack: () -> Unit,
+    onOpenTransaction: (Long) -> Unit,
     /** Only this person's accounts; null for everybody's. */
     personId: Long? = null,
     viewModel: SentToPeopleViewModel = hiltViewModel(),
@@ -150,6 +181,9 @@ fun SentToPeopleScreen(
     LaunchedEffect(personId) { viewModel.showPerson(personId) }
     val money by viewModel.money.collectAsStateWithLifecycle()
     val month by viewModel.month.collectAsStateWithLifecycle()
+    val period by viewModel.period.collectAsStateWithLifecycle()
+    /** Whose year the graph shows, by key; null for everyone together. */
+    var graphed by rememberSaveable { mutableStateOf<String?>(null) }
     val message by viewModel.message.collectAsStateWithLifecycle()
     val expenseCategories by viewModel.expenseCategories.collectAsStateWithLifecycle()
     val incomeCategories by viewModel.incomeCategories.collectAsStateWithLifecycle()
@@ -184,25 +218,51 @@ fun SentToPeopleScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             item {
-                MonthPicker(month = month, onPrevious = viewModel::previousMonth, onNext = viewModel::nextMonth)
+                PeriodSwitch(period = period, onPeriod = viewModel::setPeriod)
+            }
+            item {
+                PeriodPicker(
+                    label = if (period == PeoplePeriod.YEAR) month.year.toString() else DateUtils.formatMonth(month),
+                    isYear = period == PeoplePeriod.YEAR,
+                    onPrevious = viewModel::previous,
+                    onNext = viewModel::next,
+                )
             }
             val list = money?.people
+            val periodName = if (period == PeoplePeriod.YEAR) month.year.toString() else DateUtils.formatMonth(month)
             if (list != null && list.isEmpty()) {
                 item {
                     EmptyState(
                         icon = Icons.Outlined.CheckCircle,
                         title = "Nothing with people",
-                        message = "No money sent to or from people in ${DateUtils.formatMonth(month)}.",
+                        message = "No money sent to or from people in $periodName.",
                     )
                 }
             }
             if (!list.isNullOrEmpty()) {
                 item { Totals(list) }
+                if (period == PeoplePeriod.YEAR) {
+                    item {
+                        YearGraphCard(
+                            year = month.year,
+                            people = list,
+                            graphed = graphed?.takeIf { key -> list.any { it.key == key } },
+                            onGraph = { graphed = it },
+                        )
+                    }
+                } else {
+                    item {
+                        TextButton(onClick = { viewModel.setPeriod(PeoplePeriod.YEAR) }) {
+                            Text("See the whole of ${month.year} on a graph")
+                        }
+                    }
+                }
                 items(list, key = { it.key }) { ledger ->
                     LedgerCard(
                         ledger = ledger,
                         isOpen = open == ledger.key,
                         onToggle = { open = if (open == ledger.key) null else ledger.key },
+                        onOpenEntry = onOpenTransaction,
                         onFileSent = { filing = Filing(ledger.name, ledger.sent, isMoneyIn = false) },
                         onFileReceived = { filing = Filing(ledger.name, ledger.received, isMoneyIn = true) },
                         onNotAPerson = { viewModel.setIsPerson(ledger, isPerson = false) },
@@ -228,8 +288,9 @@ fun SentToPeopleScreen(
             item {
                 Text(
                     text = "Only people's names are shown — PayPal, shops and services are left " +
-                        "out. Tap a person and \"Not a person\" to leave one out, or keep one the " +
-                        "app left out from the list above. Your choice is remembered.",
+                        "out. Tap a person to see each payment, and tap a payment to change it. " +
+                        "\"Not a person\" leaves one out; keep one the app left out from the list " +
+                        "above. Your choice is remembered.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -272,32 +333,66 @@ fun SentToPeopleScreen(
 /** One side of one person's money, about to be filed elsewhere. */
 private data class Filing(val name: String, val entries: List<PayeeEntry>, val isMoneyIn: Boolean)
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MonthPicker(month: YearMonth, onPrevious: () -> Unit, onNext: () -> Unit) {
+private fun PeriodSwitch(period: PeoplePeriod, onPeriod: (PeoplePeriod) -> Unit) {
+    androidx.compose.material3.SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+        PeoplePeriod.entries.forEachIndexed { index, option ->
+            androidx.compose.material3.SegmentedButton(
+                selected = option == period,
+                onClick = { onPeriod(option) },
+                shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(index, PeoplePeriod.entries.size),
+            ) {
+                Text(if (option == PeoplePeriod.MONTH) "Month" else "Whole year")
+            }
+        }
+    }
+}
+
+@Composable
+private fun PeriodPicker(label: String, isYear: Boolean, onPrevious: () -> Unit, onNext: () -> Unit) {
+    val unit = if (isYear) "year" else "month"
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = onPrevious) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous month")
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous $unit")
         }
         Text(
-            text = DateUtils.formatMonth(month),
+            text = label,
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.weight(1f),
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
         IconButton(onClick = onNext) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next month")
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next $unit")
         }
     }
 }
 
 @Composable
 private fun Totals(list: List<PersonLedger>) {
+    val sent = list.sumOf { it.sentMinor }
+    val received = list.sumOf { it.receivedMinor }
     Card(modifier = Modifier.fillMaxWidth()) {
-        Row(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            Figure("You sent", list.sumOf { it.sentMinor }, FinanceTheme.colors.expense, Modifier.weight(1f))
-            Figure("Sent to you", list.sumOf { it.receivedMinor }, FinanceTheme.colors.income, Modifier.weight(1f))
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Figure("You sent", sent, FinanceTheme.colors.expense, Modifier.weight(1f))
+                Figure("Sent to you", received, FinanceTheme.colors.income, Modifier.weight(1f))
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = whoIsUp(received - sent),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
         }
     }
+}
+
+/** "You sent £20.00 more", from what came back less what went out. */
+private fun whoIsUp(netMinor: Long): String = when {
+    netMinor > 0 -> "They sent ${Money.format(netMinor)} more"
+    netMinor < 0 -> "You sent ${Money.format(-netMinor)} more"
+    else -> "Even"
 }
 
 @Composable
@@ -313,6 +408,7 @@ private fun LedgerCard(
     ledger: PersonLedger,
     isOpen: Boolean,
     onToggle: () -> Unit,
+    onOpenEntry: (Long) -> Unit,
     onFileSent: () -> Unit,
     onFileReceived: () -> Unit,
     onNotAPerson: () -> Unit,
@@ -327,11 +423,7 @@ private fun LedgerCard(
                     modifier = Modifier.weight(1f),
                 )
                 Text(
-                    text = when {
-                        ledger.netMinor > 0 -> "They sent ${Money.format(ledger.netMinor)} more"
-                        ledger.netMinor < 0 -> "You sent ${Money.format(-ledger.netMinor)} more"
-                        else -> "Even"
-                    },
+                    text = whoIsUp(ledger.netMinor),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -344,6 +436,7 @@ private fun LedgerCard(
                     entries = ledger.sent,
                     color = FinanceTheme.colors.expense,
                     isOpen = isOpen,
+                    onOpenEntry = onOpenEntry,
                     modifier = Modifier.weight(1f),
                 )
                 Side(
@@ -352,6 +445,7 @@ private fun LedgerCard(
                     entries = ledger.received,
                     color = FinanceTheme.colors.income,
                     isOpen = isOpen,
+                    onOpenEntry = onOpenEntry,
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -371,7 +465,7 @@ private fun LedgerCard(
     }
 }
 
-/** One column: a total, and each payment when the card is open. */
+/** One column: a total, and each payment when the card is open — tap one to change it. */
 @Composable
 private fun Side(
     label: String,
@@ -379,6 +473,7 @@ private fun Side(
     entries: List<PayeeEntry>,
     color: Color,
     isOpen: Boolean,
+    onOpenEntry: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
@@ -392,7 +487,13 @@ private fun Side(
         if (isOpen) {
             Spacer(Modifier.height(6.dp))
             entries.sortedBy { it.date }.forEach { entry ->
-                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 40.dp)
+                        .clickable { onOpenEntry(entry.id) },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Text(
                         text = DateUtils.formatShort(entry.date),
                         style = MaterialTheme.typography.bodySmall,
@@ -401,6 +502,12 @@ private fun Side(
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(Money.format(entry.amountMinor), style = MaterialTheme.typography.bodySmall)
+                    Icon(
+                        imageVector = Icons.Outlined.Edit,
+                        contentDescription = "Change this payment",
+                        modifier = Modifier.padding(start = 4.dp).size(14.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }
@@ -533,3 +640,129 @@ fun PeopleMoneyCard(
 
 /** How many people the Home card lists before "See all". */
 private const val HOME_PEOPLE = 5
+
+/** The ways the year graph can be drawn. */
+private val YEAR_VIEWS = listOf(BreakdownView.LINE, BreakdownView.RUNNING, BreakdownView.BARS, BreakdownView.LIST)
+
+/**
+ * The year month by month: what you sent and what came back, for everyone
+ * together or one person. Four ways to see it, from the corner button: two
+ * lines, the running balance between you, bars, or a plain list.
+ */
+@Composable
+private fun YearGraphCard(
+    year: Int,
+    people: List<PersonLedger>,
+    graphed: String?,
+    onGraph: (String?) -> Unit,
+) {
+    val (view, setView) = rememberCardView("people_year", BreakdownView.LINE)
+    val now = DateUtils.currentYearMonth()
+    // The current year stops at this month, so the lines do not fall to
+    // nothing across months that have not happened yet.
+    val months = (if (year == now.year) now.monthValue else 12).coerceAtLeast(2)
+    val shown = people.filter { graphed == null || it.key == graphed }
+    val sent = LongArray(months)
+    val received = LongArray(months)
+    shown.forEach { ledger ->
+        ledger.sent.forEach { if (it.date.year == year && it.date.monthValue <= months) sent[it.date.monthValue - 1] += it.amountMinor }
+        ledger.received.forEach { if (it.date.year == year && it.date.monthValue <= months) received[it.date.monthValue - 1] += it.amountMinor }
+    }
+    val labels = (1..months).map { DateUtils.monthNameShort(it) }
+    val colors = FinanceTheme.colors
+    val who = shown.singleOrNull()?.name ?: "everyone"
+
+    SectionCard(
+        title = "Through $year",
+        subtitle = "Sent and received, $who",
+        action = { ViewSwitchButton(view, YEAR_VIEWS, setView) },
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            FilterChip(selected = graphed == null, onClick = { onGraph(null) }, label = { Text("Everyone") })
+            people.forEach { ledger ->
+                FilterChip(
+                    selected = graphed == ledger.key,
+                    onClick = { onGraph(ledger.key) },
+                    label = { Text(ledger.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                )
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        when (view) {
+            BreakdownView.RUNNING -> {
+                var running = 0L
+                val balance = labels.indices.map { i ->
+                    running += received[i] - sent[i]
+                    running
+                }
+                TrendLineChart(
+                    labels = labels,
+                    series = listOf(LineSeries("Who's up", balance, MaterialTheme.colorScheme.primary)),
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = "The running balance between you over the year. Above the zero line " +
+                        "they have sent you more; below it, you have sent them more.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            BreakdownView.BARS -> {
+                GroupedBarChart(
+                    groups = labels.indices.map { i ->
+                        BarGroup(
+                            label = labels[i],
+                            bars = listOf(
+                                ChartEntry("You sent", sent[i].toFloat(), colors.chartOut, Money.format(sent[i])),
+                                ChartEntry("They sent you", received[i].toFloat(), colors.chartIn, Money.format(received[i])),
+                            ),
+                        )
+                    },
+                )
+                Spacer(Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        ColorDot(colors.chartOut)
+                        Spacer(Modifier.width(6.dp))
+                        Text("You sent", style = MaterialTheme.typography.bodySmall)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        ColorDot(colors.chartIn)
+                        Spacer(Modifier.width(6.dp))
+                        Text("They sent you", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+            BreakdownView.LIST -> {
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Spacer(Modifier.weight(1f))
+                    Text("You sent", style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(88.dp), textAlign = TextAlign.End)
+                    Text("They sent", style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(88.dp), textAlign = TextAlign.End)
+                }
+                labels.indices.reversed().forEach { i ->
+                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                        Text(labels[i], style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                        Text(Money.format(sent[i]), style = MaterialTheme.typography.bodyMedium, color = colors.expense, modifier = Modifier.width(88.dp), textAlign = TextAlign.End)
+                        Text(Money.format(received[i]), style = MaterialTheme.typography.bodyMedium, color = colors.income, modifier = Modifier.width(88.dp), textAlign = TextAlign.End)
+                    }
+                }
+            }
+            else -> TrendLineChart(
+                labels = labels,
+                series = listOf(
+                    LineSeries("You sent", sent.toList(), colors.chartOut),
+                    LineSeries("They sent you", received.toList(), colors.chartIn, dashed = true, marker = MarkerShape.SQUARE),
+                ),
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = "Over $year: " + whoIsUp(received.sum() - sent.sum()).replaceFirstChar { it.lowercase() },
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+}

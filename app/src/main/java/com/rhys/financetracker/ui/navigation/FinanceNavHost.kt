@@ -303,6 +303,7 @@ private fun NavGraphBuilder.topLevelDestinations(
         val personId = entry.arguments?.getLong(Routes.ARG_PERSON_ID) ?: Routes.NEW_ID
         SentToPeopleScreen(
             onBack = { navController.popBackStack() },
+            onOpenTransaction = { navController.navigate(Routes.transactionEdit(it)) },
             personId = personId.takeIf { it != Routes.NEW_ID },
         )
     }

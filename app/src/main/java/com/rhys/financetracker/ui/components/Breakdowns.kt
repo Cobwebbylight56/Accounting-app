@@ -15,9 +15,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.List
+import androidx.compose.material.icons.automirrored.outlined.ShowChart
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.DonutLarge
 import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material.icons.outlined.Timeline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -58,6 +60,8 @@ enum class BreakdownView(val label: String, val icon: ImageVector) {
     BARS("bars", Icons.Outlined.BarChart),
     TILES("tiles", Icons.Outlined.GridView),
     LIST("list", Icons.AutoMirrored.Outlined.List),
+    LINE("line graph", Icons.AutoMirrored.Outlined.ShowChart),
+    RUNNING("running total", Icons.Outlined.Timeline),
 }
 
 /** Holds how each card was last drawn, so the choice survives leaving the screen. */
@@ -110,7 +114,7 @@ fun ViewSwitchButton(
 val CATEGORY_VIEWS = listOf(BreakdownView.CHART, BreakdownView.BARS, BreakdownView.TILES, BreakdownView.LIST)
 
 /** The views a month-by-month card can take. */
-val TREND_VIEWS = listOf(BreakdownView.BARS, BreakdownView.LIST)
+val TREND_VIEWS = listOf(BreakdownView.LINE, BreakdownView.BARS, BreakdownView.LIST)
 
 /**
  * Spending by category, drawn as [view].
@@ -141,7 +145,9 @@ fun CategoryBreakdown(
     val total = shown.sumOf { it.totalMinor }
     Column(modifier = modifier) {
         when (view) {
-            BreakdownView.CHART -> ChartView(shown, total, centreLabel, onOpen, maxRows)
+            // A line over categories means nothing; those views draw the ring.
+            BreakdownView.CHART, BreakdownView.LINE, BreakdownView.RUNNING ->
+                ChartView(shown, total, centreLabel, onOpen, maxRows)
             BreakdownView.BARS -> shown.take(maxRows).forEachIndexed { index, item ->
                 BarRow(item, index, total, previous[item.categoryId], onOpen)
             }
@@ -150,7 +156,7 @@ fun CategoryBreakdown(
                 ListRow(item, index, total, previous[item.categoryId], onOpen)
             }
         }
-        if (shown.size > maxRows && view != BreakdownView.CHART) {
+        if (shown.size > maxRows && view in listOf(BreakdownView.BARS, BreakdownView.TILES, BreakdownView.LIST)) {
             Text(
                 text = "and ${shown.size - maxRows} more, " +
                     Money.format(shown.drop(maxRows).sumOf { it.totalMinor }),
@@ -312,8 +318,8 @@ private fun TilesView(shown: List<CategoryTotal>, onOpen: (CategoryTotal) -> Uni
 }
 
 /**
- * Money in and out month by month, as bars or a list. [selected] is the
- * month to pick out; tapping one calls [onMonth].
+ * Money in and out month by month, as a line graph, bars or a list.
+ * [selected] is the month to pick out; tapping one calls [onMonth].
  */
 @Composable
 fun MonthTrend(
@@ -345,14 +351,24 @@ fun MonthTrend(
                     Text("−" + Money.format(point.expenseMinor), color = colors.expense, style = MaterialTheme.typography.bodySmall)
                 }
             }
+        } else if (view == BreakdownView.LINE || view == BreakdownView.RUNNING) {
+            TrendLineChart(
+                labels = points.map { DateUtils.monthNameShort(it.yearMonth.monthValue) },
+                series = listOf(
+                    LineSeries("Money in", points.map { it.incomeMinor }, colors.chartIn, dashed = true, marker = MarkerShape.SQUARE),
+                    LineSeries("Money out", points.map { it.expenseMinor }, colors.chartOut),
+                ),
+                selectedIndex = points.indexOfFirst { it.yearMonth == selected }.takeIf { it >= 0 },
+                onPointClick = onMonth?.let { open -> { index: Int -> points.getOrNull(index)?.let { open(it.yearMonth) } } },
+            )
         } else {
             GroupedBarChart(
                 groups = points.map { point ->
                     BarGroup(
                         label = DateUtils.monthNameShort(point.yearMonth.monthValue),
                         bars = listOf(
-                            ChartEntry("In", point.incomeMinor.toFloat(), colors.income, Money.format(point.incomeMinor)),
-                            ChartEntry("Out", point.expenseMinor.toFloat(), colors.expense, Money.format(point.expenseMinor)),
+                            ChartEntry("In", point.incomeMinor.toFloat(), colors.chartIn, Money.format(point.incomeMinor)),
+                            ChartEntry("Out", point.expenseMinor.toFloat(), colors.chartOut, Money.format(point.expenseMinor)),
                         ),
                     )
                 },
@@ -369,12 +385,12 @@ fun MonthTrend(
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    ColorDot(colors.income)
+                    ColorDot(colors.chartIn)
                     Spacer(Modifier.width(6.dp))
                     Text("Money in", style = MaterialTheme.typography.bodySmall)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    ColorDot(colors.expense)
+                    ColorDot(colors.chartOut)
                     Spacer(Modifier.width(6.dp))
                     Text("Money out", style = MaterialTheme.typography.bodySmall)
                 }

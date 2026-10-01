@@ -110,6 +110,14 @@ data class FinanceColors(
     val neutral: Color,
     /** Series colours for charts, in the order they should be used. */
     val chartSeries: List<Color>,
+    /**
+     * Money in and money out as lines and bars on a chart. Teal and coral
+     * rather than the green and red of the figures: a red–green pair cannot
+     * be told apart by about one man in twelve, and these pass a colour-
+     * blindness check against the card in both themes.
+     */
+    val chartIn: Color,
+    val chartOut: Color,
     /** The home screen's tiles: slate blue, sage, blush and mist, and text on them. */
     val tileBlue: Color,
     val tileSage: Color,
@@ -142,6 +150,8 @@ data class FinanceColors(
                 Color(0xFF5E35B1), Color(0xFF00838F), Color(0xFF558B2F), Color(0xFFC62828),
                 Color(0xFF6D4C41), Color(0xFF455A64), Color(0xFF9E9D24), Color(0xFF7B1FA2),
             ),
+            chartIn = Color(0xFF1B9A94),
+            chartOut = Color(0xFFC8402A),
             tileBlue = Color(0xFF9DB0C9),
             tileSage = Color(0xFFD5E0DC),
             tileBlush = Color(0xFFDCC5CF),
@@ -172,6 +182,8 @@ data class FinanceColors(
                 Color(0xFFB39DDB), Color(0xFF7ED6DE), Color(0xFFAED581), Color(0xFFEF9A9A),
                 Color(0xFFBCAAA4), Color(0xFFB0BEC5), Color(0xFFDCE775), Color(0xFFCE93D8),
             ),
+            chartIn = Color(0xFF1B9A94),
+            chartOut = Color(0xFFE05A44),
             tileBlue = Color(0xFF3C4D66),
             tileSage = Color(0xFF394a44),
             tileBlush = Color(0xFF55414C),

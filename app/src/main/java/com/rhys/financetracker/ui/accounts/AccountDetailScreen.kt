@@ -125,7 +125,7 @@ class AccountDetailViewModel @Inject constructor(
     private val account = accountRepository.observeAllWithBalances()
         .map { list -> list.firstOrNull { it.account.id == accountId } }
 
-    /** The last six months' closing balances, worked out whenever the balance moves. */
+    /** The last twelve months' closing balances, worked out whenever the balance moves. */
     private val monthEnds = account.mapLatest { current ->
         if (current == null) return@mapLatest emptyList<MonthEnd>()
         val thisMonth = DateUtils.currentYearMonth()
@@ -176,7 +176,7 @@ class AccountDetailViewModel @Inject constructor(
 
     companion object {
         private const val RECENT = 30
-        private const val MONTH_ENDS = 6
+        private const val MONTH_ENDS = 12
         private const val COVERAGE_MONTHS = 12L
 
         /**
@@ -439,7 +439,20 @@ private fun ImportRow(item: ImportBatchWithRemaining, onUndo: () -> Unit) {
 @Composable
 private fun MonthEndsCard(ends: List<MonthEnd>) {
     SectionCard(title = "Balance at each month end") {
-        ends.forEach { end ->
+        val oldestFirst = ends.sortedBy { it.month }
+        com.rhys.financetracker.ui.components.TrendLineChart(
+            labels = oldestFirst.map { DateUtils.monthNameShort(it.month.monthValue) },
+            series = listOf(
+                com.rhys.financetracker.ui.components.LineSeries(
+                    name = "Balance",
+                    values = oldestFirst.map { it.balanceMinor },
+                    color = MaterialTheme.colorScheme.primary,
+                ),
+            ),
+            height = 180.dp,
+        )
+        Spacer(Modifier.height(8.dp))
+        ends.take(MONTH_ENDS_LISTED).forEach { end ->
             Row(modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
                 Text(
                     text = DateUtils.formatMonth(end.month),
@@ -455,6 +468,9 @@ private fun MonthEndsCard(ends: List<MonthEnd>) {
         }
     }
 }
+
+/** The graph covers the year; the list under it, the latest few. */
+private const val MONTH_ENDS_LISTED = 6
 
 @Composable
 private fun PaymentRow(item: TransactionWithDetails, accountId: Long, onClick: () -> Unit) {

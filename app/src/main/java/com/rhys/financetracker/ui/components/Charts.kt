@@ -546,7 +546,7 @@ fun ProgressBarRow(
 }
 
 @Composable
-private fun EmptyChartPlaceholder(modifier: Modifier, message: String) {
+internal fun EmptyChartPlaceholder(modifier: Modifier, message: String) {
     Box(
         modifier = modifier.fillMaxWidth().height(120.dp),
         contentAlignment = Alignment.Center,
