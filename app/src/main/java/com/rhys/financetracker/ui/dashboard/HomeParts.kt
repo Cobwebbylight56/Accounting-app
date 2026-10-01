@@ -27,7 +27,7 @@ import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Groups
-import androidx.compose.material.icons.outlined.Menu
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.Savings
 import androidx.compose.material.icons.outlined.South
@@ -114,7 +114,7 @@ internal fun HomeHeader(
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onMenu) {
-                Icon(Icons.Outlined.Menu, contentDescription = "Settings")
+                Icon(Icons.Outlined.Settings, contentDescription = "Settings")
             }
             Spacer(Modifier.weight(1f))
             Avatar(
@@ -563,7 +563,7 @@ internal fun LoansCard(state: DashboardState, onOpenAccounts: () -> Unit) {
  * which starts setting up the first person.
  */
 @Composable
-internal fun WelcomeScreen(onStart: () -> Unit, modifier: Modifier = Modifier) {
+internal fun WelcomeScreen(onStart: () -> Unit, onRestore: () -> Unit = {}, modifier: Modifier = Modifier) {
     val colors = FinanceTheme.colors
     Column(
         modifier = modifier
@@ -615,6 +615,18 @@ internal fun WelcomeScreen(onStart: () -> Unit, modifier: Modifier = Modifier) {
                     tint = colors.onTile,
                 )
             }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = "Start",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(20.dp))
+        // Putting the app on again should not mean setting everything up
+        // before the backup can be brought back.
+        androidx.compose.material3.TextButton(onClick = onRestore) {
+            Text("I have a backup — restore it")
         }
     }
 }

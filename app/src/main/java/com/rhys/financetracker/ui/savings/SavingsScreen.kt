@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -79,6 +80,7 @@ import com.rhys.financetracker.ui.theme.FinanceTheme
 fun SavingsScreen(
     onEditGoal: (Long) -> Unit,
     onAddGoal: () -> Unit,
+    onOpenAccount: (Long) -> Unit = {},
     viewModel: SavingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -103,7 +105,9 @@ fun SavingsScreen(
             }
         },
     ) { padding ->
-        if (state.goals.isEmpty() && state.archivedGoals.isEmpty()) {
+        if (state.goals.isEmpty() && state.archivedGoals.isEmpty() && state.savers.isEmpty() &&
+            state.cashPotMinor == 0L
+        ) {
             EmptyState(
                 icon = Icons.Outlined.Savings,
                 title = "No savings goals yet",
@@ -121,7 +125,65 @@ fun SavingsScreen(
             contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 96.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            item {
+            // The money itself first. This tab used to show only goals, so
+            // somebody with savers and no goals saw an empty page.
+            if (state.savers.isNotEmpty() || state.cashPotMinor != 0L) {
+                item {
+                    SectionCard(
+                        title = "Your savings",
+                        subtitle = "${Money.format(state.totalSavedMinor + state.cashPotMinor)} in all",
+                    ) {
+                        state.savers.forEach { saver ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onOpenAccount(saver.account.id) }
+                                    .padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                com.rhys.financetracker.ui.components.ColorDot(colorFromHex(saver.account.colorHex), size = 12.dp)
+                                Spacer(Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(saver.account.name, style = MaterialTheme.typography.bodyLarge)
+                                    saver.personName?.let {
+                                        Text(
+                                            it,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+                                Text(Money.format(saver.balanceMinor), style = MaterialTheme.typography.bodyLarge)
+                            }
+                        }
+                        if (state.cashPotMinor != 0L) {
+                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                                Text(
+                                    "Cash pot",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    modifier = Modifier.weight(1f).padding(start = 24.dp),
+                                )
+                                Text(Money.format(state.cashPotMinor), style = MaterialTheme.typography.bodyLarge)
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (state.goals.isEmpty()) {
+                item {
+                    SectionCard(title = "Goals", subtitle = "None yet") {
+                        Text(
+                            text = "A goal turns \"saving a bit each month\" into something you can " +
+                                "watch getting closer — a holiday, an emergency fund, Christmas.",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        TextButton(onClick = onAddGoal) { Text("Add a goal") }
+                    }
+                }
+            }
+
+            if (state.goals.isNotEmpty()) item {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     StatTile(
                         label = "In savings accounts",
@@ -137,7 +199,7 @@ fun SavingsScreen(
                 }
             }
 
-            item {
+            if (state.goals.isNotEmpty()) item {
                 SectionCard(
                     title = "All goals together",
                     subtitle = "${Money.format(state.totalInGoalsMinor)} of " +

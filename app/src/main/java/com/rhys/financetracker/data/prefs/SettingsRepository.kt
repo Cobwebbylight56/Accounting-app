@@ -63,6 +63,8 @@ class SettingsRepository @Inject constructor(
         val PAYEES_KEPT = stringSetPreferencesKey("payees_kept_as_people")
         val PAYEES_HIDDEN = stringSetPreferencesKey("payees_not_people")
         val NOTIFICATIONS_ASKED = booleanPreferencesKey("notifications_asked")
+        val HOME_TRIMMED = booleanPreferencesKey("home_trimmed")
+        val BACKUP_NUDGE_SNOOZED_UNTIL = longPreferencesKey("backup_nudge_snoozed_until")
     }
 
     /** Defaults chosen so a fresh install is immediately usable and private. */
@@ -127,6 +129,8 @@ class SettingsRepository @Inject constructor(
             payeesKeptAsPeople = prefs[Keys.PAYEES_KEPT].orEmpty(),
             payeesNotPeople = prefs[Keys.PAYEES_HIDDEN].orEmpty(),
             notificationsAsked = prefs[Keys.NOTIFICATIONS_ASKED] ?: false,
+            homeTrimmed = prefs[Keys.HOME_TRIMMED] ?: false,
+            backupNudgeSnoozedUntil = prefs[Keys.BACKUP_NUDGE_SNOOZED_UNTIL],
         )
     }
 
@@ -165,6 +169,12 @@ class SettingsRepository @Inject constructor(
     /** Who the Shared tab on Home covers; see [AppSettings.sharedPeopleIds]. */
     suspend fun setSharedPeople(ids: Set<Long>) =
         put(Keys.SHARED_PEOPLE, ids.sorted().joinToString(","))
+
+    /** Records that Home's repeated cards have been switched off once; see DashboardViewModel. */
+    suspend fun setHomeTrimmed() = put(Keys.HOME_TRIMMED, true)
+
+    /** Hides the backup reminder on Home until [until] (epoch millis). */
+    suspend fun snoozeBackupNudge(until: Long) = put(Keys.BACKUP_NUDGE_SNOOZED_UNTIL, until)
 
     /** Records that Android has been asked once for permission to show reminders. */
     suspend fun setNotificationsAsked() = put(Keys.NOTIFICATIONS_ASKED, true)
@@ -229,6 +239,10 @@ data class AppSettings(
     val payeesNotPeople: Set<String> = emptySet(),
     /** True once Android has been asked for permission to show reminders. */
     val notificationsAsked: Boolean = false,
+    /** True once Home's repeated cards have been switched off for this install. */
+    val homeTrimmed: Boolean = false,
+    /** The backup reminder stays hidden until then (epoch millis). */
+    val backupNudgeSnoozedUntil: Long? = null,
 ) {
     val isLockEnabled: Boolean get() = lockMethod != LockMethod.NONE
     val requiresPin: Boolean

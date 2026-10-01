@@ -32,6 +32,7 @@ import kotlinx.coroutines.launch
 class SavingsViewModel @Inject constructor(
     private val savingsRepository: SavingsRepository,
     accountRepository: AccountRepository,
+    cashPotRepository: com.rhys.financetracker.data.repository.CashPotRepository,
 ) : ViewModel() {
 
     private val message = MutableStateFlow<String?>(null)
@@ -39,8 +40,9 @@ class SavingsViewModel @Inject constructor(
     val state: StateFlow<SavingsState> = combine(
         savingsRepository.observeWithProgressIncludingArchived(),
         accountRepository.observeWithBalances().map { accounts -> accounts.filter { it.isSavings } },
+        cashPotRepository.observeTotal(),
         message,
-    ) { everyGoal, savingsAccounts, text ->
+    ) { everyGoal, savingsAccounts, pot, text ->
         // Archived goals are kept to one side, where they can be brought
         // back; everything that adds up is worked out from the live ones.
         val (archived, goals) = everyGoal.partition { it.goal.isArchived }
@@ -54,6 +56,8 @@ class SavingsViewModel @Inject constructor(
             isLoading = false,
             goals = goals.map { summarise(it) },
             archivedGoals = archived.map { summarise(it) },
+            savers = savingsAccounts,
+            cashPotMinor = pot,
             totalSavedMinor = savingsAccounts.sumOf { it.balanceMinor },
             totalTargetMinor = goals.sumOf { it.goal.targetAmountMinor },
             totalInGoalsMinor = goals.sumOf { it.currentAmountMinor },
@@ -104,6 +108,9 @@ data class SavingsState(
     val goals: List<GoalSummary> = emptyList(),
     /** Goals put away, which can be brought back. */
     val archivedGoals: List<GoalSummary> = emptyList(),
+    /** Every account set aside — the money itself, before any goal. */
+    val savers: List<com.rhys.financetracker.data.local.projection.AccountWithBalance> = emptyList(),
+    val cashPotMinor: Long = 0L,
     val totalSavedMinor: Long = 0L,
     val totalTargetMinor: Long = 0L,
     val totalInGoalsMinor: Long = 0L,

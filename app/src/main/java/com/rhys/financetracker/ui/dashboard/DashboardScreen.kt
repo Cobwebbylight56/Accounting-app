@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Settings
@@ -78,6 +79,7 @@ fun DashboardScreen(
     onOpenSortSpending: () -> Unit = {},
     onOpenSentToPeople: () -> Unit = {},
     onOpenPeopleMoneyFor: (Long) -> Unit = {},
+    onOpenBackup: () -> Unit = {},
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -87,6 +89,8 @@ fun DashboardScreen(
     val categoryDetail by viewModel.categoryDetail.collectAsStateWithLifecycle()
     val message by viewModel.messages.collectAsStateWithLifecycle()
     val peopleMoney by viewModel.peopleMoney.collectAsStateWithLifecycle()
+    val unsortedCount by viewModel.unsortedCount.collectAsStateWithLifecycle()
+    val showBackupNudge by viewModel.showBackupNudge.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
 
     // Reminders are on from the start, but on Android 13 and later none can
@@ -116,8 +120,18 @@ fun DashboardScreen(
         }
     }
 
+    val showsHome = !state.isLoading && !(individuals.isEmpty() && state.accountsInTotal == 0)
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
+        // Adding a payment is the commonest thing there is to do, and Home
+        // had no way to do it in one tap.
+        floatingActionButton = {
+            if (showsHome) {
+                androidx.compose.material3.FloatingActionButton(onClick = onAddTransaction) {
+                    Icon(Icons.Default.Add, contentDescription = "Add a payment")
+                }
+            }
+        },
     ) { padding ->
         when {
             state.isLoading -> LoadingState(Modifier.padding(padding))
@@ -125,7 +139,11 @@ fun DashboardScreen(
             // Nobody set up and nothing recorded: a fresh install. Everything
             // is built around a person, so that is where it starts.
             individuals.isEmpty() && state.accountsInTotal == 0 ->
-                WelcomeScreen(onStart = onOpenSetup, modifier = Modifier.padding(padding))
+                WelcomeScreen(
+                    onStart = onOpenSetup,
+                    onRestore = onOpenBackup,
+                    modifier = Modifier.padding(padding),
+                )
 
             else -> LazyColumn(
                 modifier = Modifier
@@ -148,6 +166,26 @@ fun DashboardScreen(
                         },
                         onCustomise = onOpenDashboardSettings,
                     )
+                }
+
+                if (showBackupNudge) {
+                    item {
+                        SectionCard(title = "Back up your money") {
+                            Text(
+                                text = "Everything here is only on this phone. A backup keeps it " +
+                                    "safe if the phone is lost or the app is put on again — and " +
+                                    "you can save it to Drive or OneDrive.",
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Spacer(Modifier.height(10.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(onClick = onOpenBackup, modifier = Modifier.weight(1f)) {
+                                    Text("Back up now")
+                                }
+                                TextButton(onClick = viewModel::snoozeBackupNudge) { Text("Later") }
+                            }
+                        }
+                    }
                 }
 
                 item {
@@ -192,22 +230,34 @@ fun DashboardScreen(
 
                 item { MonthList(state = state) }
 
-                item {
-                    com.rhys.financetracker.ui.spending.PeopleMoneyCard(
-                        money = peopleMoney,
-                        monthLabel = com.rhys.financetracker.core.time.DateUtils.formatMonth(state.month),
-                        onSeeAll = {
-                            val person = state.scope.personId
-                            if (person != null) onOpenPeopleMoneyFor(person) else onOpenSentToPeople()
-                        },
-                    )
+                // Only when there is someone to show: an empty card saying so
+                // was one more thing to scroll past.
+                if (!peopleMoney?.people.isNullOrEmpty()) {
+                    item {
+                        com.rhys.financetracker.ui.spending.PeopleMoneyCard(
+                            money = peopleMoney,
+                            monthLabel = com.rhys.financetracker.core.time.DateUtils.formatMonth(state.month),
+                            onSeeAll = {
+                                val person = state.scope.personId
+                                if (person != null) onOpenPeopleMoneyFor(person) else onOpenSentToPeople()
+                            },
+                        )
+                    }
                 }
 
-                item {
-                    androidx.compose.material3.OutlinedButton(
-                        onClick = onOpenSortSpending,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Sort spending") }
+                // Says how many are waiting, and goes when none are.
+                if (unsortedCount > 0) {
+                    item {
+                        androidx.compose.material3.OutlinedButton(
+                            onClick = onOpenSortSpending,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(
+                                "Sort spending · $unsortedCount " +
+                                    if (unsortedCount == 1) "payment to file" else "payments to file",
+                            )
+                        }
+                    }
                 }
 
                 item { LoansCard(state = state, onOpenAccounts = onOpenAccounts) }
@@ -219,8 +269,11 @@ fun DashboardScreen(
                 items(
                     // The tiles and the month list above are these two cards
                     // drawn the new way, so they are not shown twice.
+                    // The cash pot is the household's, so a person's own tab
+                    // does not show it.
                     items = state.widgets.filter {
-                        it.isVisible && it.widget !in REPLACED_BY_TILES
+                        it.isVisible && it.widget !in REPLACED_BY_TILES &&
+                            (it.widget != DashboardWidget.CASH_IN_HAND || state.scope.includesHousehold)
                     },
                     key = { it.widget.key },
                 ) { visible ->

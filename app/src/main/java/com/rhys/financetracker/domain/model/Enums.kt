@@ -187,24 +187,32 @@ enum class ScopeType(val displayName: String) {
 enum class DashboardWidget(val key: String, val title: String, val defaultVisible: Boolean) {
     // Declaration order is the default order on screen, so the plain
     // at-a-glance cards come before the charts.
-    ACCOUNT_ACTIVITY("account_activity", "Accounts this month", true),
+    ACCOUNT_ACTIVITY("account_activity", "Accounts this month", false),
     CATEGORY_TILES("category_tiles", "Where it went", true),
     BALANCE_SUMMARY("balance_summary", "Balances", true),
     MONTH_SUMMARY("month_summary", "This month", true),
-    DISPOSABLE_INCOME("disposable_income", "Left to spend", true),
+    DISPOSABLE_INCOME("disposable_income", "Left to spend", false),
     UPCOMING_BILLS("upcoming_bills", "Coming up", true),
     OVERDUE_BILLS("overdue_bills", "Overdue", true),
     RECENT_TRANSACTIONS("recent_transactions", "This month's payments", true),
-    SAVINGS_AND_CASH("savings_and_cash", "Savings", true),
+    SAVINGS_AND_CASH("savings_and_cash", "Savings", false),
     CASH_IN_HAND("cash_in_hand", "Cash pot", true),
     SAVINGS_PROGRESS("savings_progress", "Savings goals", true),
-    SPENDING_BY_CATEGORY("spending_by_category", "Spending by category", true),
+    SPENDING_BY_CATEGORY("spending_by_category", "Spending by category", false),
     INSIGHTS("insights", "Advice", true),
-    INCOME_VS_EXPENSE("income_vs_expense", "Income against spending", true),
+    INCOME_VS_EXPENSE("income_vs_expense", "Income against spending", false),
     NET_WORTH("net_worth", "Net worth", false),
     ACCOUNTS_LIST("accounts_list", "Accounts", false),
     EXTERNAL_DATA("external_data", "Rates and figures", false),
     ;
+
+    /**
+     * Off unless switched on, because Home already shows the same thing: the
+     * month's figures repeat "Left to spend", the Saved tile repeats
+     * Savings, and "Where it went" repeats the spending chart.
+     */
+    val repeatsHome: Boolean
+        get() = this in setOf(ACCOUNT_ACTIVITY, DISPOSABLE_INCOME, SAVINGS_AND_CASH, SPENDING_BY_CATEGORY, INCOME_VS_EXPENSE)
 
     /**
      * False for the cards Home's tiles and month list replaced: they are no

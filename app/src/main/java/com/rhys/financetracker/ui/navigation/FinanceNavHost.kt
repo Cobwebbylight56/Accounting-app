@@ -213,6 +213,7 @@ private fun NavGraphBuilder.topLevelDestinations(
             onOpenSortSpending = { navController.navigate(Routes.SORT_SPENDING) },
             onOpenSentToPeople = { navController.navigate(Routes.SENT_TO_PEOPLE) },
             onOpenPeopleMoneyFor = { navController.navigate(Routes.sentToPeople(it)) },
+            onOpenBackup = { navController.navigate(Routes.SETTINGS_BACKUP) },
         )
     }
 
@@ -229,6 +230,7 @@ private fun NavGraphBuilder.topLevelDestinations(
         SavingsScreen(
             onEditGoal = { navController.navigate(Routes.savingsEdit(it)) },
             onAddGoal = { navController.navigate(Routes.savingsEdit()) },
+            onOpenAccount = { navController.navigate(Routes.accountView(it)) },
         )
     }
 

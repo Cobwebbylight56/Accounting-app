@@ -94,8 +94,9 @@ data class PersonHubState(
 ) {
     val income: IncomeStats
         get() = IncomeStats(person?.grossYearlyIncomeMinor, person?.netYearlyIncomeMinor)
+    /** Everything owed, as Home groups it: cards, pay later, loans and mortgages. */
     val loans: List<AccountWithBalance>
-        get() = theirs.filter { it.account.type == AccountType.LOAN || it.account.type == AccountType.MORTGAGE }
+        get() = theirs.filter { it.isLiability }
     val accounts: List<AccountWithBalance> get() = theirs - loans.toSet()
 }
 
@@ -449,10 +450,10 @@ fun PersonHubScreen(
 
             // -------------------------------------------------------- loans
             item {
-                SectionCard(title = "Loans to pay", subtitle = "Each goes once it's paid off") {
+                SectionCard(title = "Cards, loans and pay later", subtitle = "Loans go once they're paid off") {
                     if (state.loans.isEmpty()) {
                         Text(
-                            text = "Nothing being paid off.",
+                            text = "Nothing owed.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -460,7 +461,8 @@ fun PersonHubScreen(
                     state.loans.forEach { loan ->
                         BalanceRow(
                             name = loan.account.name,
-                            detail = "${Money.format((-loan.balanceMinor).coerceAtLeast(0L))} left",
+                            detail = "${Money.format((-loan.balanceMinor).coerceAtLeast(0L))} " +
+                                if (loan.account.type == AccountType.CREDIT_CARD) "owed" else "left",
                             amountMinor = loan.balanceMinor,
                             colorHex = loan.account.colorHex,
                             onClick = { onOpenAccount(loan.account.id) },

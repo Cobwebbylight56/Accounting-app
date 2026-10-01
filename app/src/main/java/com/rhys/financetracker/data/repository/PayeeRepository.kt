@@ -63,6 +63,9 @@ class PayeeRepository @Inject constructor(
     private val settingsRepository: SettingsRepository,
 ) {
 
+    /** How many payments are still waiting to be sorted, all time. */
+    fun observeUnsortedCount(): Flow<Int> = transactionDao.observeUnsortedCount(VAGUE)
+
     /** Payments not properly sorted, biggest payees first. */
     fun observeUnsorted(from: LocalDate, to: LocalDate): Flow<List<PayeeGroup>> =
         transactionDao.observeUnsorted(from, to, VAGUE).map { group(it) }

@@ -56,6 +56,8 @@ class AccountsViewModel @Inject constructor(
             people = people.filterNot { it.isArchived },
             showArchived = archived,
             totalAssetsMinor = visible.filterNot { it.isLiability }.sumOf { it.balanceMinor },
+            availableMinor = visible.filterNot { it.isLiability || it.isSavings }.sumOf { it.balanceMinor },
+            savedMinor = visible.filter { it.isSavings }.sumOf { it.balanceMinor },
             totalLiabilitiesMinor = visible.filter { it.isLiability }.sumOf { it.balanceMinor },
             netWorthMinor = visible.sumOf { it.netWorthContributionMinor },
             message = text,
@@ -149,6 +151,9 @@ data class AccountsState(
     val people: List<PersonEntity> = emptyList(),
     val showArchived: Boolean = false,
     val totalAssetsMinor: Long = 0L,
+    /** The same split as Home's tiles, so the two pages use the same words. */
+    val availableMinor: Long = 0L,
+    val savedMinor: Long = 0L,
     val totalLiabilitiesMinor: Long = 0L,
     val netWorthMinor: Long = 0L,
     val message: String? = null,

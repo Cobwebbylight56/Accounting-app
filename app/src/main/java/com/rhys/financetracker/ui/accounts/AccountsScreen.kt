@@ -143,15 +143,26 @@ fun AccountsScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             item {
+                // Named as on Home — Available, Saved, Owed — rather than a
+                // second set of words for the same money.
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     StatTile(
-                        label = "Assets",
-                        value = Money.format(state.totalAssetsMinor),
-                        emphasis = StatEmphasis.POSITIVE,
+                        label = "Available",
+                        value = Money.format(state.availableMinor),
                         modifier = Modifier.weight(1f),
                     )
                     StatTile(
-                        label = "Debts",
+                        label = "Saved",
+                        value = Money.format(state.savedMinor),
+                        emphasis = StatEmphasis.POSITIVE,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    StatTile(
+                        label = "Owed",
                         value = Money.format(state.totalLiabilitiesMinor),
                         emphasis = if (state.totalLiabilitiesMinor < 0L) {
                             StatEmphasis.NEGATIVE
@@ -160,19 +171,17 @@ fun AccountsScreen(
                         },
                         modifier = Modifier.weight(1f),
                     )
+                    StatTile(
+                        label = "Net worth",
+                        value = Money.format(state.netWorthMinor),
+                        emphasis = if (state.netWorthMinor < 0L) {
+                            StatEmphasis.NEGATIVE
+                        } else {
+                            StatEmphasis.POSITIVE
+                        },
+                        modifier = Modifier.weight(1f),
+                    )
                 }
-            }
-            item {
-                StatTile(
-                    label = "Net worth",
-                    value = Money.format(state.netWorthMinor),
-                    caption = "Everything owned less everything owed",
-                    emphasis = if (state.netWorthMinor < 0L) {
-                        StatEmphasis.NEGATIVE
-                    } else {
-                        StatEmphasis.POSITIVE
-                    },
-                )
             }
 
             state.groups.forEach { group ->
@@ -205,7 +214,6 @@ fun AccountsScreen(
                                     onImportStatement = {
                                         onImportStatement(account.account.id)
                                     },
-                                    onDuplicate = { viewModel.duplicate(account.account.id) },
                                     onArchive = {
                                         viewModel.archive(
                                             account.account.id,
@@ -370,7 +378,6 @@ private fun AccountRow(
     onClick: () -> Unit,
     onEdit: () -> Unit,
     onImportStatement: () -> Unit,
-    onDuplicate: () -> Unit,
     onArchive: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -428,10 +435,6 @@ private fun AccountRow(
             DropdownMenuItem(
                 text = { Text("Import a statement") },
                 onClick = { onImportStatement(); showMenu = false },
-            )
-            DropdownMenuItem(
-                text = { Text("Duplicate") },
-                onClick = { onDuplicate(); showMenu = false },
             )
             DropdownMenuItem(
                 text = { Text(if (account.account.isArchived) "Restore" else "Archive") },

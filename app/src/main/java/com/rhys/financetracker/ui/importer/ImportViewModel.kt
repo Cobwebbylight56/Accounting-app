@@ -100,7 +100,7 @@ class ImportViewModel @Inject constructor(
                 foundBills = emptyList(),
                 billsNote = when (result) {
                     is AppResult.Success -> "${result.data} " +
-                        (if (result.data == 1) "bill" else "bills") + " added to Bills"
+                        (if (result.data == 1) "bill" else "bills") + " added to Regular payments"
                     is AppResult.Failure -> result.message
                 },
             )

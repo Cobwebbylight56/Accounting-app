@@ -892,6 +892,17 @@ interface TransactionDao {
     )
     fun observeStatementMonths(accountId: Long): Flow<List<String>>
 
+    /** [countUnsorted], kept up to date, for the count beside Sort spending. */
+    @Query(
+        """
+        SELECT COUNT(*) FROM transactions t
+        LEFT JOIN categories c ON c.id = t.category_id
+        WHERE t.is_archived = 0 AND t.type = 'EXPENSE'
+          AND (t.category_id IS NULL OR c.name IN (:vague))
+        """,
+    )
+    fun observeUnsortedCount(vague: List<String>): Flow<Int>
+
     /** How much money out is still unfiled, or filed only under a [vague] name. */
     @Query(
         """

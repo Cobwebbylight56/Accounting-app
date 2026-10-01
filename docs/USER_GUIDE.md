@@ -13,7 +13,7 @@ Along the bottom of the screen:
 |---|---|
 | **Home** | The dashboard: what you have, what came in, what went out, what is still to pay |
 | **Money** | Every transaction, searchable and filterable |
-| **Savings** | Your savings goals and how they are getting on |
+| **Savings** | Your savings accounts and cash pot (tap one to open it), then your goals |
 | **Reports** | Printable summaries and charts |
 | **More** | Accounts, people, regular payments, categories, import, settings |
 
@@ -190,6 +190,14 @@ and the entries are all there to check.
 ### Choosing what is on the home screen
 
 **Settings → What Home shows** turns each card on or off and changes the order.
+Cards that repeat what the top of Home already shows — Left to spend, Savings,
+Spending by category, Income against spending, Accounts this month — start
+switched off; switch any back on here.
+
+Home also has a **+** button for adding a payment, a **People** card only when
+there's money with people that month, **Sort spending · N payments to file**
+only while there are some, and the cash pot only on tabs that count it (the
+Shared tab, or everybody).
 Each card is listed under the name it has on Home ("Coming up", "This month's
 payments", "Spending by category"…). The tiles and the month's figures at the
 top are always shown.
@@ -462,7 +470,7 @@ asks to be confirmed each time; a fixed one is added on its day. Either way,
 when that month's statement is imported it updates the entry rather than adding
 a second one.
 
-**Bills → Find bills** looks through every statement imported so far.
+**More → Regular payments → Find bills** looks through every statement imported so far.
 
 A payment that was **returned, refunded or unpaid** ("RETURNED DD") is never
 offered as a bill. Bills seen only once are listed but left unticked — check
@@ -750,6 +758,11 @@ so a wrong guess costs nothing.
 ---
 
 ## Backups
+
+If there's money in the app, no backup in the last two weeks and automatic
+backups are off, Home shows **Back up your money** with **Back up now**, or
+**Later** to put it off for a week. Putting the app on again? The welcome
+screen has **I have a backup — restore it**, so nothing needs setting up first.
 
 **Settings → Backup and restore**
 

@@ -117,12 +117,6 @@ fun SettingsScreen(
                 icon = Icons.Outlined.Dashboard,
                 onClick = onOpenDashboardLayout,
             )
-            SettingsItem(
-                title = "Categories",
-                subtitle = "Add, rename and colour the groups your money falls into",
-                icon = Icons.Outlined.Category,
-                onClick = onOpenCategories,
-            )
 
             SettingsGroupHeader("Privacy and reminders")
             SettingsItem(
@@ -160,12 +154,6 @@ fun SettingsScreen(
                 onClick = onOpenBackup,
             )
             SettingsItem(
-                title = "Import statements & spreadsheets",
-                subtitle = "Add a bank statement, or an Excel or CSV budget",
-                icon = Icons.Outlined.UploadFile,
-                onClick = onOpenImport,
-            )
-            SettingsItem(
                 title = "Rates and figures",
                 subtitle = if (state.settings.externalDataEnabled) {
                     "Updating automatically"
@@ -176,7 +164,9 @@ fun SettingsScreen(
                 onClick = onOpenExternalData,
             )
 
-            SettingsGroupHeader("Housekeeping")
+            // Categories and Import live under More, where they are used;
+            // these are the rarely-needed jobs, kept together and out of the way.
+            SettingsGroupHeader("Advanced")
             SettingsItem(
                 title = "Run the monthly update now",
                 subtitle = "Adds anything due and archives finished months",

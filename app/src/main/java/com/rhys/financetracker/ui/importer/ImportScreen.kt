@@ -1480,7 +1480,7 @@ private fun DoneStep(
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("Add ${state.chosenBills.size} as bills") }
                 Text(
-                    text = "They go on Bills with their next date. When the next statement " +
+                    text = "They go on Regular payments with their next date. When the next statement " +
                         "arrives it updates them rather than adding them twice.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

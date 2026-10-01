@@ -56,7 +56,7 @@ fun MoreScreen(
             SettingsGroupHeader("Set things up")
             SettingsItem(
                 title = "Accounts",
-                subtitle = "Current accounts, savings, cash, cards, loans",
+                subtitle = "Current accounts, savings, cards, loans and pay later",
                 icon = Icons.Outlined.AccountBalance,
                 onClick = onOpenAccounts,
             )

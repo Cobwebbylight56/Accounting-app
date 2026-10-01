@@ -103,6 +103,29 @@ class DashboardViewModel @Inject constructor(
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    /**
+     * True when there is money in the app, no backup in the last fortnight,
+     * no automatic backup, and the reminder has not been put off. Everything
+     * lives only on this phone; a lost phone or a reinstall loses the lot.
+     */
+    val showBackupNudge: StateFlow<Boolean> = combine(
+        settingsRepository.settings,
+        // Not [accounts]: that is declared further down and is not set yet here.
+        accountRepository.observeWithBalances(),
+    ) { s, list ->
+        val now = System.currentTimeMillis()
+        list.isNotEmpty() && !s.autoBackupEnabled &&
+            (s.lastBackupAt == null || now - s.lastBackupAt > BACKUP_NUDGE_AFTER_MS) &&
+            (s.backupNudgeSnoozedUntil == null || now > s.backupNudgeSnoozedUntil)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    /** Puts the backup reminder off for a week. */
+    fun snoozeBackupNudge() {
+        viewModelScope.launch {
+            settingsRepository.snoozeBackupNudge(System.currentTimeMillis() + BACKUP_NUDGE_SNOOZE_MS)
+        }
+    }
+
     fun markNotificationsAsked() {
         viewModelScope.launch { settingsRepository.setNotificationsAsked() }
     }
@@ -130,6 +153,15 @@ class DashboardViewModel @Inject constructor(
         viewModelScope.launch {
             // Pay rises dated for today or earlier take effect now.
             incomeRepository.applyDue()
+        }
+        viewModelScope.launch {
+            // Home used to show the same figures two or three times over.
+            // Once per install, the cards that repeat what is already at the
+            // top are switched off; any can be switched back on.
+            if (!settingsRepository.settings.first().homeTrimmed) {
+                DashboardWidget.entries.filter { it.repeatsHome }.forEach { widgetDao.setVisible(it.key, false) }
+                settingsRepository.setHomeTrimmed()
+            }
         }
         viewModelScope.launch {
             // Loans are for paying off, and once they are they go.
@@ -177,6 +209,10 @@ class DashboardViewModel @Inject constructor(
     private val monthFlow = combine(visibleMonth, scope) { month, currentScope ->
         month to currentScope
     }
+
+    /** Payments still waiting to be sorted, for the count beside Sort spending. */
+    val unsortedCount: StateFlow<Int> = payeeRepository.observeUnsortedCount()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
     /** Money sent to and from people in the month and tab on screen. */
     val peopleMoney: StateFlow<PeopleMoney?> = monthFlow.flatMapLatest { (month, currentScope) ->
@@ -641,6 +677,12 @@ class DashboardViewModel @Inject constructor(
     }
 
     private companion object {
+        /** A fortnight without a backup before Home mentions it. */
+        private const val BACKUP_NUDGE_AFTER_MS = 14L * 24 * 60 * 60 * 1000
+
+        /** "Later" puts the reminder off for a week. */
+        private const val BACKUP_NUDGE_SNOOZE_MS = 7L * 24 * 60 * 60 * 1000
+
         /** How much of the cash pot's history the card can show. */
         const val CASH_LOG_LENGTH = 50
         const val MONTHS_ON_CHART = 6
