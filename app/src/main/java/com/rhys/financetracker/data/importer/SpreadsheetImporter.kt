@@ -560,7 +560,7 @@ class SpreadsheetImporter @Inject constructor(
         // it arrived. Learning from the app's own guesses kept every old
         // mistake alive: Tesco PFS filed as Groceries once was Groceries for
         // ever after, however the rules improved.
-        val learned = transactionDao.getUserFiledDescriptions(USER_FILED_AFTER_MILLIS, LEARNED_PAYEE_LIMIT)
+        val learned = transactionDao.getUserFiledDescriptions(LEARNED_PAYEE_LIMIT)
             .associate { TransactionFingerprint.normaliseDescription(it.description) to it.categoryName }
 
         return candidates.map { candidate ->
@@ -570,7 +570,7 @@ class SpreadsheetImporter @Inject constructor(
                 type = candidate.transactionType ?: TransactionType.EXPENSE,
                 learned = learned,
             )
-            if (category == null) candidate else candidate.copy(categoryName = category)
+            if (category == null) candidate else candidate.copy(categoryName = category, categoryGuessed = true)
         }
     }
 
@@ -943,6 +943,11 @@ class SpreadsheetImporter @Inject constructor(
                 // marked as such and a later spreadsheet import cannot quietly
                 // overwrite them; see RecordSource.
                 source = candidate.source,
+                // A category written in the user's own spreadsheet is theirs,
+                // and the app never re-sorts it. One the app picked, or any on
+                // a bank statement, it may.
+                categoryByUser = categoryId != null && candidate.source == RecordSource.SPREADSHEET &&
+                    !candidate.categoryGuessed,
                 // Stamped now so the next statement covering this period
                 // recognises the row instead of adding it again.
                 importHash = TransactionFingerprint.of(
@@ -1175,12 +1180,6 @@ class SpreadsheetImporter @Inject constructor(
          * is one-off payments that will never be seen again.
          */
         const val LEARNED_PAYEE_LIMIT = 2_000
-
-        /**
-         * An entry changed this long or more after it arrived was filed by a
-         * person, not by the importer. See TransactionDao.getUserFiledDescriptions.
-         */
-        const val USER_FILED_AFTER_MILLIS = 60_000L
 
         /**
          * How far either side of the statement to look for entries it might be

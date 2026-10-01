@@ -101,7 +101,29 @@ data class TransactionEntity(
     @ColumnInfo(name = "is_archived") val isArchived: Boolean = false,
     @ColumnInfo(name = "created_at") val createdAt: Long = Instant.now().toEpochMilli(),
     @ColumnInfo(name = "updated_at") val updatedAt: Long = Instant.now().toEpochMilli(),
+    /**
+     * True when the user chose this entry's category themselves — in the
+     * editor, by filing a payee, or by typing it in. Never shown. Entries
+     * without it were filed by the app and are re-sorted whenever the app
+     * learns better; entries with it are never moved by the app.
+     */
+    @ColumnInfo(name = "category_by_user", defaultValue = "0") val categoryByUser: Boolean = false,
 ) {
+    companion object {
+        /**
+         * For entries stored before the mark existed: whether the category
+         * was most likely the user's. Typed-in and edited entries (an edit
+         * used to save as typed-in), and rows from the user's own
+         * spreadsheet, count; statement rows were filed by the app.
+         */
+        fun categoryLikelyByUser(source: RecordSource, importHash: String?, categoryId: Long?): Boolean =
+            categoryId != null && when (source) {
+                RecordSource.MANUAL, RecordSource.SPREADSHEET -> true
+                RecordSource.UNKNOWN -> importHash == null
+                RecordSource.STATEMENT -> false
+            }
+    }
+
     /**
      * The effect this transaction has on [accountId]'s balance, in minor units.
      * Income adds, expenses and outgoing transfers subtract.

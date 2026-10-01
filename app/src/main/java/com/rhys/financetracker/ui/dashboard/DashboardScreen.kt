@@ -91,6 +91,7 @@ fun DashboardScreen(
     val peopleMoney by viewModel.peopleMoney.collectAsStateWithLifecycle()
     val unsortedCount by viewModel.unsortedCount.collectAsStateWithLifecycle()
     val showBackupNudge by viewModel.showBackupNudge.collectAsStateWithLifecycle()
+    val resortNote by viewModel.resortNote.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
 
     // Reminders are on from the start, but on Android 13 and later none can
@@ -166,6 +167,29 @@ fun DashboardScreen(
                         },
                         onCustomise = onOpenDashboardSettings,
                     )
+                }
+
+                resortNote?.let { note ->
+                    item {
+                        SectionCard(title = "Payments re-sorted") {
+                            Text(
+                                text = "The app now knows more shops, so it moved ${note.moved} " +
+                                    (if (note.moved == 1) "payment" else "payments") +
+                                    " it had filed itself into the right category" +
+                                    (if (note.examples.isEmpty()) "." else ": " + note.examples.joinToString(", ")) +
+                                    (if (note.examples.isNotEmpty() && note.moved > note.examples.size) " and others." else ".") +
+                                    " Anything you filed yourself was left alone.",
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Spacer(Modifier.height(10.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(onClick = viewModel::dismissResortNote, modifier = Modifier.weight(1f)) {
+                                    Text("OK")
+                                }
+                                TextButton(onClick = viewModel::undoResort) { Text("Put them back") }
+                            }
+                        }
+                    }
                 }
 
                 if (showBackupNudge) {

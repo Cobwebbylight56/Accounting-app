@@ -156,8 +156,8 @@ payment and every other payment to the same payee moves with it — the edit
 screen says how many before you save ("the other 14 move too"). The bank's
 branch and reference numbers don't matter: "TESCO PFS 3012" and "TESCO PFS
 4471" are the same payee. New statements file that payee the same way, and
-your choice always beats the app's own list of shops — Sort everything and
-"Categories to check" never move it back. Payments with no payee name at all
+your choice always beats the app's own list of shops — the app never moves
+it back. Payments with no payee name at all
 ("Contactless payment" on its own) are left alone, as they could be anything.
 
 The three-dot menu on any row offers:
@@ -591,13 +591,15 @@ how many payments it couldn't place, with **Sort the rest** to file those by
 payee. Run it again any time — after importing old statements, or after
 teaching it a few payees.
 
-**Categories to check.** Underneath, the app lists payees whose category their
-own name disagrees with — "Tesco PFS" or "Tesco Pay at Pump" under Groceries
-(that's fuel), "Asda Living" or "George" under Groceries (that's shopping), a
-model shop under Shopping (that's Hobbies). Each line says where it is, where it
-should go, how many payments and how much. Untick any that are right as they
-are, then **Move**: the ticked ones move, and the unticked ones are remembered
-and not suggested again.
+**It happens by itself, too.** The app quietly remembers every payment whose
+category **you** set — by editing it, filing a payee in Sort spending or on the
+People page, typing it in, or in your own spreadsheet. You never see this
+mark, but the app never moves those payments. Everything else it filed by
+itself is re-sorted automatically: when an update teaches it more shops, the
+first time you open the app afterwards, and whenever you run Sort everything.
+Home then shows **Payments re-sorted**, saying how many moved and the biggest
+moves ("Tesco Pfs → Fuel"). **OK** clears the note; **Put them back** returns
+them to where they were and leaves them there for good.
 
 How the app reads shop names, so you know what to expect:
 
@@ -612,7 +614,7 @@ How the app reads shop names, so you know what to expect:
 * A bare "contactless payment" with no shop name no longer decides where every
   other card payment goes, and the app only learns from payments **you** have
   filed, never from its own guesses.
-* Payees you've filed yourself are never listed here — your choice stands.
+* Payees you've filed yourself are never moved — your choice stands.
 
 ### Where each row goes
 

@@ -65,8 +65,10 @@ class SettingsRepository @Inject constructor(
         val NOTIFICATIONS_ASKED = booleanPreferencesKey("notifications_asked")
         val HOME_TRIMMED = booleanPreferencesKey("home_trimmed")
         val CARD_VIEWS = stringPreferencesKey("card_views")
-        val CATEGORY_FIXES_KEPT = stringSetPreferencesKey("category_fixes_kept")
         val CATEGORY_PAYEES_CHOSEN = stringSetPreferencesKey("category_payees_chosen")
+        val RESORTED_RULES_VERSION = intPreferencesKey("resorted_rules_version")
+        val LAST_RESORT_SUMMARY = stringPreferencesKey("last_resort_summary")
+        val LAST_RESORT_UNDO = stringPreferencesKey("last_resort_undo")
         val BACKUP_NUDGE_SNOOZED_UNTIL = longPreferencesKey("backup_nudge_snoozed_until")
     }
 
@@ -133,8 +135,10 @@ class SettingsRepository @Inject constructor(
             payeesNotPeople = prefs[Keys.PAYEES_HIDDEN].orEmpty(),
             notificationsAsked = prefs[Keys.NOTIFICATIONS_ASKED] ?: false,
             homeTrimmed = prefs[Keys.HOME_TRIMMED] ?: false,
-            categoryFixesKept = prefs[Keys.CATEGORY_FIXES_KEPT].orEmpty(),
             categoryPayeesChosen = prefs[Keys.CATEGORY_PAYEES_CHOSEN].orEmpty(),
+            resortedRulesVersion = prefs[Keys.RESORTED_RULES_VERSION] ?: 0,
+            lastResortSummary = prefs[Keys.LAST_RESORT_SUMMARY].orEmpty(),
+            lastResortUndo = prefs[Keys.LAST_RESORT_UNDO].orEmpty(),
             cardViews = prefs[Keys.CARD_VIEWS].orEmpty().split(';')
                 .mapNotNull { pair -> pair.split('=').takeIf { it.size == 2 }?.let { it[0] to it[1] } }
                 .toMap(),
@@ -178,22 +182,30 @@ class SettingsRepository @Inject constructor(
     suspend fun setSharedPeople(ids: Set<Long>) =
         put(Keys.SHARED_PEOPLE, ids.sorted().joinToString(","))
 
-    /** Suggested category moves the user chose to leave as they are; never suggested again. */
-    suspend fun keepCategories(keys: Set<String>) {
-        context.dataStore.edit { prefs ->
-            prefs[Keys.CATEGORY_FIXES_KEPT] = prefs[Keys.CATEGORY_FIXES_KEPT].orEmpty() + keys
-        }
+    /** Forgets the 1.34 list of payees the user filed, once it has been turned into marks. */
+    suspend fun clearCategoryPayeesChosen() {
+        context.dataStore.edit { it.remove(Keys.CATEGORY_PAYEES_CHOSEN) }
     }
 
     /**
-     * Payees the user has put in a category themselves, by lowercase payee
-     * name. Their choice outranks the app's list of shops from then on.
+     * Records a re-sort: which rules it used, and — when it moved anything —
+     * what to say on Home and how to put it back.
      */
-    suspend fun rememberCategoryChosen(payees: Set<String>) {
-        val keys = payees.map { it.trim().lowercase() }.filter { it.isNotEmpty() }.toSet()
-        if (keys.isEmpty()) return
+    suspend fun setResorted(rulesVersion: Int, summary: String, undo: String) {
         context.dataStore.edit { prefs ->
-            prefs[Keys.CATEGORY_PAYEES_CHOSEN] = prefs[Keys.CATEGORY_PAYEES_CHOSEN].orEmpty() + keys
+            prefs[Keys.RESORTED_RULES_VERSION] = rulesVersion
+            if (summary.isNotEmpty()) {
+                prefs[Keys.LAST_RESORT_SUMMARY] = summary
+                prefs[Keys.LAST_RESORT_UNDO] = undo
+            }
+        }
+    }
+
+    /** Takes the re-sort note off Home. */
+    suspend fun clearResortNote() {
+        context.dataStore.edit { prefs ->
+            prefs.remove(Keys.LAST_RESORT_SUMMARY)
+            prefs.remove(Keys.LAST_RESORT_UNDO)
         }
     }
 
@@ -278,10 +290,17 @@ data class AppSettings(
     val notificationsAsked: Boolean = false,
     /** True once Home's repeated cards have been switched off for this install. */
     val homeTrimmed: Boolean = false,
-    /** "payee|from|to" moves the user said to leave alone. */
-    val categoryFixesKept: Set<String> = emptySet(),
-    /** Payees, lowercase, whose category the user picked themselves. */
+    /**
+     * Payees, lowercase, the user filed in 1.34, before entries carried a
+     * mark of their own. Turned into marks on the first re-sort, then cleared.
+     */
     val categoryPayeesChosen: Set<String> = emptySet(),
+    /** The MerchantCategoriser.RULES_VERSION everything was last re-sorted by. */
+    val resortedRulesVersion: Int = 0,
+    /** What the last automatic re-sort moved, for Home; see TidyUpRepository.ResortNote. */
+    val lastResortSummary: String = "",
+    /** "id:categoryId" pairs to put the last re-sort back. */
+    val lastResortUndo: String = "",
     /** How each card is drawn, by card key; see setCardView. */
     val cardViews: Map<String, String> = emptyMap(),
     /** The backup reminder stays hidden until then (epoch millis). */

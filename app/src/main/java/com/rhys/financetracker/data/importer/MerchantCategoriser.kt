@@ -23,6 +23,13 @@ import com.rhys.financetracker.domain.model.TransactionType
 object MerchantCategoriser {
 
     /**
+     * Raise by one whenever the rules below change. On the next start the
+     * app re-sorts everything it filed by itself — never anything the user
+     * filed — so old payments follow the improved rules too.
+     */
+    const val RULES_VERSION = 1
+
+    /**
      * The category for [description], or null when nothing matches.
      *
      * @param learned merchant to category, from transactions already filed.

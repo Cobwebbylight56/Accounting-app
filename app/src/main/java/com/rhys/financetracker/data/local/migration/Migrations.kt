@@ -382,8 +382,34 @@ object Migrations {
         )
     }
 
+    /**
+     * 9 → 10: a hidden mark on each entry whose category the user chose, so
+     * the app can re-sort everything else without undoing their choices.
+     *
+     * Entries already stored get it where the category was most likely
+     * theirs — see TransactionEntity.categoryLikelyByUser, which the backup
+     * restore uses too. The column is only added when missing, so a database
+     * rebuilt from the current schema in a test migrates too.
+     */
+    val MIGRATION_9_10 = Migration(9, 10) { db ->
+        val hasColumn = db.query("PRAGMA table_info(`transactions`)").use { cursor ->
+            val name = cursor.getColumnIndex("name")
+            generateSequence { if (cursor.moveToNext()) cursor.getString(name) else null }
+                .any { it == "category_by_user" }
+        }
+        if (!hasColumn) {
+            db.execSQL(
+                "ALTER TABLE `transactions` ADD COLUMN `category_by_user` INTEGER NOT NULL DEFAULT 0",
+            )
+        }
+        db.execSQL(
+            "UPDATE `transactions` SET `category_by_user` = 1 WHERE `category_id` IS NOT NULL AND (" +
+                "`source` IN ('MANUAL', 'SPREADSHEET') OR (`source` = 'UNKNOWN' AND `import_hash` IS NULL))",
+        )
+    }
+
     val ALL: Array<Migration> = arrayOf(
         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
-        MIGRATION_7_8, MIGRATION_8_9,
+        MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10,
     )
 }

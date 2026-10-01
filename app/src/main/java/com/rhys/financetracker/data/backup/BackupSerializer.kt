@@ -264,6 +264,7 @@ class BackupSerializer @Inject constructor() {
         put("isArchived", transaction.isArchived)
         put("createdAt", transaction.createdAt)
         put("updatedAt", transaction.updatedAt)
+        put("categoryByUser", transaction.categoryByUser)
     }
 
     fun transactionFromJson(json: JSONObject): TransactionEntity = TransactionEntity(
@@ -290,6 +291,17 @@ class BackupSerializer @Inject constructor() {
         isArchived = json.optBoolean("isArchived", false),
         createdAt = json.optLong("createdAt", System.currentTimeMillis()),
         updatedAt = json.optLong("updatedAt", System.currentTimeMillis()),
+        // A backup from before the mark existed gets the same best guess the
+        // database upgrade made.
+        categoryByUser = if (json.has("categoryByUser")) {
+            json.optBoolean("categoryByUser", false)
+        } else {
+            TransactionEntity.categoryLikelyByUser(
+                source = json.optEnum("source", RecordSource.UNKNOWN) { RecordSource.valueOf(it) },
+                importHash = json.optStringOrNull("importHash"),
+                categoryId = json.optLongOrNull("categoryId"),
+            )
+        },
     )
 
     // ------------------------------------------------------------ recurring

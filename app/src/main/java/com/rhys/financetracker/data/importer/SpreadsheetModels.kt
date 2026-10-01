@@ -162,6 +162,8 @@ data class ImportCandidate(
      * so and should not claim the bank's authority on a guess.
      */
     val source: RecordSource = RecordSource.SPREADSHEET,
+    /** True when the app picked [categoryName]; false when the sheet itself named it. */
+    val categoryGuessed: Boolean = false,
     /**
      * Set when this row is the bank's version of something already recorded by
      * hand or from a spreadsheet, and will correct it rather than be added

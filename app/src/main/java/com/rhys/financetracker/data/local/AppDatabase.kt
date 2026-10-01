@@ -79,7 +79,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun importBatchDao(): com.rhys.financetracker.data.local.dao.ImportBatchDao
 
     companion object {
-        const val DATABASE_VERSION = 9
+        const val DATABASE_VERSION = 10
         const val DATABASE_NAME = "finance_tracker.db"
     }
 }

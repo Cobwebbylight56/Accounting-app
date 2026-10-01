@@ -4,6 +4,7 @@ import com.rhys.financetracker.core.time.DateUtils
 import com.rhys.financetracker.data.importer.MerchantCategoriser
 import com.rhys.financetracker.data.importer.OwnAccountMatcher
 import com.rhys.financetracker.data.importer.PayeeNames
+import com.rhys.financetracker.data.importer.Refiling
 import com.rhys.financetracker.data.importer.SpreadsheetImporter
 import com.rhys.financetracker.data.importer.TransactionFingerprint
 import com.rhys.financetracker.data.local.dao.AccountDao
@@ -20,16 +21,20 @@ import javax.inject.Singleton
 import kotlin.math.abs
 import kotlinx.coroutines.flow.first
 
-/** A payee whose payments look to be in the wrong category. */
-data class CategoryFix(
-    val payee: String,
-    val fromCategory: String,
-    val toCategory: String,
-    val ids: List<Long>,
-    val totalMinor: Long,
-) {
-    /** What is remembered when the user says to leave it. */
-    val key: String get() = "${payee.lowercase()}|${fromCategory.lowercase()}|${toCategory.lowercase()}"
+/**
+ * What an automatic re-sort moved, for the note on Home: how many payments,
+ * and the biggest moves as "Tesco Pfs → Fuel".
+ */
+data class ResortNote(val moved: Int, val examples: List<String>) {
+    fun encode(): String = (listOf(moved.toString()) + examples).joinToString("\n")
+
+    companion object {
+        fun decode(text: String): ResortNote? {
+            val lines = text.split('\n')
+            val moved = lines.firstOrNull()?.toIntOrNull() ?: return null
+            return if (moved > 0) ResortNote(moved, lines.drop(1).filter { it.isNotBlank() }) else null
+        }
+    }
 }
 
 /** What one run of [TidyUpRepository.sortEverything] changed. */
@@ -42,7 +47,7 @@ data class TidyUpResult(
     val linkedToAccounts: Int = 0,
     /** Entries given a category. */
     val categorised: Int = 0,
-    /** Entries moved to follow how the user filed the same payee. */
+    /** Entries the app had filed moved to a better category. */
     val refiled: Int = 0,
     /** Regular payments set up as bills. */
     val billsAdded: List<String> = emptyList(),
@@ -74,15 +79,14 @@ data class TidyUpResult(
  *    account's own statement already has the same movement.
  * 4. Unfiled payments, and ones filed only as "Card spending", are given a
  *    category from what has been filed before, then the built-in shop list.
- * 5. Entries a statement filed by itself follow the user's own filing of the
- *    same payee: move one Sainsbury's fuel stop to Fuel, and every other
- *    one the importer called Groceries follows.
+ * 5. Everything the app filed by itself is re-sorted: to where the user
+ *    filed the same payee, or else by the built-in list. See [resort].
  * 6. Regular payments seen at least twice and still being paid are set up
  *    as bills.
  * 7. Paid-off loans are put away.
  *
- * Nothing the user chose is overridden: only entries with no category, a
- * vague one, or one the importer picked and nobody has touched since.
+ * Nothing the user chose is overridden: entries whose category they set
+ * carry a hidden mark (TransactionEntity.categoryByUser) and are never moved.
  */
 @Singleton
 class TidyUpRepository @Inject constructor(
@@ -109,7 +113,7 @@ class TidyUpRepository @Inject constructor(
         }
 
         val categorised = categoriseUnsorted()
-        val refiled = followUserFiling()
+        val refiled = resort(remember = false)
         val bills = addStillPaidBills()
 
         val cleared = accountRepository.archivePaidOffLoans(
@@ -197,9 +201,7 @@ class TidyUpRepository @Inject constructor(
     private suspend fun categoriseUnsorted(): Int {
         val rows = transactionDao.getUnsortedEntries(VAGUE)
         if (rows.isEmpty()) return 0
-        val learned = transactionDao.getUserFiledDescriptions(UNTOUCHED_MILLIS, SpreadsheetImporter.LEARNED_PAYEE_LIMIT)
-            .filterNot { it.categoryName in VAGUE }
-            .associate { TransactionFingerprint.normaliseDescription(it.description) to it.categoryName }
+        val learned = learnedFromUser()
         val vagueIds = VAGUE.mapNotNull { categoryDao.getByName(it)?.id }.toSet()
 
         val byCategory = mutableMapOf<Long, MutableList<Long>>()
@@ -217,40 +219,86 @@ class TidyUpRepository @Inject constructor(
         return byCategory.values.sumOf { it.size }
     }
 
-    /**
-     * Moves entries the importer filed by itself to where the user filed the
-     * same payee. Only the user's own filings count as the answer — the
-     * built-in list never overrules a category that is already there.
-     */
-    private suspend fun followUserFiling(): Int {
-        val learned = transactionDao.getUserFiledDescriptions(UNTOUCHED_MILLIS, SpreadsheetImporter.LEARNED_PAYEE_LIMIT)
+    /** What the user filed each payee under, by normalised description. */
+    private suspend fun learnedFromUser(): Map<String, String> =
+        transactionDao.getUserFiledDescriptions(SpreadsheetImporter.LEARNED_PAYEE_LIMIT)
             .filterNot { it.categoryName in VAGUE }
             .associate { TransactionFingerprint.normaliseDescription(it.description) to it.categoryName }
-        if (learned.isEmpty()) return 0
-        val names = categoryDao.getAll().associate { it.id to it.name }
+
+    /**
+     * Re-sorts everything the app filed by itself — never an entry with the
+     * hidden "set by user" mark. Each goes where the user filed that payee,
+     * or else where the built-in list says. Returns how many moved; with
+     * [remember], Home is told what moved and can put it back.
+     */
+    suspend fun resort(remember: Boolean = true): Int {
+        // Payees filed in 1.34, before entries carried the mark: mark them now.
         val chosen = settingsRepository.settings.first().categoryPayeesChosen
-        val byCategory = mutableMapOf<Long, MutableList<Long>>()
-        transactionDao.getAutoFiled(UNTOUCHED_MILLIS).forEach { row ->
-            // A payee the user has put in a category themselves goes where
-            // they said, whatever the built-in list thinks. Otherwise only
-            // shops the list does not know follow older filings: where it
-            // does, the list is right, and following a filing made before it
-            // knew better would undo the fix.
-            val userChose = PayeeNames.of(row.description).lowercase() in chosen
-            val known = MerchantCategoriser.categoryFor(row.description, row.type)
-            if (!userChose && known != null && known !in VAGUE && known !in WEAK) return@forEach
-            val decided = MerchantCategoriser.learnedCategory(row.description, learned) ?: return@forEach
-            if (decided.equals(names[row.categoryId], ignoreCase = true)) return@forEach
-            val id = categoryIdFor(decided, row.type) ?: return@forEach
+        val rows = transactionDao.getAppFiled()
+        if (chosen.isNotEmpty()) {
+            val theirs = rows.filter { PayeeNames.of(it.description).lowercase() in chosen }.map { it.id }
+            theirs.chunked(BATCH).forEach { transactionDao.markCategoryByUser(it) }
+            settingsRepository.clearCategoryPayeesChosen()
+        }
+
+        val learned = learnedFromUser()
+        val names = categoryDao.getAll().associate { it.id to it.name }
+        val moves = mutableListOf<Move>()
+        rows.forEach { row ->
+            if (PayeeNames.of(row.description).lowercase() in chosen) return@forEach
+            val current = names[row.categoryId]
+            val better = Refiling.better(row.description, row.type, current, learned) ?: return@forEach
+            val id = categoryIdFor(better, row.type) ?: return@forEach
             if (id == row.categoryId) return@forEach
-            byCategory.getOrPut(id) { mutableListOf() }.add(row.id)
+            moves += Move(row, id, better)
         }
         val now = Instant.now().toEpochMilli()
-        byCategory.forEach { (categoryId, ids) ->
-            ids.chunked(BATCH).forEach { transactionDao.setCategory(it, categoryId, now) }
+        moves.groupBy { it.toId }.forEach { (categoryId, group) ->
+            group.map { it.row.id }.chunked(BATCH).forEach { transactionDao.setCategory(it, categoryId, now) }
         }
-        return byCategory.values.sumOf { it.size }
+        if (remember) {
+            val examples = moves
+                .groupBy { "${PayeeNames.of(it.row.description).ifBlank { it.row.description.trim() }} → ${it.to}" }
+                .entries.sortedByDescending { (_, group) -> group.sumOf { it.row.amountMinor } }
+                .take(NOTE_EXAMPLES)
+                .map { it.key }
+            settingsRepository.setResorted(
+                rulesVersion = MerchantCategoriser.RULES_VERSION,
+                summary = if (moves.isEmpty()) "" else ResortNote(moves.size, examples).encode(),
+                undo = moves.joinToString(",") { "${it.row.id}:${it.row.categoryId}" },
+            )
+        }
+        return moves.size
     }
+
+    /**
+     * Re-sorts once whenever the app's list of shops has changed since the
+     * last time — on the first start after an update. Cheap to call on every
+     * start: it does nothing until the rules change.
+     */
+    suspend fun resortIfRulesChanged() {
+        if (settingsRepository.settings.first().resortedRulesVersion >= MerchantCategoriser.RULES_VERSION) return
+        categoriseUnsorted()
+        resort(remember = true)
+    }
+
+    /**
+     * Puts back what the last automatic re-sort moved, and marks those
+     * entries as the user's, so they are not moved again.
+     */
+    suspend fun undoLastResort() {
+        val undo = settingsRepository.settings.first().lastResortUndo
+        undo.split(',').forEach { pair ->
+            val (id, categoryId) = pair.split(':').takeIf { it.size == 2 } ?: return@forEach
+            // A category deleted since cannot be gone back to; that one stays.
+            runCatching {
+                transactionDao.restoreCategory(id.toLongOrNull() ?: return@forEach, categoryId.toLongOrNull())
+            }
+        }
+        settingsRepository.clearResortNote()
+    }
+
+    private class Move(val row: TransactionEntity, val toId: Long, val to: String)
 
     /**
      * Sets up as bills the regular payments seen at least twice that are
@@ -267,58 +315,6 @@ class TidyUpRepository @Inject constructor(
         return if (billFinder.addAsBills(bills).isSuccess) bills.map { it.name } else emptyList()
     }
 
-    /**
-     * Payments whose category the shop's own name disagrees with — Tesco PFS
-     * under Groceries, Asda Living under Groceries — grouped by payee, for the
-     * user to look over and move. Only shops the built-in list is sure of are
-     * suggested; ones the user said to leave are not suggested again.
-     */
-    suspend fun suggestCategoryFixes(): List<CategoryFix> {
-        val settings = settingsRepository.settings.first()
-        val kept = settings.categoryFixesKept
-        return transactionDao.categorisedSpending()
-            .mapNotNull { row ->
-                val payee = PayeeNames.of(row.description)
-                // Never second-guess a payee the user filed themselves.
-                if (payee.isBlank() || payee.lowercase() in settings.categoryPayeesChosen) return@mapNotNull null
-                val suggested = MerchantCategoriser.categoryFor(row.description) ?: return@mapNotNull null
-                val current = row.categoryName ?: return@mapNotNull null
-                if (suggested in VAGUE || suggested in WEAK || suggested.equals(current, ignoreCase = true)) {
-                    return@mapNotNull null
-                }
-                Triple(payee, current, suggested) to row
-            }
-            .groupBy({ it.first }, { it.second })
-            .map { (key, rows) ->
-                CategoryFix(
-                    payee = key.first,
-                    fromCategory = key.second,
-                    toCategory = key.third,
-                    ids = rows.map { it.id },
-                    totalMinor = rows.sumOf { it.amountMinor },
-                )
-            }
-            .filterNot { it.key in kept }
-            .sortedByDescending { it.totalMinor }
-    }
-
-    /** Moves each of [fixes] to its suggested category. Returns how many payments moved. */
-    suspend fun applyCategoryFixes(fixes: List<CategoryFix>): Int {
-        val now = Instant.now().toEpochMilli()
-        var moved = 0
-        fixes.forEach { fix ->
-            val id = categoryIdFor(fix.toCategory, TransactionType.EXPENSE) ?: return@forEach
-            fix.ids.chunked(BATCH).forEach { transactionDao.setCategory(it, id, now) }
-            moved += fix.ids.size
-        }
-        return moved
-    }
-
-    /** Remembers that [fixes] are right as they are, so they are not suggested again. */
-    suspend fun keepAsTheyAre(fixes: List<CategoryFix>) {
-        settingsRepository.keepCategories(fixes.map { it.key }.toSet())
-    }
-
     /** The category called [name], preferring the savings and cash kinds, as the importer does. */
     private suspend fun categoryIdFor(name: String, type: TransactionType): Long? {
         for (kind in listOf(CategoryKind.SAVING, CategoryKind.CASH)) {
@@ -331,7 +327,7 @@ class TidyUpRepository @Inject constructor(
 
     companion object {
         /** Categories that say only that a card was used. */
-        val VAGUE = listOf("Card spending")
+        val VAGUE = Refiling.VAGUE
 
         /**
          * Categories a move between own accounts is often filed under by
@@ -342,14 +338,8 @@ class TidyUpRepository @Inject constructor(
 
         private const val BATCH = 400
 
-        /** Categories too loose to correct anything with: a transfer could be anything. */
-        val WEAK = listOf("Transfers & payments", "People & services")
-
-        /**
-         * An entry changed less than this long after it was added was filed
-         * by the importer, not by a person.
-         */
-        private const val UNTOUCHED_MILLIS = 60_000L
+        /** How many of the biggest moves Home names. */
+        private const val NOTE_EXAMPLES = 3
 
         /** How overdue a regular payment can be before it counts as stopped. */
         private const val STOPPED_AFTER_DAYS = 10L

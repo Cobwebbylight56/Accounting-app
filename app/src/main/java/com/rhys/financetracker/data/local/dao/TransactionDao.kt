@@ -772,9 +772,31 @@ interface TransactionDao {
         personIds: List<Long>,
     ): Flow<List<PayeeEntry>>
 
-    /** Files several entries under one category at once. */
+    /** Files several entries under one category at once, as the app's own choice. */
     @Query("UPDATE transactions SET category_id = :categoryId, updated_at = :updatedAt WHERE id IN (:ids)")
     suspend fun setCategory(ids: List<Long>, categoryId: Long, updatedAt: Long)
+
+    /** Files several entries under one category at once, as the user's choice. */
+    @Query(
+        "UPDATE transactions SET category_id = :categoryId, category_by_user = 1, " +
+            "updated_at = :updatedAt WHERE id IN (:ids)",
+    )
+    suspend fun setCategoryByUser(ids: List<Long>, categoryId: Long, updatedAt: Long)
+
+    /** Marks entries' categories as the user's, without changing them. */
+    @Query("UPDATE transactions SET category_by_user = 1 WHERE id IN (:ids)")
+    suspend fun markCategoryByUser(ids: List<Long>)
+
+    /**
+     * Puts an entry back in the category the app moved it from, as the
+     * user's choice so it is not moved again; see TidyUpRepository.undoLastResort.
+     * Left alone if the user has filed it since.
+     */
+    @Query(
+        "UPDATE transactions SET category_id = :categoryId, category_by_user = 1 " +
+            "WHERE id = :id AND category_by_user = 0",
+    )
+    suspend fun restoreCategory(id: Long, categoryId: Long?)
 
     /** Recent transfers into or out of [accountId], newest first; see OwnAccountMatcher. */
     @Query(
@@ -842,38 +864,36 @@ interface TransactionDao {
     suspend fun getUnsortedEntries(vague: List<String>): List<TransactionEntity>
 
     /**
-     * Entries a statement or spreadsheet filed by itself and nobody has
-     * changed since: updated within [marginMillis] of being added.
+     * Payments in and out the app filed by itself, in an ordinary category —
+     * not ones the user filed, not bills set up by hand, not savings or
+     * moves between accounts. These are re-sorted when the app knows better.
      */
     @Query(
         """
         SELECT t.* FROM transactions t
         JOIN categories c ON c.id = t.category_id
         WHERE t.is_archived = 0 AND t.type IN ('INCOME', 'EXPENSE')
-          AND t.source IN ('STATEMENT', 'SPREADSHEET')
+          AND t.category_by_user = 0
+          AND t.transfer_account_id IS NULL AND t.recurring_rule_id IS NULL
           AND c.kind IN ('INCOME', 'EXPENSE')
-          AND (t.updated_at - t.created_at) < :marginMillis
         """,
     )
-    suspend fun getAutoFiled(marginMillis: Long): List<TransactionEntity>
+    suspend fun getAppFiled(): List<TransactionEntity>
 
-    /**
-     * Payees the user filed themselves — typed in, or changed after they
-     * arrived — commonest first.
-     */
+    /** Payees the user filed themselves, commonest first. */
     @Query(
         """
         SELECT t.description AS description, c.name AS category_name
         FROM transactions t
         JOIN categories c ON c.id = t.category_id
         WHERE t.is_archived = 0 AND t.description != '' AND c.kind IN ('INCOME', 'EXPENSE')
-          AND (t.source = 'MANUAL' OR (t.updated_at - t.created_at) >= :marginMillis)
+          AND t.category_by_user = 1
         GROUP BY t.description, c.name
         ORDER BY COUNT(*) DESC
         LIMIT :limit
         """,
     )
-    suspend fun getUserFiledDescriptions(marginMillis: Long, limit: Int): List<DescriptionCategory>
+    suspend fun getUserFiledDescriptions(limit: Int): List<DescriptionCategory>
 
     @Query("SELECT COUNT(*) FROM transactions WHERE is_archived = 0")
     suspend fun countActive(): Int
@@ -915,18 +935,6 @@ interface TransactionDao {
         """,
     )
     suspend fun entriesOfType(type: String): List<PayeeEntry>
-
-    /** Every payment out that has a spending category, with that category's name. */
-    @Query(
-        """
-        SELECT t.id AS id, t.description AS description, t.amount_minor AS amount_minor,
-               t.date AS date, c.name AS category_name
-        FROM transactions t
-        JOIN categories c ON c.id = t.category_id
-        WHERE t.is_archived = 0 AND t.type = 'EXPENSE' AND c.kind = 'EXPENSE'
-        """,
-    )
-    suspend fun categorisedSpending(): List<PayeeEntry>
 
     /** How much money out is still unfiled, or filed only under a [vague] name. */
     @Query(

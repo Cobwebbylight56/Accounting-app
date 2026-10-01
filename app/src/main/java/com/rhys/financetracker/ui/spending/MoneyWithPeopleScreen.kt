@@ -128,7 +128,7 @@ class SentToPeopleViewModel @Inject constructor(
 
     fun file(name: String, entries: List<PayeeEntry>, category: CategoryEntity) {
         viewModelScope.launch {
-            payeeRepository.file(entries.map { it.id }, category.id, listOf(name))
+            payeeRepository.file(entries.map { it.id }, category.id)
             message.value = "$name: ${entries.size} " +
                 (if (entries.size == 1) "entry" else "entries") + " filed under ${category.name}."
         }

@@ -132,6 +132,7 @@ class IncomeRepository @Inject constructor(
                 categoryId = overtime.id,
                 personId = personId,
                 source = RecordSource.MANUAL,
+                categoryByUser = true,
             ),
         )
     }

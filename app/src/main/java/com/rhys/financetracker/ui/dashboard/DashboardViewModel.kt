@@ -83,6 +83,7 @@ class DashboardViewModel @Inject constructor(
     private val incomeRepository: IncomeRepository,
     private val settingsRepository: SettingsRepository,
     private val payeeRepository: PayeeRepository,
+    private val tidyUp: com.rhys.financetracker.data.repository.TidyUpRepository,
 ) : ViewModel() {
 
     /** Which tab is picked; null until somebody picks, meaning the first person. */
@@ -118,6 +119,20 @@ class DashboardViewModel @Inject constructor(
             (s.lastBackupAt == null || now - s.lastBackupAt > BACKUP_NUDGE_AFTER_MS) &&
             (s.backupNudgeSnoozedUntil == null || now > s.backupNudgeSnoozedUntil)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    /** What the app re-sorted by itself after an update, until it is seen. */
+    val resortNote: StateFlow<com.rhys.financetracker.data.repository.ResortNote?> = settingsRepository.settings
+        .map { com.rhys.financetracker.data.repository.ResortNote.decode(it.lastResortSummary) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    fun dismissResortNote() {
+        viewModelScope.launch { settingsRepository.clearResortNote() }
+    }
+
+    /** Puts every payment the re-sort moved back where it was. */
+    fun undoResort() {
+        viewModelScope.launch { tidyUp.undoLastResort() }
+    }
 
     /** Puts the backup reminder off for a week. */
     fun snoozeBackupNudge() {

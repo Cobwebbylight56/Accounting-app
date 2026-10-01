@@ -60,6 +60,9 @@ class TransactionEditViewModel @Inject constructor(
     /** The category it had when opened, and how many other payments share its payee. */
     private val original = MutableStateFlow(Original())
 
+    /** The entry as stored, so saving keeps what the form does not show. */
+    private var loaded: TransactionEntity? = null
+
     val state: StateFlow<TransactionEditState> = combine(
         form,
         accountRepository.observeActiveOptions(),
@@ -117,6 +120,7 @@ class TransactionEditViewModel @Inject constructor(
             message.value = "That transaction no longer exists"
             return
         }
+        loaded = existing
         form.value = TransactionForm(
             description = existing.description,
             amountText = Money.formatPlain(existing.amountMinor),
@@ -177,7 +181,9 @@ class TransactionEditViewModel @Inject constructor(
                 return@launch
             }
 
-            val entity = TransactionEntity(
+            val before = loaded
+            val categoryChanged = current.categoryId != before?.categoryId
+            val fresh = TransactionEntity(
                 id = if (transactionId == Routes.NEW_ID) 0L else transactionId,
                 amountMinor = Money.parseOrNull(current.amountText) ?: 0L,
                 type = current.type,
@@ -192,7 +198,24 @@ class TransactionEditViewModel @Inject constructor(
                 tags = current.tags.trim().takeIf { it.isNotEmpty() },
                 isCleared = current.isCleared,
                 isConfirmed = true,
+                // The hidden mark: the user picked this category, so the app
+                // never re-sorts it. Saving without touching the category
+                // keeps whatever mark it had.
+                categoryByUser = current.categoryId != null &&
+                    (before == null || categoryChanged || before.categoryByUser),
             )
+            // An edit is still the same entry: where it came from, its
+            // fingerprint and its bill stay, or a re-import would add the
+            // statement row again beside it and the bill would lose it.
+            val entity = before?.let { old ->
+                fresh.copy(
+                    recurringRuleId = old.recurringRuleId,
+                    importHash = old.importHash,
+                    source = old.source,
+                    isArchived = old.isArchived,
+                    createdAt = old.createdAt,
+                )
+            } ?: fresh
 
             when (val result = transactionRepository.save(entity)) {
                 is AppResult.Success -> {

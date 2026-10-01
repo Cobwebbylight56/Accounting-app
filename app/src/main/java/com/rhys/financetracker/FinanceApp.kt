@@ -5,6 +5,7 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.work.Configuration
 import com.rhys.financetracker.data.repository.SeedRepository
+import com.rhys.financetracker.data.repository.TidyUpRepository
 import com.rhys.financetracker.di.ApplicationScope
 import com.rhys.financetracker.domain.rollover.MonthlyRolloverEngine
 import com.rhys.financetracker.notify.NotificationChannels
@@ -23,7 +24,9 @@ import kotlinx.coroutines.launch
  *  * seeds the database if it is empty;
  *  * runs the monthly rollover, which also generates any recurring
  *    transactions that fell due while the app was closed;
- *  * makes sure the background workers are scheduled.
+ *  * makes sure the background workers are scheduled;
+ *  * after an update that improved the list of shops, re-sorts every
+ *    payment the app filed by itself (never one the user filed).
  *
  * All of that happens off the main thread in [applicationScope], so a slow
  * first start never blocks the UI.
@@ -36,6 +39,7 @@ class FinanceApp : Application(), Configuration.Provider {
     @Inject lateinit var rolloverEngine: MonthlyRolloverEngine
     @Inject lateinit var workScheduler: WorkScheduler
     @Inject lateinit var appLockManager: AppLockManager
+    @Inject lateinit var tidyUp: TidyUpRepository
 
     @Inject
     @ApplicationScope
@@ -63,6 +67,8 @@ class FinanceApp : Application(), Configuration.Provider {
             // Catch up on anything that fell due while the app was closed.
             rolloverEngine.runRollover()
             workScheduler.scheduleAll()
+            // Never allowed to stop the app starting; it tries again next time.
+            runCatching { tidyUp.resortIfRulesChanged() }
         }
     }
 }

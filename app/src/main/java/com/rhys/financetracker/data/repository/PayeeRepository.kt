@@ -104,15 +104,14 @@ class PayeeRepository @Inject constructor(
     }
 
     /**
-     * Files every payment in [ids] under [categoryId]; the importer learns it
-     * too. [payees] are remembered as the user's own choice, which outranks
-     * the app's list of shops from then on.
+     * Files every payment in [ids] under [categoryId] as the user's own
+     * choice: each carries the hidden mark, so the app never re-sorts them,
+     * and the importer files that payee the same way from then on.
      */
-    suspend fun file(ids: List<Long>, categoryId: Long, payees: Collection<String> = emptyList()) {
+    suspend fun file(ids: List<Long>, categoryId: Long) {
         ids.chunked(BATCH).forEach { batch ->
-            transactionDao.setCategory(batch, categoryId, System.currentTimeMillis())
+            transactionDao.setCategoryByUser(batch, categoryId, System.currentTimeMillis())
         }
-        settingsRepository.rememberCategoryChosen(payees.toSet())
     }
 
     /**
@@ -143,7 +142,7 @@ class PayeeRepository @Inject constructor(
         val payee = PayeeNames.of(description)
         if (payee.isBlank()) return 0
         val others = samePayee(description, type, exceptId)
-        file(others.map { it.id }, categoryId, listOf(payee))
+        file(others.map { it.id }, categoryId)
         return others.size
     }
 
