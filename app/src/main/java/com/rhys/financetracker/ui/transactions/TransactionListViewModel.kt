@@ -19,6 +19,7 @@ import com.rhys.financetracker.data.repository.PeopleRepository
 import com.rhys.financetracker.data.repository.TransactionRepository
 import com.rhys.financetracker.domain.model.ExportFormat
 import com.rhys.financetracker.domain.model.TransactionType
+import com.rhys.financetracker.ui.navigation.Routes
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.LocalDate
 import javax.inject.Inject
@@ -49,6 +50,7 @@ class TransactionListViewModel @Inject constructor(
     private val peopleRepository: PeopleRepository,
     private val exportManager: ExportManager,
     ledgerRequests: LedgerRequests,
+    savedStateHandle: androidx.lifecycle.SavedStateHandle,
 ) : ViewModel() {
 
     private val filter = MutableStateFlow(TransactionFilter())
@@ -101,16 +103,17 @@ class TransactionListViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TransactionListState())
 
     init {
-        // Another screen sent someone here to see something in particular.
-        viewModelScope.launch {
-            ledgerRequests.requests.collect { request ->
-                if (request != null) {
-                    // Any words go in the search box, where they can be seen
-                    // and cleared, rather than hidden in the filter.
-                    filter.value = request.copy(text = null)
-                    searchText.value = request.text.orEmpty()
-                    ledgerRequests.consumed()
-                }
+        // Opened from another page to show something in particular — a
+        // category on the Spending tab, an account's payments. That page left
+        // the filter; this one is its own page, so back goes back there. The
+        // Money tab itself never takes it, or back from it went to Home.
+        if (savedStateHandle.get<Boolean>(Routes.ARG_DRILL_DOWN) == true) {
+            ledgerRequests.requests.value?.let { request ->
+                // Any words go in the search box, where they can be seen and
+                // cleared, rather than hidden in the filter.
+                filter.value = request.copy(text = null)
+                searchText.value = request.text.orEmpty()
+                ledgerRequests.consumed()
             }
         }
     }

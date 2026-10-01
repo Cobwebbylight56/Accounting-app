@@ -556,7 +556,11 @@ class SpreadsheetImporter @Inject constructor(
     internal suspend fun categorise(candidates: List<ImportCandidate>): List<ImportCandidate> {
         if (candidates.none { it.categoryName.isNullOrBlank() }) return candidates
 
-        val learned = transactionDao.getCategorisedDescriptions(LEARNED_PAYEE_LIMIT)
+        // Learned only from what a person filed — typed in, or changed after
+        // it arrived. Learning from the app's own guesses kept every old
+        // mistake alive: Tesco PFS filed as Groceries once was Groceries for
+        // ever after, however the rules improved.
+        val learned = transactionDao.getUserFiledDescriptions(USER_FILED_AFTER_MILLIS, LEARNED_PAYEE_LIMIT)
             .associate { TransactionFingerprint.normaliseDescription(it.description) to it.categoryName }
 
         return candidates.map { candidate ->
@@ -1171,6 +1175,12 @@ class SpreadsheetImporter @Inject constructor(
          * is one-off payments that will never be seen again.
          */
         const val LEARNED_PAYEE_LIMIT = 2_000
+
+        /**
+         * An entry changed this long or more after it arrived was filed by a
+         * person, not by the importer. See TransactionDao.getUserFiledDescriptions.
+         */
+        const val USER_FILED_AFTER_MILLIS = 60_000L
 
         /**
          * How far either side of the statement to look for entries it might be

@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FilterList
@@ -82,6 +83,8 @@ fun TransactionListScreen(
     onAddTransaction: () -> Unit,
     onOpenImport: () -> Unit,
     onShareFile: (com.rhys.financetracker.data.export.ExportedFile) -> Unit,
+    /** Set when opened from another page: shows a back arrow, and back returns there. */
+    onBack: (() -> Unit)? = null,
     viewModel: TransactionListViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -132,7 +135,14 @@ fun TransactionListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Money") },
+                title = { Text(if (onBack != null) "Payments" else "Money") },
+                navigationIcon = {
+                    if (onBack != null) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    }
+                },
                 actions = {
                     BadgedBox(
                         badge = {

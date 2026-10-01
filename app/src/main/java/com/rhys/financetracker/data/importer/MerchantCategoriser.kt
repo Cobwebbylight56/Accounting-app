@@ -52,8 +52,14 @@ object MerchantCategoriser {
         learned[text]?.let { return it }
         // A payee remembered under a longer reference still counts: banks add
         // and drop trailing numbers between exports.
+        //
+        // But only a real payee. A remembered "contactless payment" names no
+        // shop at all, and letting it claim everything that starts the same
+        // way filed every card payment after it — Tesco PFS, Asda Living, the
+        // lot — under whatever the bare one had been given.
         return learned.entries.firstOrNull { (merchant, _) ->
             merchant.length >= MIN_LEARNED_PREFIX &&
+                PayeeNames.of(merchant).isNotBlank() &&
                 (text.startsWith(merchant) || merchant.startsWith(text))
         }?.value
     }
@@ -98,8 +104,26 @@ object MerchantCategoriser {
     /** One category and the words that mean it. */
     private data class Rule(val category: String, val keywords: List<String>)
 
+    /**
+     * A rule, with every "x and y" keyword also matched as "x y": a statement
+     * writes "M&S", "B&Q" and "FRANKIE & BENNYS", and the "&" becomes a space
+     * when the text is tidied, so "m and s" on its own never matched. A
+     * single letter left at the end ("b q") must end the word there, or "b q"
+     * would match "B QUALITY".
+     */
     private fun rule(category: String, vararg keywords: String) =
-        Rule(category, keywords.toList())
+        Rule(
+            category,
+            keywords.flatMap { keyword ->
+                if (" and " !in keyword) {
+                    listOf(keyword)
+                } else {
+                    val short = keyword.replace(" and ", " ").trimEnd()
+                    val ended = if (short.substringAfterLast(' ').length == 1) "$short " else short
+                    listOf(keyword, ended)
+                }
+            },
+        )
 
     /**
      * Ordered, and the order carries meaning: the first match wins, so
@@ -128,14 +152,35 @@ object MerchantCategoriser {
         rule("Mobile", "tesco mobile", "sky mobile", "asda mobile"),
         rule("Eating out", "uber eats", "ubereats"),
         rule("Energy", "shell energy", "sainsbury energy"),
-        rule("Fuel", "sainsburys petrol", "tesco petrol", "morrisons petrol", "asda petrol"),
+
+        // Fuel before groceries: the supermarkets' forecourts carry their
+        // names. "TESCO PFS" is a petrol filling station and "TESCO PAY AT
+        // PUMP" is the same pump paid for at the pump; both were the weekly
+        // shop while Groceries came first.
+        rule(
+            "Fuel",
+            "pfs", "pay at pump", "petrol", "filling station", "service station", "fuel",
+            "shell", "bp ", "esso", "texaco", "gulf", "murco", "applegreen", "jet ",
+            "eg on the move", "euro garages", "rontec", "mfg ", "motor fuel",
+        ),
+
+        // Not food, though they carry a supermarket's name: Asda's homeware
+        // and clothes, Tesco's and Sainsbury's clothes, Argos inside
+        // Sainsbury's.
+        rule(
+            "Shopping",
+            "asda living", "george at asda", "george asda", "george com", "tesco f and f",
+            "f and f clothing", "tu clothing", "sainsburys argos", "argos",
+        ),
 
         // -- groceries ------------------------------------------------------
         rule(
             "Groceries",
             "tesco", "sainsbury", "asda", "aldi", "lidl", "morrisons", "waitrose",
-            "co op", "coop", "iceland", "ocado", "farmfoods", "spar", "budgens",
-            "marks and spencer", "m and s", "booths", "costcutter", "nisa",
+            // Ended where a word ends: "coop" was matching COOPERS DIY and
+            // "spar" SPARE ROOM.
+            "co op ", "coop ", "co operative", "iceland", "ocado", "farmfoods", "spar ", "budgens",
+            "marks and spencer", "m and s", "m s simply food", "m s food", "booths", "costcutter", "nisa",
             "costco", "makro", "bookers", "heron foods", "premier stores",
             "one stop", "mccoll", "londis", "premier store", "food warehouse",
             "grocer", "butcher", "greengrocer", "milk and more", "milkman",
@@ -157,11 +202,6 @@ object MerchantCategoriser {
         ),
 
         // -- motoring -------------------------------------------------------
-        rule(
-            "Fuel",
-            "shell", "bp ", "esso", "texaco", "gulf", "murco", "applegreen", "jet ",
-            "petrol", "fuel", "filling station", "service station",
-        ),
         rule(
             "Car insurance",
             "admiral", "hastings direct", "churchill", "direct line", "esure",
@@ -211,7 +251,9 @@ object MerchantCategoriser {
         rule(
             "Mobile",
             "vodafone", "giffgaff", "lebara", "lycamobile", "id mobile", "o2 ",
-            "three uk", "ee limited", "ee ltd", "mobile", "smarty", "voxi",
+            // Not "mobile" on its own: banks write "MOBILE PAYMENT" for a
+            // transfer made in their app, which made those phone bills.
+            "three uk", "ee limited", "ee ltd", "mobile phone", "smarty", "voxi",
             "talkmobile", "vectone", "phone bill", "airtime",
         ),
         rule("Mortgage", "mortgage", "halifax mtg", "nationwide mtg"),
@@ -220,7 +262,7 @@ object MerchantCategoriser {
             "Repairs",
             "screwfix", "toolstation", "plumber", "electrician", "builder",
             "joiner", "roofer", "handyman", "locksmith", "boiler", "gas safe",
-            "travis perkins", "jewson", "selco", "buildbase",
+            "travis perkins", "jewson", "selco", "buildbase", "diy",
         ),
         rule(
             "Home",
@@ -252,6 +294,14 @@ object MerchantCategoriser {
             "safari", "farm park", "go ape", "paintball", "karting", "arcade", "showcase",
             "everyman", "picturehouse", "empire cinema", "ice rink", "climbing", "splash",
             "water park", "adventure", "attraction", "tickets",
+        ),
+
+        // -- hobbies --------------------------------------------------------
+        rule(
+            "Hobbies",
+            "hobbycraft", "games workshop", "warhammer", "angling", "fishing", "tackle",
+            "model zone", "model shop", "crafts", "wool shop", "yarn", "lego store",
+            "steam games", "steampowered", "guitar", "music shop", "hobby",
         ),
 
         // -- shopping -------------------------------------------------------

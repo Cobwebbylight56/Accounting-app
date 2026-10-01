@@ -219,7 +219,25 @@ private fun NavGraphBuilder.topLevelDestinations(
 
     composable(Routes.SPENDING) {
         com.rhys.financetracker.ui.spending.SpendingScreen(
-            onOpenLedger = { navController.navigateToTab(Routes.TRANSACTIONS) },
+            onOpenLedger = { navController.navigate(Routes.LEDGER) },
+        )
+    }
+
+    composable(
+        route = Routes.LEDGER_PATTERN,
+        arguments = listOf(
+            navArgument(Routes.ARG_DRILL_DOWN) {
+                type = NavType.BoolType
+                defaultValue = true
+            },
+        ),
+    ) {
+        TransactionListScreen(
+            onOpenTransaction = { navController.navigate(Routes.transactionEdit(it)) },
+            onAddTransaction = { navController.navigate(Routes.transactionEdit()) },
+            onOpenImport = { navController.navigate(Routes.importForAccount()) },
+            onShareFile = onShareFile,
+            onBack = { navController.popBackStack() },
         )
     }
 
@@ -243,7 +261,7 @@ private fun NavGraphBuilder.topLevelDestinations(
     composable(Routes.REPORTS) {
         ReportsScreen(
             onShareFile = onShareFile,
-            onOpenLedger = { navController.navigateToTab(Routes.TRANSACTIONS) },
+            onOpenLedger = { navController.navigate(Routes.LEDGER) },
         )
     }
 
@@ -323,7 +341,7 @@ private fun NavGraphBuilder.editorDestinations(
             onEdit = { navController.navigate(Routes.accountEdit(it)) },
             onImportStatement = { navController.navigate(Routes.importForAccount(it)) },
             onOpenTransaction = { navController.navigate(Routes.transactionEdit(it)) },
-            onOpenLedger = { navController.navigateToTab(Routes.TRANSACTIONS) },
+            onOpenLedger = { navController.navigate(Routes.LEDGER) },
         )
     }
 
@@ -409,9 +427,8 @@ private fun NavGraphBuilder.editorDestinations(
         InsightsScreen(
             onBack = { navController.popBackStack() },
             onOpenCategory = { _, _ ->
-                // Tapping through from advice lands on the ledger, where the
-                // full filter set is available.
-                navController.navigateToTab(Routes.TRANSACTIONS)
+                // A page of its own, so back returns to the advice.
+                navController.navigate(Routes.LEDGER)
             },
         )
     }
@@ -438,11 +455,9 @@ private fun NavGraphBuilder.editorDestinations(
             // saveState, then restoreState — and using it to reach the very
             // destination it is popping to depends on saved-stack keying that
             // is easy to get wrong. Popping says what is meant and nothing else.
-            onFinished = {
-                if (!navController.popBackStack(Routes.DASHBOARD, inclusive = false)) {
-                    navController.popBackStack()
-                }
-            },
+            // Back to wherever the import was started — the account's page,
+            // a person's page, Money — not all the way to Home.
+            onFinished = { navController.popBackStack() },
             preselectedAccountId = accountId.takeIf { it != Routes.NEW_ID },
             expectedPersonId = personId.takeIf { it != Routes.NEW_ID },
             incomingFile = importFile,

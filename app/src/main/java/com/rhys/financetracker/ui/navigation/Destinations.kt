@@ -51,6 +51,13 @@ object Routes {
     const val SETTINGS_DASHBOARD = "settings/dashboard"
     const val IMPORT = "import"
 
+    /** Payments filtered by another page, as a page of its own with a back arrow. */
+    const val LEDGER = "ledger"
+
+    /** Set on [LEDGER]: the list takes the filter another page left for it. */
+    const val ARG_DRILL_DOWN = "drill"
+    const val LEDGER_PATTERN = "$LEDGER?$ARG_DRILL_DOWN={$ARG_DRILL_DOWN}"
+
     /** Argument name shared by every "edit this record" screen. */
     const val ARG_ID = "id"
 

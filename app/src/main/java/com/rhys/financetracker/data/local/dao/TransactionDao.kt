@@ -903,6 +903,18 @@ interface TransactionDao {
     )
     fun observeUnsortedCount(vague: List<String>): Flow<Int>
 
+    /** Every payment out that has a spending category, with that category's name. */
+    @Query(
+        """
+        SELECT t.id AS id, t.description AS description, t.amount_minor AS amount_minor,
+               t.date AS date, c.name AS category_name
+        FROM transactions t
+        JOIN categories c ON c.id = t.category_id
+        WHERE t.is_archived = 0 AND t.type = 'EXPENSE' AND c.kind = 'EXPENSE'
+        """,
+    )
+    suspend fun categorisedSpending(): List<PayeeEntry>
+
     /** How much money out is still unfiled, or filed only under a [vague] name. */
     @Query(
         """

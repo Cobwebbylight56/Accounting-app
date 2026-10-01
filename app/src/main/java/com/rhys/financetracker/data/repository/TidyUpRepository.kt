@@ -3,6 +3,7 @@ package com.rhys.financetracker.data.repository
 import com.rhys.financetracker.core.time.DateUtils
 import com.rhys.financetracker.data.importer.MerchantCategoriser
 import com.rhys.financetracker.data.importer.OwnAccountMatcher
+import com.rhys.financetracker.data.importer.PayeeNames
 import com.rhys.financetracker.data.importer.SpreadsheetImporter
 import com.rhys.financetracker.data.importer.TransactionFingerprint
 import com.rhys.financetracker.data.local.dao.AccountDao
@@ -18,6 +19,18 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
 import kotlinx.coroutines.flow.first
+
+/** A payee whose payments look to be in the wrong category. */
+data class CategoryFix(
+    val payee: String,
+    val fromCategory: String,
+    val toCategory: String,
+    val ids: List<Long>,
+    val totalMinor: Long,
+) {
+    /** What is remembered when the user says to leave it. */
+    val key: String get() = "${payee.lowercase()}|${fromCategory.lowercase()}|${toCategory.lowercase()}"
+}
 
 /** What one run of [TidyUpRepository.sortEverything] changed. */
 data class TidyUpResult(
@@ -81,6 +94,7 @@ class TidyUpRepository @Inject constructor(
     private val incomeRepository: IncomeRepository,
     private val importer: SpreadsheetImporter,
     private val billFinder: BillFinderRepository,
+    private val settingsRepository: com.rhys.financetracker.data.prefs.SettingsRepository,
 ) {
 
     suspend fun sortEverything(): TidyUpResult {
@@ -183,7 +197,7 @@ class TidyUpRepository @Inject constructor(
     private suspend fun categoriseUnsorted(): Int {
         val rows = transactionDao.getUnsortedEntries(VAGUE)
         if (rows.isEmpty()) return 0
-        val learned = transactionDao.getCategorisedDescriptions(SpreadsheetImporter.LEARNED_PAYEE_LIMIT)
+        val learned = transactionDao.getUserFiledDescriptions(UNTOUCHED_MILLIS, SpreadsheetImporter.LEARNED_PAYEE_LIMIT)
             .filterNot { it.categoryName in VAGUE }
             .associate { TransactionFingerprint.normaliseDescription(it.description) to it.categoryName }
         val vagueIds = VAGUE.mapNotNull { categoryDao.getByName(it)?.id }.toSet()
@@ -216,6 +230,11 @@ class TidyUpRepository @Inject constructor(
         val names = categoryDao.getAll().associate { it.id to it.name }
         val byCategory = mutableMapOf<Long, MutableList<Long>>()
         transactionDao.getAutoFiled(UNTOUCHED_MILLIS).forEach { row ->
+            // Only for shops the built-in list does not know. Where it does,
+            // the list is right, and following a filing made before the list
+            // knew better would undo the fix.
+            val known = MerchantCategoriser.categoryFor(row.description, row.type)
+            if (known != null && known !in VAGUE && known !in WEAK) return@forEach
             val decided = MerchantCategoriser.learnedCategory(row.description, learned) ?: return@forEach
             if (decided.equals(names[row.categoryId], ignoreCase = true)) return@forEach
             val id = categoryIdFor(decided, row.type) ?: return@forEach
@@ -244,6 +263,56 @@ class TidyUpRepository @Inject constructor(
         return if (billFinder.addAsBills(bills).isSuccess) bills.map { it.name } else emptyList()
     }
 
+    /**
+     * Payments whose category the shop's own name disagrees with — Tesco PFS
+     * under Groceries, Asda Living under Groceries — grouped by payee, for the
+     * user to look over and move. Only shops the built-in list is sure of are
+     * suggested; ones the user said to leave are not suggested again.
+     */
+    suspend fun suggestCategoryFixes(): List<CategoryFix> {
+        val kept = settingsRepository.settings.first().categoryFixesKept
+        return transactionDao.categorisedSpending()
+            .mapNotNull { row ->
+                val payee = PayeeNames.of(row.description)
+                if (payee.isBlank()) return@mapNotNull null
+                val suggested = MerchantCategoriser.categoryFor(row.description) ?: return@mapNotNull null
+                val current = row.categoryName ?: return@mapNotNull null
+                if (suggested in VAGUE || suggested in WEAK || suggested.equals(current, ignoreCase = true)) {
+                    return@mapNotNull null
+                }
+                Triple(payee, current, suggested) to row
+            }
+            .groupBy({ it.first }, { it.second })
+            .map { (key, rows) ->
+                CategoryFix(
+                    payee = key.first,
+                    fromCategory = key.second,
+                    toCategory = key.third,
+                    ids = rows.map { it.id },
+                    totalMinor = rows.sumOf { it.amountMinor },
+                )
+            }
+            .filterNot { it.key in kept }
+            .sortedByDescending { it.totalMinor }
+    }
+
+    /** Moves each of [fixes] to its suggested category. Returns how many payments moved. */
+    suspend fun applyCategoryFixes(fixes: List<CategoryFix>): Int {
+        val now = Instant.now().toEpochMilli()
+        var moved = 0
+        fixes.forEach { fix ->
+            val id = categoryIdFor(fix.toCategory, TransactionType.EXPENSE) ?: return@forEach
+            fix.ids.chunked(BATCH).forEach { transactionDao.setCategory(it, id, now) }
+            moved += fix.ids.size
+        }
+        return moved
+    }
+
+    /** Remembers that [fixes] are right as they are, so they are not suggested again. */
+    suspend fun keepAsTheyAre(fixes: List<CategoryFix>) {
+        settingsRepository.keepCategories(fixes.map { it.key }.toSet())
+    }
+
     /** The category called [name], preferring the savings and cash kinds, as the importer does. */
     private suspend fun categoryIdFor(name: String, type: TransactionType): Long? {
         for (kind in listOf(CategoryKind.SAVING, CategoryKind.CASH)) {
@@ -266,6 +335,9 @@ class TidyUpRepository @Inject constructor(
         val LOOSE = listOf("Transfers & payments", "Credit & loans", "Car finance", "Mortgage")
 
         private const val BATCH = 400
+
+        /** Categories too loose to correct anything with: a transfer could be anything. */
+        val WEAK = listOf("Transfers & payments", "People & services")
 
         /**
          * An entry changed less than this long after it was added was filed

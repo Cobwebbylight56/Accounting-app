@@ -506,7 +506,7 @@ The second tab is all about where the money goes, for one month at a time
 (arrows to step back), for everyone or one person:
 
 * **How much was spent**, what came in, and how that compares with last month.
-* **Where it went** — every category, tap one to see its payments in Money.
+* **Where it went** — every category, tap one to see its payments.
 * **Month by month** — money in against money out over six months; tap a month
   to look at it.
 * **Who it went to** — the ten biggest payees; tap one to see their payments.
@@ -516,6 +516,11 @@ The second tab is all about where the money goes, for one month at a time
 on every card like this, here, on Home ("Where it went", "Spending by
 category", "Income against spending") and in Reports, and each card remembers
 how you left it.
+
+Tapping through to payments — from a category, a payee, an account's page,
+advice or Reports — opens a **Payments** page with a back arrow. Back (the
+arrow or the phone's own) returns to the page you came from, not to Home.
+Finishing an import goes back to where you started it, too.
 
 ### Sort spending
 
@@ -576,6 +581,28 @@ and accounts it checked, what it changed and
 how many payments it couldn't place, with **Sort the rest** to file those by
 payee. Run it again any time — after importing old statements, or after
 teaching it a few payees.
+
+**Categories to check.** Underneath, the app lists payees whose category their
+own name disagrees with — "Tesco PFS" or "Tesco Pay at Pump" under Groceries
+(that's fuel), "Asda Living" or "George" under Groceries (that's shopping), a
+model shop under Shopping (that's Hobbies). Each line says where it is, where it
+should go, how many payments and how much. Untick any that are right as they
+are, then **Move**: the ticked ones move, and the unticked ones are remembered
+and not suggested again.
+
+How the app reads shop names, so you know what to expect:
+
+* **Fuel** wins over the supermarket: Tesco PFS / Pay at Pump, Sainsbury's,
+  Asda and Morrisons petrol stations, Shell, BP, Esso, Texaco, Gulf, Jet,
+  Applegreen, EG, MFG and anything saying "petrol", "filling station" or
+  "service station".
+* **Shopping** wins over the supermarket for their non-food shops: Asda Living,
+  George, Tesco F&F, Tu clothing and Argos.
+* **Hobbies**: Hobbycraft, Games Workshop / Warhammer, angling and tackle
+  shops, model shops, craft and wool shops, music shops, Steam.
+* A bare "contactless payment" with no shop name no longer decides where every
+  other card payment goes, and the app only learns from payments **you** have
+  filed, never from its own guesses.
 
 ### Where each row goes
 

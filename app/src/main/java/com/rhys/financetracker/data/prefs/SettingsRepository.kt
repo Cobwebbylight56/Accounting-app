@@ -65,6 +65,7 @@ class SettingsRepository @Inject constructor(
         val NOTIFICATIONS_ASKED = booleanPreferencesKey("notifications_asked")
         val HOME_TRIMMED = booleanPreferencesKey("home_trimmed")
         val CARD_VIEWS = stringPreferencesKey("card_views")
+        val CATEGORY_FIXES_KEPT = stringSetPreferencesKey("category_fixes_kept")
         val BACKUP_NUDGE_SNOOZED_UNTIL = longPreferencesKey("backup_nudge_snoozed_until")
     }
 
@@ -131,6 +132,7 @@ class SettingsRepository @Inject constructor(
             payeesNotPeople = prefs[Keys.PAYEES_HIDDEN].orEmpty(),
             notificationsAsked = prefs[Keys.NOTIFICATIONS_ASKED] ?: false,
             homeTrimmed = prefs[Keys.HOME_TRIMMED] ?: false,
+            categoryFixesKept = prefs[Keys.CATEGORY_FIXES_KEPT].orEmpty(),
             cardViews = prefs[Keys.CARD_VIEWS].orEmpty().split(';')
                 .mapNotNull { pair -> pair.split('=').takeIf { it.size == 2 }?.let { it[0] to it[1] } }
                 .toMap(),
@@ -173,6 +175,13 @@ class SettingsRepository @Inject constructor(
     /** Who the Shared tab on Home covers; see [AppSettings.sharedPeopleIds]. */
     suspend fun setSharedPeople(ids: Set<Long>) =
         put(Keys.SHARED_PEOPLE, ids.sorted().joinToString(","))
+
+    /** Suggested category moves the user chose to leave as they are; never suggested again. */
+    suspend fun keepCategories(keys: Set<String>) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.CATEGORY_FIXES_KEPT] = prefs[Keys.CATEGORY_FIXES_KEPT].orEmpty() + keys
+        }
+    }
 
     /** Remembers how a card is drawn — chart, bars, tiles or list — by the card's key. */
     suspend fun setCardView(card: String, view: String) {
@@ -255,6 +264,8 @@ data class AppSettings(
     val notificationsAsked: Boolean = false,
     /** True once Home's repeated cards have been switched off for this install. */
     val homeTrimmed: Boolean = false,
+    /** "payee|from|to" moves the user said to leave alone. */
+    val categoryFixesKept: Set<String> = emptySet(),
     /** How each card is drawn, by card key; see setCardView. */
     val cardViews: Map<String, String> = emptyMap(),
     /** The backup reminder stays hidden until then (epoch millis). */
