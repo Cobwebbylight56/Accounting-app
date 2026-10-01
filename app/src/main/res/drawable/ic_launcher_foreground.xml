@@ -1,20 +1,49 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Simple pound-sign-in-a-chart mark used as the adaptive launcher icon. -->
+<!--
+    The app's mark, the same as the opening animation's last frame: a teal
+    badge with four rising bars, and a gold line climbing across their tops
+    to a glowing point. Kept inside the adaptive icon's safe circle.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <group android:pivotX="54" android:pivotY="54" android:scaleX="1.125" android:scaleY="1.125">
+    <path android:pathData="M42.00,30.00 h24.00 a12.00,12.00 0 0 1 12.00,12.00 v24.00 a12.00,12.00 0 0 1 -12.00,12.00 h-24.00 a12.00,12.00 0 0 1 -12.00,-12.00 v-24.00 a12.00,12.00 0 0 1 12.00,-12.00 z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="30.0" android:startY="30.0"
+                android:endX="78.0" android:endY="78.0">
+                <item android:offset="0" android:color="#FF1B9A94" />
+                <item android:offset="1" android:color="#FF1F5F8B" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:pathData="M42.00,30.00 h24.00 a12.00,12.00 0 0 1 12.00,12.00 v24.00 a12.00,12.00 0 0 1 -12.00,12.00 h-24.00 a12.00,12.00 0 0 1 -12.00,-12.00 v-24.00 a12.00,12.00 0 0 1 12.00,-12.00 z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="54" android:startY="30.0"
+                android:endX="54" android:endY="58.80">
+                <item android:offset="0" android:color="#2EFFFFFF" />
+                <item android:offset="1" android:color="#00FFFFFF" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:fillColor="#E6FFFFFF" android:pathData="M41.10,57.59 h1.50 a1.50,1.50 0 0 1 1.50,1.50 v6.85 a1.50,1.50 0 0 1 -1.50,1.50 h-1.50 a1.50,1.50 0 0 1 -1.50,-1.50 v-6.85 a1.50,1.50 0 0 1 1.50,-1.50 z" />
+    <path android:fillColor="#E6FFFFFF" android:pathData="M48.30,52.41 h1.50 a1.50,1.50 0 0 1 1.50,1.50 v12.03 a1.50,1.50 0 0 1 -1.50,1.50 h-1.50 a1.50,1.50 0 0 1 -1.50,-1.50 v-12.03 a1.50,1.50 0 0 1 1.50,-1.50 z" />
+    <path android:fillColor="#E6FFFFFF" android:pathData="M55.50,55.26 h1.50 a1.50,1.50 0 0 1 1.50,1.50 v9.18 a1.50,1.50 0 0 1 -1.50,1.50 h-1.50 a1.50,1.50 0 0 1 -1.50,-1.50 v-9.18 a1.50,1.50 0 0 1 1.50,-1.50 z" />
+    <path android:fillColor="#E6FFFFFF" android:pathData="M62.70,45.15 h1.50 a1.50,1.50 0 0 1 1.50,1.50 v19.29 a1.50,1.50 0 0 1 -1.50,1.50 h-1.50 a1.50,1.50 0 0 1 -1.50,-1.50 v-19.29 a1.50,1.50 0 0 1 1.50,-1.50 z" />
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M32,72h44v6h-44z" />
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M36,52h16v6h-16z" />
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M56,30c-9,0 -14,6 -14,14v22h8v-22c0,-5 2,-8 6,-8c4,0 6,3 6,7h8c0,-8 -5,-13 -14,-13z" />
-    <path
-        android:fillColor="#8CE0C0"
-        android:pathData="M34,44l10,-10l10,8l14,-16l4,4l-18,20l-10,-8l-10,10z" />
+        android:strokeColor="#FFFFD27A"
+        android:strokeWidth="2.2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M37.35,57.21 L41.85,54.33 L49.05,49.14 L56.25,51.99 L63.45,41.88" />
+    <path android:fillColor="#59FFD27A" android:pathData="M59.65,41.88 a3.80,3.80 0 1 0 7.60,0 a3.80,3.80 0 1 0 -7.60,0 z" />
+    <path android:fillColor="#FFFFD27A" android:pathData="M61.55,41.88 a1.90,1.90 0 1 0 3.80,0 a1.90,1.90 0 1 0 -3.80,0 z" />
+    </group>
 </vector>

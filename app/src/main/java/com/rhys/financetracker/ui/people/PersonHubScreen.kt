@@ -122,6 +122,15 @@ class PersonHubViewModel @Inject constructor(
         payeeRepository.observeMoneyWithPeople(month.start, month.endInclusive, setOf(personId))
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    /** The same over this year, for the card's graph. */
+    val peopleYear: StateFlow<PeopleMoney?> = DateUtils.currentYearMonth().year.let { year ->
+        payeeRepository.observeMoneyWithPeople(
+            java.time.LocalDate.of(year, 1, 1),
+            java.time.LocalDate.of(year, 12, 31),
+            setOf(personId),
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
     private val drafts = MutableStateFlow(PersonHubState())
     private val message = MutableStateFlow<String?>(null)
     val messages: StateFlow<String?> = message
@@ -277,6 +286,7 @@ fun PersonHubScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val peopleMoney by viewModel.peopleMoney.collectAsStateWithLifecycle()
+    val peopleYear by viewModel.peopleYear.collectAsStateWithLifecycle()
     val message by viewModel.messages.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     var adding by rememberSaveable { mutableStateOf(Adding.NONE) }
@@ -372,6 +382,8 @@ fun PersonHubScreen(
                     money = peopleMoney,
                     monthLabel = DateUtils.formatMonth(DateUtils.currentYearMonth()),
                     onSeeAll = { person?.let { onOpenPeopleMoney(it.id) } },
+                    year = peopleYear,
+                    yearNumber = DateUtils.currentYearMonth().year,
                 )
             }
 

@@ -520,6 +520,14 @@ The second tab is all about where the money goes, for one month at a time
   to look at it.
 * **Who it went to** — the ten biggest payees; tap one to see their payments.
 
+More graphs further down the Spending tab:
+
+* **Spending pace** — the month's running total day by day, against the month
+  before, and whether you're ahead or behind by this day.
+* **Everyone's spending** — a line for each person, month by month, so the
+  whole household is on one graph (when the tab is showing Everyone).
+* **Categories over time** — your five biggest categories over six months.
+
 **The button in each card's top corner changes how it's drawn**: a line graph
 (month-by-month cards — tap or slide along it to read a month), a chart, bars
 (with ▲/▼ against last month), tiles or a list — one tap moves to the next. It's
@@ -560,6 +568,16 @@ its corner changes the graph: two lines (what you sent, and what they sent
 you), the **running balance** between you (above the line, they've sent you
 more; below it, you've sent them more), bars, or a plain list. Tap the graph,
 or slide along it, to read any month.
+
+**Payments on the wrong side.** An older reading of some statements put money
+that came *in* on the "you sent" side — "Bank credit H Payne" read as a payment
+out. Open the person's card and tap **Some of these the wrong way round?**: it
+lists every payment with them, with the ones that read like money in already
+ticked. **Swap** moves the ticked ones to the other side, and every balance
+follows.
+
+The **People** card on Home stays there all month — at the start of a month it
+shows the year so far, with a small graph of what you sent and what came back.
 
 **Changing a payment from here:** tap a person to open their card, then tap any
 payment in it to edit it — the amount, the category, or "it's not money to

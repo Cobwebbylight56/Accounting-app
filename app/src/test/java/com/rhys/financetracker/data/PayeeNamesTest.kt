@@ -37,4 +37,15 @@ class PayeeNamesTest {
         assertTrue(PayeeNames.looksLikeFromAPerson("From HANNAH EVANS ref dinner"))
         assertTrue(!PayeeNames.looksLikeFromAPerson("ACME LTD SALARY"))
     }
+
+    @Test
+    fun `money that came in is recognised however the bank words it`() {
+        assertTrue(PayeeNames.readsLikeMoneyIn("Bank credit H Payne"))
+        assertTrue(PayeeNames.readsLikeMoneyIn("FASTER PAYMENT FROM HANNAH PAYNE"))
+        assertTrue(PayeeNames.readsLikeMoneyIn("Payment received H PAYNE"))
+        org.junit.Assert.assertFalse(PayeeNames.readsLikeMoneyIn("FASTER PAYMENT TO H PAYNE"))
+        org.junit.Assert.assertFalse(PayeeNames.readsLikeMoneyIn("Standing order Hannah Payne"))
+        // "Credit card" in a name is not money in.
+        org.junit.Assert.assertFalse(PayeeNames.readsLikeMoneyIn("CREDITON GARAGE"))
+    }
 }

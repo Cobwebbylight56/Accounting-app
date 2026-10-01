@@ -235,6 +235,15 @@ class DashboardViewModel @Inject constructor(
         payeeRepository.observeMoneyWithPeople(range.start, range.endInclusive, currentScope.personIds)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    /** The same for the whole year the month is in, for the People card's graph and totals. */
+    val peopleYear: StateFlow<PeopleMoney?> = monthFlow.flatMapLatest { (month, currentScope) ->
+        payeeRepository.observeMoneyWithPeople(
+            java.time.LocalDate.of(month.year, 1, 1),
+            java.time.LocalDate.of(month.year, 12, 31),
+            currentScope.personIds,
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
     private val totals = monthFlow.flatMapLatest { (month, currentScope) ->
         val range = DateUtils.monthRange(month)
         transactionRepository.observeIncomeExpense(

@@ -118,6 +118,43 @@ class TransactionRepository @Inject constructor(
 
     suspend fun get(id: Long): TransactionEntity? = transactionDao.getById(id)
 
+    /**
+     * Turns payments the wrong way round: money recorded as going out that
+     * really came in ("Bank credit H Payne" read as a payment), or the other
+     * way. Each becomes [toType] under [categoryId], marked as the user's
+     * choice, and its fingerprint is worked out again — direction is part of
+     * it, so the bank's own row is still recognised on a re-import rather than
+     * added beside it. Moves between accounts are left alone. Returns how many
+     * were turned.
+     */
+    suspend fun turnRound(ids: List<Long>, toType: TransactionType, categoryId: Long?): Int {
+        val now = Instant.now().toEpochMilli()
+        var turned = 0
+        ids.forEach { id ->
+            val entry = transactionDao.getById(id) ?: return@forEach
+            if (entry.type == TransactionType.TRANSFER || entry.type == toType) return@forEach
+            transactionDao.update(
+                entry.copy(
+                    type = toType,
+                    categoryId = categoryId,
+                    categoryByUser = categoryId != null,
+                    importHash = entry.importHash?.let {
+                        com.rhys.financetracker.data.importer.TransactionFingerprint.of(
+                            accountId = entry.accountId,
+                            date = entry.date,
+                            amountMinor = entry.amountMinor,
+                            type = toType,
+                            description = entry.description,
+                        )
+                    },
+                    updatedAt = now,
+                ),
+            )
+            turned++
+        }
+        return turned
+    }
+
     suspend fun save(transaction: TransactionEntity): AppResult<Long> =
         runCatchingApp("Could not save this transaction") {
             validate(transaction)

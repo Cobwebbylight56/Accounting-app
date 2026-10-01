@@ -78,6 +78,24 @@ import kotlinx.coroutines.flow.stateIn
 /** One payee's spending over the month. */
 data class PayeeTotal(val name: String, val totalMinor: Long, val count: Int)
 
+/** One line on a graph: a name, its own colour, and a figure per point. */
+data class GraphLine(val name: String, val colorHex: String?, val values: List<Long>)
+
+/** The Spending tab's extra graphs. */
+data class SpendingGraphs(
+    /** Day labels for the month shown. */
+    val days: List<String> = emptyList(),
+    /** Running total spent, day by day: this month (to today) and last month. */
+    val paceThis: List<Long> = emptyList(),
+    val paceLast: List<Long> = emptyList(),
+    /** The months the over-time graphs cover. */
+    val months: List<YearMonth> = emptyList(),
+    /** Each person's spending, month by month, for everyone side by side. */
+    val byPerson: List<GraphLine> = emptyList(),
+    /** The biggest categories, month by month. */
+    val byCategory: List<GraphLine> = emptyList(),
+)
+
 data class SpendingState(
     val isLoading: Boolean = true,
     val month: YearMonth = DateUtils.currentYearMonth(),
@@ -157,6 +175,83 @@ class SpendingViewModel @Inject constructor(
         current.copy(people = everyone)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SpendingState())
 
+    /** Running totals by day, this month against last. */
+    private val pace = combine(month, personId) { m, p -> m to p }.flatMapLatest { (m, p) ->
+        val ids = p?.let { setOf(it) }
+        fun spentIn(target: YearMonth) = transactionRepository.search(
+            TransactionFilter(
+                types = setOf(TransactionType.EXPENSE),
+                dateFrom = target.atDay(1),
+                dateTo = target.atEndOfMonth(),
+                personIds = ids.orEmpty(),
+            ),
+        )
+        combine(spentIn(m), spentIn(m.minusMonths(1))) { now, before ->
+            val days = m.lengthOfMonth()
+            // This month runs to today; a past month runs to its end.
+            val upTo = if (m == DateUtils.currentYearMonth()) DateUtils.today().dayOfMonth else days
+            fun running(rows: List<com.rhys.financetracker.data.local.projection.TransactionWithDetails>, length: Int): List<Long> {
+                val byDay = LongArray(length)
+                rows.forEach { row ->
+                    val day = row.transaction.date.dayOfMonth
+                    if (day in 1..length) byDay[day - 1] += row.transaction.amountMinor
+                }
+                var total = 0L
+                return byDay.map { total += it; total }
+            }
+            Triple((1..days).map { it.toString() }, running(now, upTo), running(before, minOf(days, m.minusMonths(1).lengthOfMonth())))
+        }
+    }
+
+    /** Each person's spending over the months, and the biggest categories over them. */
+    private val overTime = combine(month, personId, people) { m, p, everyone -> Triple(m, p, everyone) }
+        .flatMapLatest { (m, p, everyone) ->
+            val months = DateUtils.recentMonths(TREND_MONTHS, m)
+            val from = months.first().atDay(1)
+            val to = months.last().atEndOfMonth()
+            val personFlows = everyone.map { person ->
+                transactionRepository.observeMonthlyTotals(from, to, personIds = setOf(person.id)).map { rows ->
+                    val byKey = rows.associateBy { it.yearMonth }
+                    GraphLine(person.name.substringBefore(' '), person.colorHex, months.map { byKey[DateUtils.yearMonthKey(it)]?.expenseMinor ?: 0L })
+                }
+            }
+            val ids = p?.let { setOf(it) }
+            val categoryFlows = months.map { target ->
+                transactionRepository.observeCategoryTotals(TransactionType.EXPENSE, target.atDay(1), target.atEndOfMonth(), personIds = ids)
+            }
+            val byPerson = if (personFlows.isEmpty()) {
+                kotlinx.coroutines.flow.flowOf(emptyList<GraphLine>())
+            } else {
+                combine(personFlows) { it.toList() }
+            }
+            val byCategory = combine(categoryFlows) { perMonth ->
+                val totals = perMonth.flatMap { it.toList() }
+                    .groupBy { it.categoryId }
+                    .mapValues { (_, rows) -> rows.sumOf { it.totalMinor } }
+                val top = totals.entries.sortedByDescending { it.value }.take(TOP_CATEGORY_LINES).map { it.key }
+                top.map { id ->
+                    val sample = perMonth.flatMap { it.toList() }.first { it.categoryId == id }
+                    GraphLine(
+                        name = sample.categoryName ?: "Uncategorised",
+                        colorHex = sample.categoryColor,
+                        values = perMonth.map { month -> month.firstOrNull { it.categoryId == id }?.totalMinor ?: 0L },
+                    )
+                }
+            }
+            combine(byPerson, byCategory) { lines, categories -> Triple(months, lines, categories) }
+        }
+
+    val graphs: StateFlow<SpendingGraphs> = combine(pace, overTime) { (days, now, before), (months, lines, categories) ->
+        SpendingGraphs(
+            days = days,
+            paceThis = now,
+            paceLast = before,
+            months = months,
+            byPerson = lines,
+            byCategory = categories,
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SpendingGraphs())
+
     fun previousMonth() {
         month.value = month.value.minusMonths(1)
     }
@@ -186,6 +281,7 @@ class SpendingViewModel @Inject constructor(
     private companion object {
         const val TREND_MONTHS = 6
         const val TOP_PAYEES = 10
+        const val TOP_CATEGORY_LINES = 5
     }
 }
 
@@ -196,6 +292,7 @@ fun SpendingScreen(
     viewModel: SpendingViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val graphs by viewModel.graphs.collectAsStateWithLifecycle()
     val (whereView, setWhereView) = rememberCardView("spending_where", BreakdownView.CHART)
     val (trendView, setTrendView) = rememberCardView("spending_trend_line", BreakdownView.LINE)
     val (payeeView, setPayeeView) = rememberCardView("spending_payees", BreakdownView.BARS)
@@ -275,6 +372,27 @@ fun SpendingScreen(
                         view = trendView,
                         selected = state.month,
                         onMonth = viewModel::showMonth,
+                    )
+                }
+            }
+
+            if (graphs.paceThis.isNotEmpty() || graphs.paceLast.isNotEmpty()) {
+                item { PaceCard(graphs = graphs, isCurrentMonth = state.isCurrentMonth) }
+            }
+
+            // Everyone on one graph, when the tab is showing everyone.
+            if (state.personId == null && graphs.byPerson.size > 1) {
+                item { LinesCard("Everyone's spending", "Each person, month by month", "spending_everyone", graphs.months, graphs.byPerson) }
+            }
+
+            if (graphs.byCategory.isNotEmpty()) {
+                item {
+                    LinesCard(
+                        "Categories over time",
+                        "The ${graphs.byCategory.size} biggest, month by month",
+                        "spending_categories_time",
+                        graphs.months,
+                        graphs.byCategory,
                     )
                 }
             }
@@ -380,6 +498,114 @@ private fun PayeeRow(payee: PayeeTotal, index: Int, asBar: Boolean, share: Float
                         .background(chartColorAt(index), RoundedCornerShape(4.dp)),
                 )
             }
+        }
+    }
+}
+
+/**
+ * The month's spending as a running total, day by day, against the same
+ * days last month — whether this month is running ahead or behind.
+ */
+@Composable
+private fun PaceCard(graphs: SpendingGraphs, isCurrentMonth: Boolean) {
+    val colors = FinanceTheme.colors
+    SectionCard(title = "Spending pace", subtitle = "Running total by day, against last month") {
+        com.rhys.financetracker.ui.components.TrendLineChart(
+            labels = graphs.days,
+            series = listOf(
+                com.rhys.financetracker.ui.components.LineSeries(
+                    if (isCurrentMonth) "This month" else "That month",
+                    graphs.paceThis,
+                    colors.chartOut,
+                ),
+                com.rhys.financetracker.ui.components.LineSeries(
+                    "Month before",
+                    graphs.paceLast,
+                    MaterialTheme.colorScheme.outline,
+                    dashed = true,
+                    marker = com.rhys.financetracker.ui.components.MarkerShape.SQUARE,
+                ),
+            ),
+        )
+        val day = graphs.paceThis.size
+        val now = graphs.paceThis.lastOrNull()
+        val before = graphs.paceLast.getOrNull(day - 1)
+        if (now != null && before != null) {
+            Spacer(Modifier.height(6.dp))
+            val diff = now - before
+            Text(
+                text = "${Money.format(now)} by day $day — " + when {
+                    diff > 0 -> "${Money.format(diff)} more than by the same day the month before."
+                    diff < 0 -> "${Money.format(-diff)} less than by the same day the month before."
+                    else -> "the same as the month before."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/**
+ * Several lines over the same months, each in its own colour and, every
+ * other one, dashed with square dots — so they can be told apart without
+ * colour. Also as bars or a list, from the corner button.
+ */
+@Composable
+private fun LinesCard(title: String, subtitle: String, key: String, months: List<YearMonth>, lines: List<GraphLine>) {
+    val (view, setView) = rememberCardView(key, BreakdownView.LINE)
+    val labels = months.map { DateUtils.monthNameShort(it.monthValue) }
+    val series = lines.mapIndexed { index, line ->
+        com.rhys.financetracker.ui.components.LineSeries(
+            name = line.name,
+            values = line.values,
+            color = com.rhys.financetracker.ui.components.colorFromHex(line.colorHex, index),
+            dashed = index % 2 == 1,
+            marker = if (index % 2 == 1) com.rhys.financetracker.ui.components.MarkerShape.SQUARE else com.rhys.financetracker.ui.components.MarkerShape.CIRCLE,
+        )
+    }
+    SectionCard(
+        title = title,
+        subtitle = subtitle,
+        action = { ViewSwitchButton(view, listOf(BreakdownView.LINE, BreakdownView.BARS, BreakdownView.LIST), setView) },
+    ) {
+        when (view) {
+            BreakdownView.BARS -> {
+                com.rhys.financetracker.ui.components.GroupedBarChart(
+                    groups = labels.indices.map { i ->
+                        com.rhys.financetracker.ui.components.BarGroup(
+                            label = labels[i],
+                            bars = series.map { line ->
+                                com.rhys.financetracker.ui.components.ChartEntry(
+                                    line.name,
+                                    line.values.getOrElse(i) { 0L }.toFloat(),
+                                    line.color,
+                                    Money.format(line.values.getOrElse(i) { 0L }),
+                                )
+                            },
+                        )
+                    },
+                )
+                Spacer(Modifier.height(6.dp))
+                com.rhys.financetracker.ui.components.LineLegend(series)
+            }
+            BreakdownView.LIST -> {
+                months.indices.reversed().forEach { i ->
+                    Text(
+                        DateUtils.formatMonth(months[i]),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                    series.forEach { line ->
+                        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+                            Text(line.name, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                            Text(Money.format(line.values.getOrElse(i) { 0L }), style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+            }
+            else -> com.rhys.financetracker.ui.components.TrendLineChart(labels = labels, series = series)
         }
     }
 }

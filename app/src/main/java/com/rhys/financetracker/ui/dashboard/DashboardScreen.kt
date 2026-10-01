@@ -89,6 +89,7 @@ fun DashboardScreen(
     val categoryDetail by viewModel.categoryDetail.collectAsStateWithLifecycle()
     val message by viewModel.messages.collectAsStateWithLifecycle()
     val peopleMoney by viewModel.peopleMoney.collectAsStateWithLifecycle()
+    val peopleYear by viewModel.peopleYear.collectAsStateWithLifecycle()
     val unsortedCount by viewModel.unsortedCount.collectAsStateWithLifecycle()
     val showBackupNudge by viewModel.showBackupNudge.collectAsStateWithLifecycle()
     val resortNote by viewModel.resortNote.collectAsStateWithLifecycle()
@@ -254,12 +255,15 @@ fun DashboardScreen(
 
                 item { MonthList(state = state) }
 
-                // Only when there is someone to show: an empty card saying so
-                // was one more thing to scroll past.
-                if (!peopleMoney?.people.isNullOrEmpty()) {
+                // Whenever money has gone to or from anyone this year — not only
+                // when this month has some, or it vanished at the start of
+                // every month.
+                if (!peopleMoney?.people.isNullOrEmpty() || !peopleYear?.people.isNullOrEmpty()) {
                     item {
                         com.rhys.financetracker.ui.spending.PeopleMoneyCard(
                             money = peopleMoney,
+                            year = peopleYear,
+                            yearNumber = state.month.year,
                             monthLabel = com.rhys.financetracker.core.time.DateUtils.formatMonth(state.month),
                             onSeeAll = {
                                 val person = state.scope.personId

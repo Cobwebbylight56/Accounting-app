@@ -100,7 +100,8 @@ enum class PeoplePeriod { MONTH, YEAR }
 @HiltViewModel
 class SentToPeopleViewModel @Inject constructor(
     private val payeeRepository: PayeeRepository,
-    categoryRepository: CategoryRepository,
+    private val categoryRepository: CategoryRepository,
+    private val transactionRepository: com.rhys.financetracker.data.repository.TransactionRepository,
 ) : ViewModel() {
 
     /** The month shown, or in a year view any month of the year shown. */
@@ -167,6 +168,26 @@ class SentToPeopleViewModel @Inject constructor(
         month.value = if (period.value == PeoplePeriod.YEAR) month.value.plusYears(1) else month.value.plusMonths(1)
     }
 
+    /**
+     * Swaps sides for [toMoneyIn] (recorded as sent, really received) and
+     * [toMoneyOut] (the other way). Balances follow, as every figure is
+     * worked out from the payments.
+     */
+    fun turnRound(name: String, toMoneyIn: List<PayeeEntry>, toMoneyOut: List<PayeeEntry>) {
+        viewModelScope.launch {
+            var turned = 0
+            if (toMoneyIn.isNotEmpty()) {
+                val category = categoryRepository.findOrCreate(MONEY_FROM_PEOPLE, CategoryKind.INCOME, "#1B9A94")
+                turned += transactionRepository.turnRound(toMoneyIn.map { it.id }, com.rhys.financetracker.domain.model.TransactionType.INCOME, category.id)
+            }
+            if (toMoneyOut.isNotEmpty()) {
+                val category = categoryRepository.findOrCreate(MONEY_TO_PEOPLE, CategoryKind.EXPENSE, "#C8402A")
+                turned += transactionRepository.turnRound(toMoneyOut.map { it.id }, com.rhys.financetracker.domain.model.TransactionType.EXPENSE, category.id)
+            }
+            message.value = "$name: $turned " + (if (turned == 1) "payment" else "payments") + " turned round."
+        }
+    }
+
     fun file(name: String, entries: List<PayeeEntry>, category: CategoryEntity) {
         viewModelScope.launch {
             payeeRepository.file(entries.map { it.id }, category.id)
@@ -204,6 +225,7 @@ fun SentToPeopleScreen(
     val snackbar = remember { SnackbarHostState() }
     var open by rememberSaveable { mutableStateOf<String?>(null) }
     var filing by remember { mutableStateOf<Filing?>(null) }
+    var turning by remember { mutableStateOf<PersonLedger?>(null) }
     var showNotPeople by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(message) {
@@ -279,6 +301,7 @@ fun SentToPeopleScreen(
                         onFileSent = { filing = Filing(ledger.name, ledger.sent, isMoneyIn = false) },
                         onFileReceived = { filing = Filing(ledger.name, ledger.received, isMoneyIn = true) },
                         onNotAPerson = { viewModel.setIsPerson(ledger, isPerson = false) },
+                        onWrongWayRound = { turning = ledger },
                     )
                 }
             }
@@ -309,6 +332,17 @@ fun SentToPeopleScreen(
                 )
             }
         }
+    }
+
+    turning?.let { ledger ->
+        TurnRoundDialog(
+            ledger = ledger,
+            onDismiss = { turning = null },
+            onConfirm = { toIn, toOut ->
+                viewModel.turnRound(ledger.name, toIn, toOut)
+                turning = null
+            },
+        )
     }
 
     filing?.let { chosen ->
@@ -430,6 +464,7 @@ private fun LedgerCard(
     onFileSent: () -> Unit,
     onFileReceived: () -> Unit,
     onNotAPerson: () -> Unit,
+    onWrongWayRound: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onToggle)) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -477,6 +512,7 @@ private fun LedgerCard(
                         TextButton(onClick = onFileReceived, modifier = Modifier.weight(1f)) { Text("File received") }
                     }
                 }
+                TextButton(onClick = onWrongWayRound) { Text("Some of these the wrong way round?") }
                 TextButton(onClick = onNotAPerson) { Text("Not a person — leave out") }
             }
         }
@@ -558,6 +594,9 @@ fun PeopleMoneyCard(
     monthLabel: String,
     onSeeAll: () -> Unit,
     modifier: Modifier = Modifier,
+    /** The whole year, for a small graph and the year's totals under the month. */
+    year: PeopleMoney? = null,
+    yearNumber: Int? = null,
 ) {
     Card(modifier = modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -575,10 +614,11 @@ fun PeopleMoneyCard(
             val people = money?.people.orEmpty()
             if (people.isEmpty()) {
                 Text(
-                    text = "No money sent to or from people this month.",
+                    text = "Nothing sent to or from people in $monthLabel yet.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (year != null && yearNumber != null) PeopleYearStrip(year, yearNumber)
                 return@Column
             }
             Spacer(Modifier.height(8.dp))
@@ -652,8 +692,46 @@ fun PeopleMoneyCard(
                     textAlign = androidx.compose.ui.text.style.TextAlign.End,
                 )
             }
+            if (year != null && yearNumber != null) PeopleYearStrip(year, yearNumber)
         }
     }
+}
+
+/**
+ * The year so far under the month: a small graph of what you sent and what
+ * came back, month by month, and who is up over the year.
+ */
+@Composable
+private fun PeopleYearStrip(year: PeopleMoney, yearNumber: Int) {
+    if (year.people.isEmpty()) return
+    val now = DateUtils.currentYearMonth()
+    val months = (if (yearNumber == now.year) now.monthValue else 12).coerceAtLeast(2)
+    val sent = LongArray(months)
+    val received = LongArray(months)
+    year.people.forEach { ledger ->
+        ledger.sent.forEach { if (it.date.year == yearNumber && it.date.monthValue <= months) sent[it.date.monthValue - 1] += it.amountMinor }
+        ledger.received.forEach { if (it.date.year == yearNumber && it.date.monthValue <= months) received[it.date.monthValue - 1] += it.amountMinor }
+    }
+    val colors = FinanceTheme.colors
+    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+    Text("So far in $yearNumber", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+    Spacer(Modifier.height(4.dp))
+    TrendLineChart(
+        labels = (1..months).map { DateUtils.monthNameShort(it) },
+        series = listOf(
+            LineSeries("You sent", sent.toList(), colors.chartOut),
+            LineSeries("They sent you", received.toList(), colors.chartIn, dashed = true, marker = MarkerShape.SQUARE),
+        ),
+        height = 150.dp,
+        surface = androidx.compose.material3.CardDefaults.cardColors().containerColor,
+    )
+    Spacer(Modifier.height(6.dp))
+    Text(
+        text = "You sent ${Money.format(year.sentMinor)} · they sent ${Money.format(year.receivedMinor)} — " +
+            whoIsUp(year.receivedMinor - year.sentMinor).replaceFirstChar { it.lowercase() },
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 /** How many people the Home card lists before "See all". */
@@ -789,4 +867,79 @@ private fun YearGraphCard(
             fontWeight = FontWeight.SemiBold,
         )
     }
+}
+
+/** The category money from people goes under when it is turned round. */
+private const val MONEY_FROM_PEOPLE = "Money from people"
+private const val MONEY_TO_PEOPLE = "People & services"
+
+/**
+ * Every payment with one person, each ticked to swap sides: sent becomes
+ * "they sent you", and the other way. Ones recorded as sent that read like
+ * money in start ticked.
+ */
+@Composable
+private fun TurnRoundDialog(
+    ledger: PersonLedger,
+    onDismiss: () -> Unit,
+    onConfirm: (toMoneyIn: List<PayeeEntry>, toMoneyOut: List<PayeeEntry>) -> Unit,
+) {
+    var ticked by remember(ledger.key) {
+        mutableStateOf(ledger.sent.filter { com.rhys.financetracker.data.importer.PayeeNames.readsLikeMoneyIn(it.description) }.map { it.id }.toSet())
+    }
+    val rows = ledger.sent.map { it to true } + ledger.received.map { it to false }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Which way did the money go?") },
+        text = {
+            Column {
+                Text(
+                    text = "Tick any that are on the wrong side and they swap: \"you sent\" becomes " +
+                        "\"they sent you\", and the other way. Ones that read like money in are ticked already.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                LazyColumn(modifier = Modifier.heightIn(max = 380.dp)) {
+                    items(rows.sortedByDescending { it.first.date }, key = { it.first.id }) { (entry, isSent) ->
+                        val on = entry.id in ticked
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { ticked = if (on) ticked - entry.id else ticked + entry.id }
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            androidx.compose.material3.Checkbox(
+                                checked = on,
+                                onCheckedChange = { ticked = if (on) ticked - entry.id else ticked + entry.id },
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(entry.description, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                val side = if (isSent != on) "You sent" else "They sent you"
+                                Text(
+                                    text = "${DateUtils.formatShort(entry.date)} · ${Money.format(entry.amountMinor)} · " +
+                                        (if (on) "will be: $side" else side),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = ticked.isNotEmpty(),
+                onClick = {
+                    onConfirm(
+                        ledger.sent.filter { it.id in ticked },
+                        ledger.received.filter { it.id in ticked },
+                    )
+                },
+            ) { Text(if (ticked.isEmpty()) "Swap" else "Swap ${ticked.size}") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }

@@ -251,18 +251,25 @@ fun TrendLineChart(
 
             // The last figure on each line, written beside it.
             if (progress.value >= 1f && touched == null && series.size <= 4) {
-                val ends = series.map { it to yAt(it.values.getOrElse(points - 1) { 0L }) }
+                // A line may stop early — this month's, so far — so each is
+                // labelled where it ends.
+                val ends = series.filter { it.values.isNotEmpty() }
+                    .map { it to yAt(it.values.take(points).last()) }
                     .sortedBy { it.second }
                 var lastY = -1000f
-                labelPaint.textAlign = Paint.Align.RIGHT
                 labelPaint.color = ink.toArgb()
                 labelPaint.textSize = 11.dp.toPx()
                 ends.forEach { (line, y) ->
+                    val last = line.values.take(points).size - 1
                     val placed = maxOf(y - 9.dp.toPx(), lastY + 13.dp.toPx())
                     lastY = placed
+                    // At the right edge the label sits inside it; a line that
+                    // stops early has its label just after its last point.
+                    val atEdge = last >= points - 1
+                    labelPaint.textAlign = if (atEdge) Paint.Align.RIGHT else Paint.Align.LEFT
                     drawContext.canvas.nativeCanvas.drawText(
-                        Money.formatCompact(line.values.getOrElse(points - 1) { 0L }),
-                        right - 8.dp.toPx(),
+                        Money.formatCompact(line.values[last]),
+                        if (atEdge) right - 8.dp.toPx() else xAt(last) + 6.dp.toPx(),
                         placed.coerceAtLeast(top),
                         labelPaint,
                     )
@@ -284,7 +291,7 @@ fun TrendLineChart(
                     left = left,
                     right = right,
                     title = labels[i],
-                    rows = series.map { it to it.values.getOrElse(i) { 0L } },
+                    rows = series.filter { i < it.values.size }.map { it to it.values[i] },
                     back = tooltipBack,
                     ink = tooltipInk,
                     surface = surface,

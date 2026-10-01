@@ -91,4 +91,14 @@ object PayeeNames {
             " standing order", " so ", " mobile payment", " sent to", " paym ",
         ).any { text.contains(it) }
     }
+
+    /**
+     * True when a payment recorded as sent reads like money that came in —
+     * "Bank credit H Payne", "From J Smith", "Received" — the kind an older
+     * reading of a statement put on the wrong side.
+     */
+    fun readsLikeMoneyIn(description: String): Boolean {
+        val text = " ${TransactionFingerprint.normaliseDescription(description)} "
+        return listOf(" credit ", " from ", " received ", " paid in ", " receipt ", " refund ").any { text.contains(it) }
+    }
 }
