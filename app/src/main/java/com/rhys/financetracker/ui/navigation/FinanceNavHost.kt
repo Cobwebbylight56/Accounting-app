@@ -153,7 +153,7 @@ private fun SoftBottomBar(
                     val selected = currentRoute == destination.route
                     Box(
                         modifier = Modifier
-                            .size(52.dp)
+                            .size(48.dp)
                             .clip(CircleShape)
                             .clickable { onSelect(destination) }
                             .semantics { this.selected = selected },
@@ -166,7 +166,7 @@ private fun SoftBottomBar(
                                 shadowElevation = 6.dp,
                                 border = BorderStroke(3.dp, MaterialTheme.colorScheme.background),
                                 modifier = Modifier
-                                    .size(52.dp)
+                                    .size(48.dp)
                                     .offset(y = (-14).dp),
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
@@ -217,6 +217,12 @@ private fun NavGraphBuilder.topLevelDestinations(
         )
     }
 
+    composable(Routes.SPENDING) {
+        com.rhys.financetracker.ui.spending.SpendingScreen(
+            onOpenLedger = { navController.navigateToTab(Routes.TRANSACTIONS) },
+        )
+    }
+
     composable(Routes.TRANSACTIONS) {
         TransactionListScreen(
             onOpenTransaction = { navController.navigate(Routes.transactionEdit(it)) },
@@ -235,7 +241,10 @@ private fun NavGraphBuilder.topLevelDestinations(
     }
 
     composable(Routes.REPORTS) {
-        ReportsScreen(onShareFile = onShareFile)
+        ReportsScreen(
+            onShareFile = onShareFile,
+            onOpenLedger = { navController.navigateToTab(Routes.TRANSACTIONS) },
+        )
     }
 
     composable(Routes.MORE) {

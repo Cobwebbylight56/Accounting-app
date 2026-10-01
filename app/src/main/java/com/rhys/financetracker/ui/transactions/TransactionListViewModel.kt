@@ -105,8 +105,10 @@ class TransactionListViewModel @Inject constructor(
         viewModelScope.launch {
             ledgerRequests.requests.collect { request ->
                 if (request != null) {
-                    filter.value = request
-                    searchText.value = ""
+                    // Any words go in the search box, where they can be seen
+                    // and cleared, rather than hidden in the filter.
+                    filter.value = request.copy(text = null)
+                    searchText.value = request.text.orEmpty()
                     ledgerRequests.consumed()
                 }
             }

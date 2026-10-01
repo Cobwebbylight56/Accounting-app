@@ -23,10 +23,23 @@ class LedgerRequests @Inject constructor() {
     val requests: StateFlow<TransactionFilter?> = pending
 
     /** One category's payments in [month]; a null [categoryId] means the uncategorised ones. */
-    fun openCategory(categoryId: Long?, month: YearMonth) {
+    fun openCategory(categoryId: Long?, month: YearMonth) =
+        openCategoryBetween(categoryId, month.atDay(1), month.atEndOfMonth())
+
+    /** One category's payments between two dates — a report's period, say. */
+    fun openCategoryBetween(categoryId: Long?, from: java.time.LocalDate, to: java.time.LocalDate) {
         pending.value = TransactionFilter(
             categoryIds = categoryId?.let { setOf(it) }.orEmpty(),
             onlyUncategorised = categoryId == null,
+            dateFrom = from,
+            dateTo = to,
+        )
+    }
+
+    /** A search for [text] in [month] — one payee's payments, say. */
+    fun openSearch(text: String, month: YearMonth) {
+        pending.value = TransactionFilter(
+            text = text,
             dateFrom = month.atDay(1),
             dateTo = month.atEndOfMonth(),
         )

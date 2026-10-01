@@ -157,49 +157,30 @@ internal fun CategoryTilesCard(
     state: DashboardState,
     onCategoryClick: (Long?, String, String?) -> Unit,
 ) {
-    val top = state.spendingByCategory
-        .filter { it.totalMinor > 0L }
-        .take(CATEGORY_TILE_COUNT)
-
+    // Drawn however it was last left: tiles, a chart, bars or a list.
+    val (view, setView) = com.rhys.financetracker.ui.components.rememberCardView(
+        "home_where",
+        com.rhys.financetracker.ui.components.BreakdownView.TILES,
+    )
     SectionCard(
         title = "Where it went",
         subtitle = DateUtils.formatMonth(state.month),
-    ) {
-        if (top.isEmpty()) {
-            Text(
-                "Nothing spent yet this month.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+        action = {
+            com.rhys.financetracker.ui.components.ViewSwitchButton(
+                view,
+                com.rhys.financetracker.ui.components.CATEGORY_VIEWS,
+                setView,
             )
-            return@SectionCard
-        }
-        // Two to a row: wide enough for "Household bills" and a figure without
-        // either being cut short.
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            top.chunked(2).forEach { pair ->
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    pair.forEachIndexed { offset, entry ->
-                        StatTile(
-                            label = entry.categoryName ?: "Uncategorised",
-                            value = Money.format(entry.totalMinor),
-                            caption = "${entry.transactionCount} " +
-                                if (entry.transactionCount == 1) "entry" else "entries",
-                            modifier = Modifier.weight(1f),
-                            onClick = {
-                                onCategoryClick(
-                                    entry.categoryId,
-                                    entry.categoryName ?: "Uncategorised",
-                                    entry.categoryColor,
-                                )
-                            },
-                        )
-                        // Keeps a lone tile on the last row half-width rather
-                        // than letting it stretch across.
-                        if (pair.size == 1 && offset == 0) Spacer(Modifier.weight(1f))
-                    }
-                }
-            }
-        }
+        },
+    ) {
+        com.rhys.financetracker.ui.components.CategoryBreakdown(
+            totals = state.spendingByCategory,
+            view = view,
+            maxRows = CATEGORY_TILE_COUNT,
+            onOpen = { entry ->
+                onCategoryClick(entry.categoryId, entry.categoryName ?: "Uncategorised", entry.categoryColor)
+            },
+        )
     }
 }
 
@@ -882,37 +863,28 @@ internal fun SpendingByCategoryCard(
     state: DashboardState,
     onCategoryClick: (Long?, String, String?) -> Unit,
 ) {
-    val totals = state.spendingByCategory
-    val entries = totals.mapIndexed { index, total ->
-        ChartEntry(
-            label = total.categoryName ?: "Uncategorised",
-            value = total.totalMinor.toFloat(),
-            color = colorFromHex(total.categoryColor, index),
-            displayValue = Money.format(total.totalMinor),
-        )
-    }
-    // The chart drops zero-value entries, so index back through the same
-    // filtered list rather than the raw totals.
-    val tappable = totals.filter { it.totalMinor > 0L }
-
-    fun open(index: Int) {
-        tappable.getOrNull(index)?.let {
-            onCategoryClick(it.categoryId, it.categoryName ?: "Uncategorised", it.categoryColor)
-        }
-    }
-
+    val (view, setView) = com.rhys.financetracker.ui.components.rememberCardView(
+        "home_spending",
+        com.rhys.financetracker.ui.components.BreakdownView.CHART,
+    )
     SectionCard(
         title = "Spending by category",
-        subtitle = if (entries.isEmpty()) null else "Tap a slice to see what is in it",
+        subtitle = "Tap one to see what is in it",
+        action = {
+            com.rhys.financetracker.ui.components.ViewSwitchButton(
+                view,
+                com.rhys.financetracker.ui.components.CATEGORY_VIEWS,
+                setView,
+            )
+        },
     ) {
-        DonutChart(
-            entries = entries,
-            centreLabel = "spent",
-            centreValue = Money.formatCompact(state.summary.monthExpenseMinor),
-            onSliceClick = { index -> index?.let(::open) },
+        com.rhys.financetracker.ui.components.CategoryBreakdown(
+            totals = state.spendingByCategory,
+            view = view,
+            onOpen = { entry ->
+                onCategoryClick(entry.categoryId, entry.categoryName ?: "Uncategorised", entry.categoryColor)
+            },
         )
-        Spacer(Modifier.height(14.dp))
-        ChartLegend(entries = entries, onEntryClick = ::open)
     }
 }
 
@@ -921,45 +893,27 @@ internal fun IncomeVsExpenseCard(
     state: DashboardState,
     onMonthClick: (java.time.YearMonth) -> Unit,
 ) {
-    val colors = FinanceTheme.colors
-    val groups = state.monthlyTrend.map { point ->
-        BarGroup(
-            label = DateUtils.monthNameShort(point.yearMonth.monthValue),
-            bars = listOf(
-                ChartEntry(
-                    label = "In",
-                    value = point.incomeMinor.toFloat(),
-                    color = colors.income,
-                    displayValue = Money.format(point.incomeMinor),
-                ),
-                ChartEntry(
-                    label = "Out",
-                    value = point.expenseMinor.toFloat(),
-                    color = colors.expense,
-                    displayValue = Money.format(point.expenseMinor),
-                ),
-            ),
-        )
-    }
-    val selected = state.monthlyTrend.indexOfFirst { it.yearMonth == state.month }
-        .takeIf { it >= 0 }
-
+    val (view, setView) = com.rhys.financetracker.ui.components.rememberCardView(
+        "home_trend",
+        com.rhys.financetracker.ui.components.BreakdownView.BARS,
+    )
     SectionCard(
         title = "Income against spending",
-        subtitle = "The last ${groups.size} months · tap a month to open it",
+        subtitle = "The last ${state.monthlyTrend.size} months · tap a month to open it",
+        action = {
+            com.rhys.financetracker.ui.components.ViewSwitchButton(
+                view,
+                com.rhys.financetracker.ui.components.TREND_VIEWS,
+                setView,
+            )
+        },
     ) {
-        GroupedBarChart(
-            groups = groups,
-            selectedIndex = selected,
-            onGroupClick = { index ->
-                state.monthlyTrend.getOrNull(index)?.let { onMonthClick(it.yearMonth) }
-            },
+        com.rhys.financetracker.ui.components.MonthTrend(
+            points = state.monthlyTrend,
+            view = view,
+            selected = state.month,
+            onMonth = onMonthClick,
         )
-        Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            LegendSwatch("Money in", colors.income)
-            LegendSwatch("Money out", colors.expense)
-        }
         state.monthlyTrend.firstOrNull { it.yearMonth == state.month }?.let { current ->
             Spacer(Modifier.height(10.dp))
             Text(

@@ -13,6 +13,7 @@ Along the bottom of the screen:
 |---|---|
 | **Home** | The dashboard: what you have, what came in, what went out, what is still to pay |
 | **Money** | Every transaction, searchable and filterable |
+| **Spending** | Where the money went this month — by category, month by month, and who it went to |
 | **Savings** | Your savings accounts and cash pot (tap one to open it), then your goals |
 | **Reports** | Printable summaries and charts |
 | **More** | Accounts, people, regular payments, categories, import, settings |
@@ -498,6 +499,23 @@ loans and mortgages. Home lists them all under **Cards, loans and pay later**:
 a card shows what's owed and how much of its limit is used; a pay-later plan or
 loan shows what's left and how much is paid off. A pay-later plan or loan
 disappears once it's paid off; a card stays.
+
+### The Spending tab
+
+The second tab is all about where the money goes, for one month at a time
+(arrows to step back), for everyone or one person:
+
+* **How much was spent**, what came in, and how that compares with last month.
+* **Where it went** — every category, tap one to see its payments in Money.
+* **Month by month** — money in against money out over six months; tap a month
+  to look at it.
+* **Who it went to** — the ten biggest payees; tap one to see their payments.
+
+**The button in each card's top corner changes how it's drawn**: a chart, bars
+(with ▲/▼ against last month), tiles or a list — one tap moves to the next. It's
+on every card like this, here, on Home ("Where it went", "Spending by
+category", "Income against spending") and in Reports, and each card remembers
+how you left it.
 
 ### Sort spending
 

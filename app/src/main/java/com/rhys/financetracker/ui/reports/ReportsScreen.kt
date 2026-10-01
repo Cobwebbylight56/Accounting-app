@@ -78,6 +78,7 @@ import kotlinx.coroutines.flow.first
 @Composable
 fun ReportsScreen(
     onShareFile: (com.rhys.financetracker.data.export.ExportedFile) -> Unit,
+    onOpenLedger: () -> Unit = {},
     viewModel: ReportsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -205,7 +206,12 @@ fun ReportsScreen(
 
             state.report?.let { report ->
                 if (report.charts.categoryTotals.isNotEmpty()) {
-                    item { CategoryChartCard(report.charts.categoryTotals) }
+                    item {
+                        CategoryChartCard(report.charts.categoryTotals) { total ->
+                            viewModel.openCategory(total.categoryId)
+                            onOpenLedger()
+                        }
+                    }
                 }
                 if (report.charts.monthlySeries.isNotEmpty()) {
                     item { MonthlyChartCard(report.charts.monthlySeries) }
@@ -303,61 +309,28 @@ private fun ScopeChips(state: ReportsState, onScopeChange: (ReportScope) -> Unit
 @Composable
 private fun CategoryChartCard(
     totals: List<com.rhys.financetracker.data.local.projection.CategoryTotal>,
+    onOpen: (com.rhys.financetracker.data.local.projection.CategoryTotal) -> Unit,
 ) {
-    var selected by remember(totals) { mutableStateOf<Int?>(null) }
-    val entries = totals.mapIndexed { index, total ->
-        ChartEntry(
-            label = total.categoryName ?: "Uncategorised",
-            value = total.totalMinor.toFloat(),
-            color = colorFromHex(total.categoryColor, index),
-            displayValue = Money.format(total.totalMinor),
-        )
-    }
-    val tappable = totals.filter { it.totalMinor > 0L }
-    val grandTotal = tappable.sumOf { it.totalMinor }
-
+    val (view, setView) = com.rhys.financetracker.ui.components.rememberCardView(
+        "reports_category",
+        com.rhys.financetracker.ui.components.BreakdownView.CHART,
+    )
     SectionCard(
         title = "By category",
-        subtitle = "Tap a slice to see its share",
+        subtitle = "Tap one to see its payments",
+        action = {
+            com.rhys.financetracker.ui.components.ViewSwitchButton(
+                view,
+                com.rhys.financetracker.ui.components.CATEGORY_VIEWS,
+                setView,
+            )
+        },
     ) {
-        DonutChart(
-            entries = entries,
-            centreLabel = selected?.let { "of the total" } ?: "total",
-            centreValue = selected?.let { index ->
-                tappable.getOrNull(index)?.let { Money.formatCompact(it.totalMinor) }
-            } ?: Money.formatCompact(grandTotal),
-            selectedIndex = selected,
-            onSliceClick = { index -> selected = if (index == selected) null else index },
-        )
-
-        selected?.let { index ->
-            tappable.getOrNull(index)?.let { total ->
-                Spacer(Modifier.height(10.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    ColorDot(colorFromHex(total.categoryColor, index))
-                    Spacer(Modifier.width(10.dp))
-                    Text(
-                        text = "${total.categoryName ?: "Uncategorised"} · " +
-                            "${Money.format(total.totalMinor)} across " +
-                            "${total.transactionCount} " +
-                            (if (total.transactionCount == 1) "entry" else "entries") +
-                            if (grandTotal > 0L) {
-                                " · ${(total.totalMinor * 100 / grandTotal)}% of the total"
-                            } else {
-                                ""
-                            },
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-            }
-        }
-
-        Spacer(Modifier.height(14.dp))
-        ChartLegend(
-            entries = entries,
-            maxItems = 12,
-            selectedIndex = selected,
-            onEntryClick = { index -> selected = if (index == selected) null else index },
+        com.rhys.financetracker.ui.components.CategoryBreakdown(
+            totals = totals,
+            view = view,
+            onOpen = onOpen,
+            centreLabel = "total",
         )
     }
 }
@@ -366,61 +339,21 @@ private fun CategoryChartCard(
 private fun MonthlyChartCard(
     series: List<com.rhys.financetracker.domain.report.MonthPoint>,
 ) {
-    val colors = FinanceTheme.colors
-    var selected by remember(series) { mutableStateOf<Int?>(null) }
-
+    val (view, setView) = com.rhys.financetracker.ui.components.rememberCardView(
+        "reports_trend",
+        com.rhys.financetracker.ui.components.BreakdownView.BARS,
+    )
     SectionCard(
         title = "Month by month",
-        subtitle = "Tap a column for that month's figures",
+        action = {
+            com.rhys.financetracker.ui.components.ViewSwitchButton(
+                view,
+                com.rhys.financetracker.ui.components.TREND_VIEWS,
+                setView,
+            )
+        },
     ) {
-        GroupedBarChart(
-            groups = series.map { point ->
-                BarGroup(
-                    label = DateUtils.monthNameShort(point.yearMonth.monthValue),
-                    bars = listOf(
-                        ChartEntry(
-                            "In",
-                            point.incomeMinor.toFloat(),
-                            colors.income,
-                            Money.format(point.incomeMinor),
-                        ),
-                        ChartEntry(
-                            "Out",
-                            point.expenseMinor.toFloat(),
-                            colors.expense,
-                            Money.format(point.expenseMinor),
-                        ),
-                    ),
-                )
-            },
-            selectedIndex = selected,
-            onGroupClick = { index -> selected = if (index == selected) null else index },
-        )
-        Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                ColorDot(colors.income)
-                Spacer(Modifier.width(6.dp))
-                Text("Money in", style = MaterialTheme.typography.bodySmall)
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                ColorDot(colors.expense)
-                Spacer(Modifier.width(6.dp))
-                Text("Money out", style = MaterialTheme.typography.bodySmall)
-            }
-        }
-        selected?.let { index ->
-            series.getOrNull(index)?.let { point ->
-                Spacer(Modifier.height(10.dp))
-                Text(
-                    text = "${DateUtils.formatMonth(point.yearMonth)}: " +
-                        "${Money.format(point.incomeMinor)} in, " +
-                        "${Money.format(point.expenseMinor)} out, " +
-                        "${Money.format(point.netMinor, showSign = true)} left over",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-        }
+        com.rhys.financetracker.ui.components.MonthTrend(points = series, view = view)
     }
 }
 

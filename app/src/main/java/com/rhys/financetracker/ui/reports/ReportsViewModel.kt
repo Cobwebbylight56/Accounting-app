@@ -43,7 +43,15 @@ class ReportsViewModel @Inject constructor(
     private val reportPrinter: ReportPrinter,
     accountRepository: AccountRepository,
     peopleRepository: PeopleRepository,
+    private val ledgerRequests: com.rhys.financetracker.ui.transactions.LedgerRequests,
 ) : ViewModel() {
+
+    /** Leaves the Money tab a filter for this category over the report's period. */
+    fun openCategory(categoryId: Long?) {
+        val current = period.value
+        ledgerRequests.openCategoryBetween(categoryId, current.start, current.end)
+    }
+
 
     private val reportType = MutableStateFlow(ReportType.MONTHLY_SPENDING)
     private val period = MutableStateFlow(ReportPeriod.month(DateUtils.currentYearMonth()))

@@ -4,6 +4,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Assessment
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.MoreHoriz
+import androidx.compose.material.icons.outlined.PieChart
 import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.Savings
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -17,6 +18,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
  */
 object Routes {
     const val DASHBOARD = "dashboard"
+    const val SPENDING = "spending"
     const val TRANSACTIONS = "transactions"
     const val SAVINGS = "savings"
     const val REPORTS = "reports"
@@ -98,13 +100,14 @@ object Routes {
         "$IMPORT?$ARG_ACCOUNT_ID={$ARG_ACCOUNT_ID}&$ARG_PERSON_ID={$ARG_PERSON_ID}"
 }
 
-/** The five tabs along the bottom. */
+/** The tabs along the bottom. Spending has its own: where the money goes matters most. */
 enum class TopLevelDestination(
     val route: String,
     val label: String,
     val icon: ImageVector,
 ) {
     DASHBOARD(Routes.DASHBOARD, "Home", Icons.Outlined.Home),
+    SPENDING(Routes.SPENDING, "Spending", Icons.Outlined.PieChart),
     TRANSACTIONS(Routes.TRANSACTIONS, "Money", Icons.Outlined.ReceiptLong),
     SAVINGS(Routes.SAVINGS, "Savings", Icons.Outlined.Savings),
     REPORTS(Routes.REPORTS, "Reports", Icons.Outlined.Assessment),

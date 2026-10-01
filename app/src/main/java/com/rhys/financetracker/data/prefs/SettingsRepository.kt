@@ -64,6 +64,7 @@ class SettingsRepository @Inject constructor(
         val PAYEES_HIDDEN = stringSetPreferencesKey("payees_not_people")
         val NOTIFICATIONS_ASKED = booleanPreferencesKey("notifications_asked")
         val HOME_TRIMMED = booleanPreferencesKey("home_trimmed")
+        val CARD_VIEWS = stringPreferencesKey("card_views")
         val BACKUP_NUDGE_SNOOZED_UNTIL = longPreferencesKey("backup_nudge_snoozed_until")
     }
 
@@ -130,6 +131,9 @@ class SettingsRepository @Inject constructor(
             payeesNotPeople = prefs[Keys.PAYEES_HIDDEN].orEmpty(),
             notificationsAsked = prefs[Keys.NOTIFICATIONS_ASKED] ?: false,
             homeTrimmed = prefs[Keys.HOME_TRIMMED] ?: false,
+            cardViews = prefs[Keys.CARD_VIEWS].orEmpty().split(';')
+                .mapNotNull { pair -> pair.split('=').takeIf { it.size == 2 }?.let { it[0] to it[1] } }
+                .toMap(),
             backupNudgeSnoozedUntil = prefs[Keys.BACKUP_NUDGE_SNOOZED_UNTIL],
         )
     }
@@ -169,6 +173,16 @@ class SettingsRepository @Inject constructor(
     /** Who the Shared tab on Home covers; see [AppSettings.sharedPeopleIds]. */
     suspend fun setSharedPeople(ids: Set<Long>) =
         put(Keys.SHARED_PEOPLE, ids.sorted().joinToString(","))
+
+    /** Remembers how a card is drawn — chart, bars, tiles or list — by the card's key. */
+    suspend fun setCardView(card: String, view: String) {
+        context.dataStore.edit { prefs ->
+            val current = prefs[Keys.CARD_VIEWS].orEmpty().split(';')
+                .mapNotNull { pair -> pair.split('=').takeIf { it.size == 2 }?.let { it[0] to it[1] } }
+                .toMap()
+            prefs[Keys.CARD_VIEWS] = (current + (card to view)).entries.joinToString(";") { "${it.key}=${it.value}" }
+        }
+    }
 
     /** Records that Home's repeated cards have been switched off once; see DashboardViewModel. */
     suspend fun setHomeTrimmed() = put(Keys.HOME_TRIMMED, true)
@@ -241,6 +255,8 @@ data class AppSettings(
     val notificationsAsked: Boolean = false,
     /** True once Home's repeated cards have been switched off for this install. */
     val homeTrimmed: Boolean = false,
+    /** How each card is drawn, by card key; see setCardView. */
+    val cardViews: Map<String, String> = emptyMap(),
     /** The backup reminder stays hidden until then (epoch millis). */
     val backupNudgeSnoozedUntil: Long? = null,
 ) {
