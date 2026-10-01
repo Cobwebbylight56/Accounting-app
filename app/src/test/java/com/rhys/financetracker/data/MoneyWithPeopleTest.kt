@@ -54,7 +54,8 @@ class MoneyWithPeopleTest {
         val sent = listOf(
             entry(1, "PAYPAL *EBAY", 2_500, category = "Transfers & payments"),
             entry(2, "FASTER PAYMENT TO J SMITH", 5_000),
-            entry(3, "FASTER PAYMENT TO RUBY COOPER", 1_000),
+            // A surname that is also a fuel brand: guessed as a shop.
+            entry(3, "FASTER PAYMENT TO ROSS SHELL", 1_000),
         )
         val guessed = PayeeRepository.ledgers(sent, emptyList())
         assertEquals(listOf("J Smith"), guessed.people.map { it.name })
@@ -63,10 +64,10 @@ class MoneyWithPeopleTest {
         val answered = PayeeRepository.ledgers(
             sent,
             emptyList(),
-            kept = setOf("r cooper"),
+            kept = setOf("r shell"),
             hidden = setOf("j smith"),
         )
-        assertEquals(listOf("Ruby Cooper"), answered.people.map { it.name })
+        assertEquals(listOf("Ross Shell"), answered.people.map { it.name })
     }
 
     @Test

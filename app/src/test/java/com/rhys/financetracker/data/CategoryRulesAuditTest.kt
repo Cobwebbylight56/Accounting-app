@@ -105,4 +105,15 @@ class CategoryRulesAuditTest {
         )
         assertEquals("Groceries", MerchantCategoriser.categoryFor("Contactless Payment", learned = learned))
     }
+
+    @Test
+    fun `what the user chose for a payee outranks the list, under any reference`() {
+        // Filed one Tesco PFS under Groceries by hand: every Tesco PFS goes
+        // there, whatever its branch number, even though the list says Fuel.
+        val learned = mapOf("card payment tesco pfs 3012" to "Groceries")
+        assertEquals("Groceries", MerchantCategoriser.categoryFor("CARD PAYMENT TESCO PFS 4471", learned = learned))
+        assertEquals("Groceries", MerchantCategoriser.categoryFor("TESCO PFS 9", learned = learned))
+        // A different payee is not claimed.
+        assertEquals("Fuel", MerchantCategoriser.categoryFor("SHELL NEWPORT", learned = learned))
+    }
 }

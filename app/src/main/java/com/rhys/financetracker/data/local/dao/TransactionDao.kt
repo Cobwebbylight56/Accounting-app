@@ -903,6 +903,19 @@ interface TransactionDao {
     )
     fun observeUnsortedCount(vague: List<String>): Flow<Int>
 
+    /** Every entry of one [type] ('INCOME' or 'EXPENSE') that is not a move between accounts. */
+    @Query(
+        """
+        SELECT t.id AS id, t.description AS description, t.amount_minor AS amount_minor,
+               t.date AS date, c.name AS category_name
+        FROM transactions t
+        LEFT JOIN categories c ON c.id = t.category_id
+        WHERE t.is_archived = 0 AND t.type = :type AND t.transfer_account_id IS NULL
+          AND t.description != ''
+        """,
+    )
+    suspend fun entriesOfType(type: String): List<PayeeEntry>
+
     /** Every payment out that has a spending category, with that category's name. */
     @Query(
         """

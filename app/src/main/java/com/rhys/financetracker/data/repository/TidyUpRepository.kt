@@ -228,13 +228,17 @@ class TidyUpRepository @Inject constructor(
             .associate { TransactionFingerprint.normaliseDescription(it.description) to it.categoryName }
         if (learned.isEmpty()) return 0
         val names = categoryDao.getAll().associate { it.id to it.name }
+        val chosen = settingsRepository.settings.first().categoryPayeesChosen
         val byCategory = mutableMapOf<Long, MutableList<Long>>()
         transactionDao.getAutoFiled(UNTOUCHED_MILLIS).forEach { row ->
-            // Only for shops the built-in list does not know. Where it does,
-            // the list is right, and following a filing made before the list
+            // A payee the user has put in a category themselves goes where
+            // they said, whatever the built-in list thinks. Otherwise only
+            // shops the list does not know follow older filings: where it
+            // does, the list is right, and following a filing made before it
             // knew better would undo the fix.
+            val userChose = PayeeNames.of(row.description).lowercase() in chosen
             val known = MerchantCategoriser.categoryFor(row.description, row.type)
-            if (known != null && known !in VAGUE && known !in WEAK) return@forEach
+            if (!userChose && known != null && known !in VAGUE && known !in WEAK) return@forEach
             val decided = MerchantCategoriser.learnedCategory(row.description, learned) ?: return@forEach
             if (decided.equals(names[row.categoryId], ignoreCase = true)) return@forEach
             val id = categoryIdFor(decided, row.type) ?: return@forEach
@@ -270,11 +274,13 @@ class TidyUpRepository @Inject constructor(
      * suggested; ones the user said to leave are not suggested again.
      */
     suspend fun suggestCategoryFixes(): List<CategoryFix> {
-        val kept = settingsRepository.settings.first().categoryFixesKept
+        val settings = settingsRepository.settings.first()
+        val kept = settings.categoryFixesKept
         return transactionDao.categorisedSpending()
             .mapNotNull { row ->
                 val payee = PayeeNames.of(row.description)
-                if (payee.isBlank()) return@mapNotNull null
+                // Never second-guess a payee the user filed themselves.
+                if (payee.isBlank() || payee.lowercase() in settings.categoryPayeesChosen) return@mapNotNull null
                 val suggested = MerchantCategoriser.categoryFor(row.description) ?: return@mapNotNull null
                 val current = row.categoryName ?: return@mapNotNull null
                 if (suggested in VAGUE || suggested in WEAK || suggested.equals(current, ignoreCase = true)) {

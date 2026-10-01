@@ -57,10 +57,18 @@ object MerchantCategoriser {
         // shop at all, and letting it claim everything that starts the same
         // way filed every card payment after it — Tesco PFS, Asda Living, the
         // lot — under whatever the bare one had been given.
-        return learned.entries.firstOrNull { (merchant, _) ->
+        learned.entries.firstOrNull { (merchant, _) ->
             merchant.length >= MIN_LEARNED_PREFIX &&
                 PayeeNames.of(merchant).isNotBlank() &&
                 (text.startsWith(merchant) || merchant.startsWith(text))
+        }?.let { return it.value }
+        // The same payee under a different reference: "TESCO PFS 3012" and
+        // "TESCO PFS 4471" are the one filling station. What the user chose
+        // for one goes for every one of them.
+        val payee = PayeeNames.of(description)
+        if (payee.isBlank()) return null
+        return learned.entries.firstOrNull { (merchant, _) ->
+            PayeeNames.of(merchant).equals(payee, ignoreCase = true)
         }?.value
     }
 

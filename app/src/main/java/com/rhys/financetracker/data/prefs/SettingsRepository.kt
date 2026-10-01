@@ -66,6 +66,7 @@ class SettingsRepository @Inject constructor(
         val HOME_TRIMMED = booleanPreferencesKey("home_trimmed")
         val CARD_VIEWS = stringPreferencesKey("card_views")
         val CATEGORY_FIXES_KEPT = stringSetPreferencesKey("category_fixes_kept")
+        val CATEGORY_PAYEES_CHOSEN = stringSetPreferencesKey("category_payees_chosen")
         val BACKUP_NUDGE_SNOOZED_UNTIL = longPreferencesKey("backup_nudge_snoozed_until")
     }
 
@@ -133,6 +134,7 @@ class SettingsRepository @Inject constructor(
             notificationsAsked = prefs[Keys.NOTIFICATIONS_ASKED] ?: false,
             homeTrimmed = prefs[Keys.HOME_TRIMMED] ?: false,
             categoryFixesKept = prefs[Keys.CATEGORY_FIXES_KEPT].orEmpty(),
+            categoryPayeesChosen = prefs[Keys.CATEGORY_PAYEES_CHOSEN].orEmpty(),
             cardViews = prefs[Keys.CARD_VIEWS].orEmpty().split(';')
                 .mapNotNull { pair -> pair.split('=').takeIf { it.size == 2 }?.let { it[0] to it[1] } }
                 .toMap(),
@@ -180,6 +182,18 @@ class SettingsRepository @Inject constructor(
     suspend fun keepCategories(keys: Set<String>) {
         context.dataStore.edit { prefs ->
             prefs[Keys.CATEGORY_FIXES_KEPT] = prefs[Keys.CATEGORY_FIXES_KEPT].orEmpty() + keys
+        }
+    }
+
+    /**
+     * Payees the user has put in a category themselves, by lowercase payee
+     * name. Their choice outranks the app's list of shops from then on.
+     */
+    suspend fun rememberCategoryChosen(payees: Set<String>) {
+        val keys = payees.map { it.trim().lowercase() }.filter { it.isNotEmpty() }.toSet()
+        if (keys.isEmpty()) return
+        context.dataStore.edit { prefs ->
+            prefs[Keys.CATEGORY_PAYEES_CHOSEN] = prefs[Keys.CATEGORY_PAYEES_CHOSEN].orEmpty() + keys
         }
     }
 
@@ -266,6 +280,8 @@ data class AppSettings(
     val homeTrimmed: Boolean = false,
     /** "payee|from|to" moves the user said to leave alone. */
     val categoryFixesKept: Set<String> = emptySet(),
+    /** Payees, lowercase, whose category the user picked themselves. */
+    val categoryPayeesChosen: Set<String> = emptySet(),
     /** How each card is drawn, by card key; see setCardView. */
     val cardViews: Map<String, String> = emptyMap(),
     /** The backup reminder stays hidden until then (epoch millis). */

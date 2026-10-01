@@ -151,6 +151,15 @@ on the filter icon tells you how many filters are active.
 
 Everything can be edited. Tap any entry to open it.
 
+**Your category goes for the whole payee.** Change the category of one
+payment and every other payment to the same payee moves with it — the edit
+screen says how many before you save ("the other 14 move too"). The bank's
+branch and reference numbers don't matter: "TESCO PFS 3012" and "TESCO PFS
+4471" are the same payee. New statements file that payee the same way, and
+your choice always beats the app's own list of shops — Sort everything and
+"Categories to check" never move it back. Payments with no payee name at all
+("Contactless payment" on its own) are left alone, as they could be anything.
+
 The three-dot menu on any row offers:
 
 - **Duplicate** — makes a copy on today's date. Handy for an irregular payment
@@ -603,6 +612,7 @@ How the app reads shop names, so you know what to expect:
 * A bare "contactless payment" with no shop name no longer decides where every
   other card payment goes, and the app only learns from payments **you** have
   filed, never from its own guesses.
+* Payees you've filed yourself are never listed here — your choice stands.
 
 ### Where each row goes
 

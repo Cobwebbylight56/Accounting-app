@@ -4,6 +4,7 @@ import com.rhys.financetracker.data.importer.PayeeNames
 import com.rhys.financetracker.data.local.dao.TransactionDao
 import com.rhys.financetracker.data.prefs.SettingsRepository
 import com.rhys.financetracker.data.local.projection.PayeeEntry
+import com.rhys.financetracker.domain.model.TransactionType
 import java.time.LocalDate
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -102,11 +103,48 @@ class PayeeRepository @Inject constructor(
         settingsRepository.setPayeeIsPerson(key, isPerson)
     }
 
-    /** Files every payment in [ids] under [categoryId]; the importer learns it too. */
-    suspend fun file(ids: List<Long>, categoryId: Long) {
+    /**
+     * Files every payment in [ids] under [categoryId]; the importer learns it
+     * too. [payees] are remembered as the user's own choice, which outranks
+     * the app's list of shops from then on.
+     */
+    suspend fun file(ids: List<Long>, categoryId: Long, payees: Collection<String> = emptyList()) {
         ids.chunked(BATCH).forEach { batch ->
             transactionDao.setCategory(batch, categoryId, System.currentTimeMillis())
         }
+        settingsRepository.rememberCategoryChosen(payees.toSet())
+    }
+
+    /**
+     * Every other entry of [type] to the same payee as [description] —
+     * "TESCO PFS 3012" finds "TESCO PFS 4471" too. Empty when the description
+     * names nobody ("CONTACTLESS PAYMENT"), or for moves between accounts.
+     */
+    suspend fun samePayee(description: String, type: TransactionType, exceptId: Long): List<PayeeEntry> {
+        if (type == TransactionType.TRANSFER) return emptyList()
+        val payee = PayeeNames.of(description)
+        if (payee.isBlank()) return emptyList()
+        return transactionDao.entriesOfType(type.name).filter { entry ->
+            entry.id != exceptId && PayeeNames.of(entry.description).equals(payee, ignoreCase = true)
+        }
+    }
+
+    /**
+     * The user put one payment in a category: every other payment to that
+     * payee goes there too, whatever it was in before, and so do new
+     * statements. Returns how many others moved.
+     */
+    suspend fun fileEveryPaymentLike(
+        description: String,
+        type: TransactionType,
+        categoryId: Long,
+        exceptId: Long,
+    ): Int {
+        val payee = PayeeNames.of(description)
+        if (payee.isBlank()) return 0
+        val others = samePayee(description, type, exceptId)
+        file(others.map { it.id }, categoryId, listOf(payee))
+        return others.size
     }
 
     private fun group(entries: List<PayeeEntry>): List<PayeeGroup> =

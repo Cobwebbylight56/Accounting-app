@@ -164,6 +164,19 @@ fun TransactionEditScreen(
                 optionColor = { colorFromHex(it.colorHex) },
                 placeholder = "Not categorised",
             )
+            if (state.movesOthers) {
+                val chosen = state.categories.firstOrNull { it.id == state.form.categoryId }?.name.orEmpty()
+                Text(
+                    text = if (state.otherPayments > 0) {
+                        "Every payment to ${state.payee} goes under $chosen — the other " +
+                            "${state.otherPayments} move too, and new statements follow."
+                    } else {
+                        "Payments to ${state.payee} go under $chosen from now on."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
 
             DropdownField(
                 label = "Who is this for?",

@@ -110,7 +110,7 @@ abstract class PayeeListViewModel(
 
     fun file(group: PayeeGroup, category: CategoryEntity) {
         viewModelScope.launch {
-            payees.file(group.ids, category.id)
+            payees.file(group.ids, category.id, listOf(group.name))
             message.value = "${group.name}: ${group.count} " +
                 (if (group.count == 1) "payment" else "payments") +
                 " filed under ${category.name}. New statements will do the same."
