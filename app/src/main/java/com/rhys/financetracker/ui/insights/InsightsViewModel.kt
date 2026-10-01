@@ -29,6 +29,7 @@ import javax.inject.Inject
 class InsightsViewModel @Inject constructor(
     private val insightRepository: InsightRepository,
     transactionRepository: com.rhys.financetracker.data.repository.TransactionRepository,
+    private val ledgerRequests: com.rhys.financetracker.ui.transactions.LedgerRequests,
 ) : ViewModel() {
 
     private val month = MutableStateFlow(DateUtils.currentYearMonth())
@@ -58,6 +59,11 @@ class InsightsViewModel @Inject constructor(
             isCurrentMonth = current == DateUtils.currentYearMonth(),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), InsightsState())
+
+    /** Leaves the Money tab a filter for this category in the month the advice is about. */
+    fun openInLedger(categoryId: Long?) {
+        ledgerRequests.openCategory(categoryId, month.value)
+    }
 
     fun showPreviousMonth() {
         month.value = month.value.minusMonths(1)

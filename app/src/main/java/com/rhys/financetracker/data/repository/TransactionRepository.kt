@@ -181,6 +181,12 @@ class TransactionRepository @Inject constructor(
             ids.size
         }
 
+    /** Puts back an entry that was just deleted, exactly as it was, id and all. */
+    suspend fun restore(transaction: TransactionEntity): AppResult<Long> =
+        runCatchingApp("Could not put that entry back") {
+            transactionDao.insert(transaction)
+        }
+
     suspend fun delete(transaction: TransactionEntity): AppResult<Unit> =
         runCatchingApp("Could not delete this transaction") {
             transactionDao.delete(transaction)

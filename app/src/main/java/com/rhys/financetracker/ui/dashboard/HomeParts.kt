@@ -278,56 +278,71 @@ internal fun HomeTiles(state: DashboardState, onOpenAccounts: () -> Unit) {
     val summary = state.summary
     val income = state.incomeInScope
     val owed = -summary.totalLiabilitiesMinor
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            HomeTile(
-                icon = Icons.Outlined.AccountBalanceWallet,
-                value = Money.formatCompact(summary.totalBalanceMinor),
-                label = "Available",
-                color = colors.tileBlue,
-                height = SHORT_TILE,
-                onClick = onOpenAccounts,
-            )
-            HomeTile(
-                icon = Icons.Outlined.CreditCard,
-                value = Money.formatCompact(owed.coerceAtLeast(0L)),
-                label = if (owed > 0L) "Owed on loans and cards" else "Nothing owed",
-                color = colors.tileBlush,
-                height = TALL_TILE,
-                onClick = onOpenAccounts,
+    Column {
+        // Looking back, the tiles hold that month's closing balances; saying so
+        // stops them being read as today's.
+        if (!state.isCurrentMonth) {
+            Text(
+                text = "Balances at the end of ${DateUtils.formatMonth(state.month)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp),
             )
         }
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            HomeTile(
-                icon = Icons.Outlined.Savings,
-                value = Money.formatCompact(summary.totalSavingsMinor),
-                label = when {
-                    summary.savingsNetMinor > 0L ->
-                        "Saved · ${Money.formatCompact(summary.savingsNetMinor)} put aside this month"
-                    else -> "Saved"
-                },
-                color = colors.tileSage,
-                height = TALL_TILE,
-                onClick = onOpenAccounts,
-            )
-            val monthly = income.netMonthlyMinor
-            HomeTile(
-                icon = Icons.Outlined.Payments,
-                value = Money.formatCompact(monthly ?: summary.monthIncomeMinor),
-                label = if (monthly != null) "Take-home a month" else "Money in this month",
-                color = colors.tileMist,
-                height = SHORT_TILE,
-                onClick = null,
-            )
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                HomeTile(
+                    icon = Icons.Outlined.AccountBalanceWallet,
+                    value = Money.format(summary.totalBalanceMinor),
+                    label = "Available",
+                    color = colors.tileBlue,
+                    height = SHORT_TILE,
+                    onClick = onOpenAccounts,
+                )
+                HomeTile(
+                    icon = Icons.Outlined.CreditCard,
+                    value = Money.format(owed.coerceAtLeast(0L)),
+                    label = if (owed > 0L) "Owed on loans and cards" else "Nothing owed",
+                    color = colors.tileBlush,
+                    height = TALL_TILE,
+                    onClick = onOpenAccounts,
+                )
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                HomeTile(
+                    icon = Icons.Outlined.Savings,
+                    value = Money.format(summary.totalSavingsMinor),
+                    label = when {
+                        summary.savingsNetMinor > 0L ->
+                            "Saved · ${Money.formatCompact(summary.savingsNetMinor)} put aside this month"
+                        else -> "Saved"
+                    },
+                    color = colors.tileSage,
+                    height = TALL_TILE,
+                    onClick = onOpenAccounts,
+                )
+                val monthly = income.netMonthlyMinor
+                HomeTile(
+                    icon = Icons.Outlined.Payments,
+                    value = Money.format(monthly ?: summary.monthIncomeMinor),
+                    label = if (monthly != null) "Take-home a month" else "Money in this month",
+                    color = colors.tileMist,
+                    height = SHORT_TILE,
+                    onClick = null,
+                )
+            }
         }
     }
 }
+
+/** Longer than this ("£12,345.67" and up) and a tile's figure drops a size. */
+private const val TILE_FULL_SIZE_CHARS = 9
 
 private val SHORT_TILE = 118.dp
 private val TALL_TILE = 168.dp
@@ -367,9 +382,15 @@ private fun HomeTile(
                 Icon(icon, contentDescription = null, tint = onTile, modifier = Modifier.size(20.dp))
             }
             Spacer(Modifier.height(10.dp))
+            // Exact to the penny: a balance is the one figure people check
+            // against their banking app. Long ones step down a size to fit.
             Text(
                 text = value,
-                style = MaterialTheme.typography.titleLarge,
+                style = if (value.length > TILE_FULL_SIZE_CHARS) {
+                    MaterialTheme.typography.titleMedium
+                } else {
+                    MaterialTheme.typography.titleLarge
+                },
                 color = onTile,
                 maxLines = 1,
             )
@@ -396,7 +417,7 @@ internal fun MonthList(state: DashboardState) {
     val month = DateUtils.formatMonth(state.month)
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
-            text = "This month",
+            text = if (state.isCurrentMonth) "This month" else month,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
         )

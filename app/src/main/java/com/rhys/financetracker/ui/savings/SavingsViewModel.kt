@@ -37,20 +37,23 @@ class SavingsViewModel @Inject constructor(
     private val message = MutableStateFlow<String?>(null)
 
     val state: StateFlow<SavingsState> = combine(
-        savingsRepository.observeWithProgress(),
+        savingsRepository.observeWithProgressIncludingArchived(),
         accountRepository.observeWithBalances().map { accounts -> accounts.filter { it.isSavings } },
         message,
-    ) { goals, savingsAccounts, text ->
+    ) { everyGoal, savingsAccounts, text ->
+        // Archived goals are kept to one side, where they can be brought
+        // back; everything that adds up is worked out from the live ones.
+        val (archived, goals) = everyGoal.partition { it.goal.isArchived }
+        fun summarise(goal: SavingsGoalWithProgress) = GoalSummary(
+            goal = goal,
+            requiredMonthlyMinor = SavingsProjection.requiredMonthlyMinor(goal),
+            projectedCompletion = SavingsProjection.projectedCompletion(goal),
+            isBehind = SavingsProjection.isBehindSchedule(goal),
+        )
         SavingsState(
             isLoading = false,
-            goals = goals.map { goal ->
-                GoalSummary(
-                    goal = goal,
-                    requiredMonthlyMinor = SavingsProjection.requiredMonthlyMinor(goal),
-                    projectedCompletion = SavingsProjection.projectedCompletion(goal),
-                    isBehind = SavingsProjection.isBehindSchedule(goal),
-                )
-            },
+            goals = goals.map { summarise(it) },
+            archivedGoals = archived.map { summarise(it) },
             totalSavedMinor = savingsAccounts.sumOf { it.balanceMinor },
             totalTargetMinor = goals.sumOf { it.goal.targetAmountMinor },
             totalInGoalsMinor = goals.sumOf { it.currentAmountMinor },
@@ -99,6 +102,8 @@ data class GoalSummary(
 data class SavingsState(
     val isLoading: Boolean = true,
     val goals: List<GoalSummary> = emptyList(),
+    /** Goals put away, which can be brought back. */
+    val archivedGoals: List<GoalSummary> = emptyList(),
     val totalSavedMinor: Long = 0L,
     val totalTargetMinor: Long = 0L,
     val totalInGoalsMinor: Long = 0L,

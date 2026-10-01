@@ -156,9 +156,15 @@ The three-dot menu on any row offers:
   you make often.
 - **Archive** — hides it from lists but keeps it in your history and your
   totals.
-- **Delete** — removes it permanently. Your totals change.
+- **Delete** — removes it. The message that follows has **Undo** for a few
+  seconds, which puts it back exactly as it was.
 
-When in doubt, archive. It is the only one you can undo.
+**Clearing out a statement that went in wrong:** filter the Money list down to it
+(the account and the dates), then **⋮ → Delete these N**. It is only offered
+while a filter or search is narrowing the list, so it can never mean everything.
+
+Archived goals and regular payments are not lost: **Show archived** at the
+bottom of the Savings tab and of Regular payments lists them, with **Restore**.
 
 ---
 
@@ -183,10 +189,20 @@ and the entries are all there to check.
 
 ### Choosing what is on the home screen
 
-Settings > Dashboard layout turns each card on or off and changes the order.
-Every card the app has appears in that list, including the charts.
+**Settings → What Home shows** turns each card on or off and changes the order.
+Each card is listed under the name it has on Home ("Coming up", "This month's
+payments", "Spending by category"…). The tiles and the month's figures at the
+top are always shown.
 
 If a card you expected is missing, that is where to switch it on.
+
+### Looking back at an earlier month
+
+The arrows beside the month step back through history. The tiles then show
+each balance **as it stood at the end of that month** ("Balances at the end of
+August 2026"), so they match that month's money in and out. **Today** jumps back.
+
+Tile figures are exact to the penny.
 
 ### Available and Saved
 
@@ -640,7 +656,8 @@ follows.
 **More → Advice**, or the Advice card on the home screen.
 
 This is the part a spreadsheet cannot do. It looks at what you have recorded and
-says, in plain words:
+says, in plain words (tap one about a category to open the Money tab on just
+those payments, for that month):
 
 - **Where spending has moved** — "You have spent £90 on takeaways this month —
   £30 more than your usual £60 (50% up on the last 3 months)", and what that
@@ -756,11 +773,15 @@ Each can be turned on separately:
 The app checks once a day at the hour you choose. It never wakes your phone more
 often than that, which is why it uses so little battery.
 
+Reminders start switched on, and once your first person is set up the app asks
+Android to allow them. If the phone is blocking them, this page says so in red
+with **Allow notifications** — none of the reminders can appear until then.
+
 ---
 
 ## Making it yours
 
-- **Settings → Dashboard layout** — turn cards on and off and change their
+- **Settings → What Home shows** — turn cards on and off and change their
   order.
 - **Settings → Appearance** — light or dark, wallpaper colours, larger text.
 - **More → Categories** — add, rename, recolour and group your own categories,

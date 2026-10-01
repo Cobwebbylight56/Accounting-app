@@ -89,6 +89,24 @@ fun DashboardScreen(
     val peopleMoney by viewModel.peopleMoney.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
 
+    // Reminders are on from the start, but on Android 13 and later none can
+    // appear until Android has asked. Asked once, after the first person is
+    // set up — not over the welcome screen, before anything makes sense.
+    val askForNotifications by viewModel.askForNotifications.collectAsStateWithLifecycle()
+    val notificationsAllowed = com.rhys.financetracker.ui.components.rememberNotificationsAllowed()
+    val askNotifications = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { }
+    val hasSomeone = individuals.isNotEmpty()
+    LaunchedEffect(askForNotifications, hasSomeone) {
+        if (askForNotifications && hasSomeone) {
+            viewModel.markNotificationsAsked()
+            if (!notificationsAllowed && android.os.Build.VERSION.SDK_INT >= 33) {
+                askNotifications.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
+
     // The cash buttons change a number further up the card, which is easy to
     // miss on a screen this busy — so what happened is said outright.
     LaunchedEffect(message) {
@@ -352,8 +370,8 @@ private fun DashboardCard(
     onOpenInsights: () -> Unit,
     onCategoryClick: (Long?, String, String?) -> Unit,
     onMonthClick: (java.time.YearMonth) -> Unit,
-    onRecordCash: (String, String, Boolean) -> Unit,
-    onCountCash: (String) -> Unit,
+    onRecordCash: (String, String, Boolean) -> Boolean,
+    onCountCash: (String) -> Boolean,
     onRemoveCash: (com.rhys.financetracker.data.local.entity.CashPotEntryEntity) -> Unit,
 ) {
     when (widget) {

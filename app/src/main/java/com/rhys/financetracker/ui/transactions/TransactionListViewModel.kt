@@ -48,12 +48,16 @@ class TransactionListViewModel @Inject constructor(
     private val categoryRepository: CategoryRepository,
     private val peopleRepository: PeopleRepository,
     private val exportManager: ExportManager,
+    ledgerRequests: LedgerRequests,
 ) : ViewModel() {
 
     private val filter = MutableStateFlow(TransactionFilter())
     private val searchText = MutableStateFlow("")
     private val message = MutableStateFlow<String?>(null)
     private val exported = MutableStateFlow<ExportedFile?>(null)
+
+    /** The entry just deleted from the list, kept until its Undo has had its chance. */
+    private val lastDeleted = MutableStateFlow<com.rhys.financetracker.data.local.entity.TransactionEntity?>(null)
 
     private val effectiveFilter: StateFlow<TransactionFilter> =
         combine(filter, searchText.debounce(SEARCH_DEBOUNCE_MS)) { current, text ->
@@ -73,7 +77,7 @@ class TransactionListViewModel @Inject constructor(
             categoryRepository.observeActive(),
             peopleRepository.observeActive(),
         ) { accounts, categories, people -> Triple(accounts, categories, people) },
-        combine(message, exported) { text, file -> text to file },
+        combine(message, exported, lastDeleted) { text, file, deleted -> Triple(text, file, deleted != null) },
     ) { items, currentFilter, text, options, messages ->
         val (accounts, categories, people) = options
         TransactionListState(
@@ -92,8 +96,22 @@ class TransactionListViewModel @Inject constructor(
                 .sumOf { it.transaction.amountMinor },
             message = messages.first,
             exportedFile = messages.second,
+            canUndoDelete = messages.third,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TransactionListState())
+
+    init {
+        // Another screen sent someone here to see something in particular.
+        viewModelScope.launch {
+            ledgerRequests.requests.collect { request ->
+                if (request != null) {
+                    filter.value = request
+                    searchText.value = ""
+                    ledgerRequests.consumed()
+                }
+            }
+        }
+    }
 
     fun setSearchText(text: String) {
         searchText.value = text
@@ -185,12 +203,32 @@ class TransactionListViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Deletes one entry straight from the list, with Undo on the message.
+     *
+     * The menu's Delete sits right under Archive; one slip used to remove a
+     * payment for good with nothing to bring it back.
+     */
     fun delete(id: Long) {
         viewModelScope.launch {
             val entity = transactionRepository.get(id) ?: return@launch
-            val result = transactionRepository.delete(entity)
-            message.value = result.errorMessageOrNull() ?: "Deleted"
+            val error = transactionRepository.delete(entity).errorMessageOrNull()
+            if (error == null) lastDeleted.value = entity
+            message.value = error ?: "Deleted \"${entity.description}\""
         }
+    }
+
+    fun undoDelete() {
+        val entity = lastDeleted.value ?: return
+        lastDeleted.value = null
+        viewModelScope.launch {
+            message.value = transactionRepository.restore(entity).errorMessageOrNull()
+        }
+    }
+
+    /** The Undo has had its chance; what was deleted stays deleted. */
+    fun forgetDeleted() {
+        lastDeleted.value = null
     }
 
     /** Exports whatever the current filter has produced, not the whole database. */
@@ -244,6 +282,8 @@ data class TransactionListState(
     val totalExpenseMinor: Long = 0L,
     val message: String? = null,
     val exportedFile: ExportedFile? = null,
+    /** True while the message on show is about an entry that Undo can still bring back. */
+    val canUndoDelete: Boolean = false,
 ) {
     val netMinor: Long get() = totalIncomeMinor - totalExpenseMinor
     val hasFilters: Boolean get() = !filter.isEmpty

@@ -89,6 +89,7 @@ fun RecurringScreen(
     val found by viewModel.found.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var pendingDelete by remember { mutableLongStateOf(0L) }
+    var showArchived by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
 
     found?.let { bills ->
         FoundBillsDialog(
@@ -127,7 +128,7 @@ fun RecurringScreen(
             }
         },
     ) { padding ->
-        if (state.rules.isEmpty() && state.typeFilter == null) {
+        if (state.rules.isEmpty() && state.typeFilter == null && state.archivedRules.isEmpty()) {
             EmptyState(
                 icon = Icons.Outlined.EventRepeat,
                 title = "Nothing repeating yet",
@@ -194,6 +195,40 @@ fun RecurringScreen(
                     onArchive = { viewModel.archive(item.rule.id, true) },
                     onDelete = { pendingDelete = item.rule.id },
                 )
+            }
+
+            // Archived ones used to vanish: nothing listed them, so there was
+            // no way back from "Archive".
+            if (state.archivedRules.isNotEmpty()) {
+                item {
+                    TextButton(onClick = { showArchived = !showArchived }) {
+                        Text(
+                            (if (showArchived) "Hide" else "Show") +
+                                " ${state.archivedRules.size} archived",
+                        )
+                    }
+                }
+                if (showArchived) {
+                    items(state.archivedRules, key = { "archived-${it.rule.id}" }) { item ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(item.rule.name, style = MaterialTheme.typography.bodyLarge)
+                                Text(
+                                    text = Money.format(item.rule.amountMinor) + " · " +
+                                        frequencyLabel(item.rule.frequency, item.rule.interval),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            TextButton(onClick = { viewModel.archive(item.rule.id, false) }) {
+                                Text("Restore")
+                            }
+                        }
+                    }
+                }
             }
         }
     }

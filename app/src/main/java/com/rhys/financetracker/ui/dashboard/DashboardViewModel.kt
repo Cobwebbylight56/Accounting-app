@@ -54,6 +54,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -89,6 +90,22 @@ class DashboardViewModel @Inject constructor(
 
     private val people = peopleRepository.observeActive()
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /**
+     * True when reminders are switched on but Android has never been asked
+     * whether the app may show them. They start switched on, and on Android
+     * 13 and later nothing appears until that question has been answered.
+     */
+    val askForNotifications: StateFlow<Boolean> = settingsRepository.settings
+        .map { s ->
+            !s.notificationsAsked &&
+                (s.notifyBills || s.notifyOverdue || s.notifyLowBalance || s.notifyGoals)
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun markNotificationsAsked() {
+        viewModelScope.launch { settingsRepository.setNotificationsAsked() }
+    }
 
     /** Who the Shared tab covers, as chosen; null means everybody. */
     val sharedPeopleIds: StateFlow<Set<Long>?> = settingsRepository.settings
@@ -137,6 +154,25 @@ class DashboardViewModel @Inject constructor(
     private val accounts: StateFlow<List<AccountWithBalance>> =
         accountRepository.observeWithBalances()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /**
+     * The accounts as they stood at the end of the month on screen.
+     *
+     * Looking back at August used to show August's money in and out beside
+     * today's balances, which never matched. For the current month the
+     * balances are today's; for an earlier one, each is worked out as it was
+     * at that month's close.
+     */
+    private val accountsForMonth: Flow<List<AccountWithBalance>> =
+        combine(accounts, visibleMonth) { list, month -> list to month }
+            .mapLatest { (list, month) ->
+                if (!month.isBefore(DateUtils.currentYearMonth())) {
+                    list
+                } else {
+                    val end = month.atEndOfMonth()
+                    list.map { it.copy(balanceMinor = accountRepository.balanceAsOf(it.account.id, end)) }
+                }
+            }
 
     private val monthFlow = combine(visibleMonth, scope) { month, currentScope ->
         month to currentScope
@@ -284,7 +320,7 @@ class DashboardViewModel @Inject constructor(
      */
     val state: StateFlow<DashboardState> = combine(
         listOf<Flow<Any?>>(
-            accounts,
+            accountsForMonth,
             totals,
             spendingByCategory,
             monthlyTrend,
@@ -503,11 +539,12 @@ class DashboardViewModel @Inject constructor(
      * not something the app can know, and a cash total that is quietly wrong
      * is worse than none at all.
      */
-    fun recordCash(amountText: String, note: String, isIn: Boolean) {
+    /** Returns false, leaving what was typed alone, when there is no amount to record. */
+    fun recordCash(amountText: String, note: String, isIn: Boolean): Boolean {
         val amount = Money.parseOrNull(amountText)
         if (amount == null || amount <= 0L) {
             message.value = "Enter an amount"
-            return
+            return false
         }
         viewModelScope.launch {
             val result = cashPotRepository.record(
@@ -522,19 +559,22 @@ class DashboardViewModel @Inject constructor(
                     "${Money.format(amount)} spent from the cash pot"
                 }
         }
+        return true
     }
 
     /** Sets the pot to what was counted in it; see [CashPotRepository.setTotalTo]. */
-    fun countCash(amountText: String) {
+    /** Returns false, leaving what was typed alone, when there is no amount to set. */
+    fun countCash(amountText: String): Boolean {
         val amount = Money.parseOrNull(amountText)
         if (amount == null || amount < 0L) {
             message.value = "Enter what is in the pot"
-            return
+            return false
         }
         viewModelScope.launch {
             message.value = cashPotRepository.setTotalTo(amount).errorMessageOrNull()
                 ?: "Cash pot set to ${Money.format(amount)}"
         }
+        return true
     }
 
     fun removeCashEntry(entry: CashPotEntryEntity) {

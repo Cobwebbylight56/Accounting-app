@@ -23,6 +23,9 @@ class RecurringRepository @Inject constructor(
 
     fun observeAll(): Flow<List<RecurringRuleWithDetails>> = ruleDao.observeActiveWithDetails()
 
+    /** Every rule, archived ones included, last. */
+    fun observeIncludingArchived(): Flow<List<RecurringRuleWithDetails>> = ruleDao.observeAllWithDetails()
+
     fun observeByType(type: TransactionType): Flow<List<RecurringRuleWithDetails>> =
         ruleDao.observeByType(type)
 

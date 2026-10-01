@@ -72,6 +72,7 @@ fun SettingsScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var showClearConfirm by remember { mutableStateOf(false) }
+    var showExampleConfirm by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.message) {
         state.message?.let {
@@ -111,8 +112,8 @@ fun SettingsScreen(
                 onClick = onOpenAppearance,
             )
             SettingsItem(
-                title = "Dashboard layout",
-                subtitle = "Choose which cards appear on the home screen",
+                title = "What Home shows",
+                subtitle = "Choose which cards appear on Home, and in what order",
                 icon = Icons.Outlined.Dashboard,
                 onClick = onOpenDashboardLayout,
             )
@@ -188,12 +189,16 @@ fun SettingsScreen(
                 icon = Icons.Outlined.Refresh,
                 onClick = viewModel::rebuildArchive,
             )
-            SettingsItem(
-                title = "Load the example household",
-                subtitle = "Adds a worked example so you can see how everything fits together",
-                icon = Icons.Outlined.PlayCircle,
-                onClick = viewModel::loadSampleData,
-            )
+            // Made-up people and payments mixed into real ones cannot be
+            // picked back out, so the example is only offered to an empty app.
+            if (!state.hasAccounts) {
+                SettingsItem(
+                    title = "Load the example household",
+                    subtitle = "Adds a worked example so you can see how everything fits together",
+                    icon = Icons.Outlined.PlayCircle,
+                    onClick = { showExampleConfirm = true },
+                )
+            }
             SettingsItem(
                 title = "Delete everything",
                 subtitle = "Clears all accounts, transactions and goals",
@@ -219,6 +224,21 @@ fun SettingsScreen(
                     "and the bank holiday calendar.",
             )
         }
+    }
+
+    if (showExampleConfirm) {
+        ConfirmDialog(
+            title = "Load the example household?",
+            message = "This adds made-up people, accounts and a few months of payments. " +
+                "They can only be taken out again with Delete everything, so it's for " +
+                "trying the app out before you add your own money.",
+            confirmLabel = "Load the example",
+            onConfirm = {
+                viewModel.loadSampleData()
+                showExampleConfirm = false
+            },
+            onDismiss = { showExampleConfirm = false },
+        )
     }
 
     if (showClearConfirm) {

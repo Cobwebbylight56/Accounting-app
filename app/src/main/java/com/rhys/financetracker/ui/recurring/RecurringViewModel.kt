@@ -82,15 +82,19 @@ class RecurringViewModel @Inject constructor(
     private val message = MutableStateFlow<String?>(null)
 
     val state: StateFlow<RecurringState> = combine(
-        recurringRepository.observeAll(),
+        recurringRepository.observeIncludingArchived(),
         recurringRepository.observeOverdue(),
         typeFilter,
         message,
-    ) { rules, overdue, filter, text ->
+    ) { everyRule, overdue, filter, text ->
+        // Archived ones are kept apart so they can be brought back; the
+        // monthly figures only count the live ones.
+        val (archived, rules) = everyRule.partition { it.rule.isArchived }
         val visible = rules.filter { filter == null || it.rule.type == filter }
         RecurringState(
             isLoading = false,
             rules = visible,
+            archivedRules = archived,
             overdueIds = overdue.map { it.rule.id }.toSet(),
             typeFilter = filter,
             monthlyIncomeMinor = rules
@@ -163,6 +167,8 @@ class RecurringViewModel @Inject constructor(
 data class RecurringState(
     val isLoading: Boolean = true,
     val rules: List<RecurringRuleWithDetails> = emptyList(),
+    /** Regular payments put away, which can be brought back. */
+    val archivedRules: List<RecurringRuleWithDetails> = emptyList(),
     val overdueIds: Set<Long> = emptySet(),
     val typeFilter: TransactionType? = null,
     val monthlyIncomeMinor: Long = 0L,

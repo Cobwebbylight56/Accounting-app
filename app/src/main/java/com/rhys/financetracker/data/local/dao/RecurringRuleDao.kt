@@ -38,6 +38,13 @@ interface RecurringRuleDao {
     )
     fun observeActiveWithDetails(): Flow<List<RecurringRuleWithDetails>>
 
+    /** Every rule, archived ones included (last), for bringing one back. */
+    @Query(
+        "SELECT $DETAIL_COLUMNS $DETAIL_JOINS " +
+            "ORDER BY r.is_archived ASC, r.next_due_date ASC, r.name ASC",
+    )
+    fun observeAllWithDetails(): Flow<List<RecurringRuleWithDetails>>
+
     @Query(
         "SELECT $DETAIL_COLUMNS $DETAIL_JOINS " +
             "WHERE r.is_archived = 0 AND r.type = :type ORDER BY r.next_due_date ASC",

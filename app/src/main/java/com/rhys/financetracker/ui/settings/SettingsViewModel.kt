@@ -49,6 +49,7 @@ class SettingsViewModel @Inject constructor(
     private val pinStore: PinStore,
     private val appLockManager: AppLockManager,
     private val widgetDao: DashboardWidgetDao,
+    accountDao: com.rhys.financetracker.data.local.dao.AccountDao,
 ) : ViewModel() {
 
     private val message = MutableStateFlow<String?>(null)
@@ -60,18 +61,23 @@ class SettingsViewModel @Inject constructor(
         settingsRepository.settings,
         externalDataRepository.observeGrouped(),
         widgetDao.observeAll(),
-        combine(message, isBusy) { text, busy -> text to busy },
+        combine(message, isBusy, accountDao.observeActive()) { text, busy, accounts ->
+            Triple(text, busy, accounts.isNotEmpty())
+        },
         pendingRestore,
     ) { settings, external, widgets, status, restore ->
         SettingsState(
             settings = settings,
             externalData = external,
+            // The cards the Home tiles replaced are drawn no longer, so a
+            // switch for them would do nothing at all.
             widgets = widgets.mapNotNull { entity ->
-                DashboardWidget.fromKey(entity.widgetKey)?.let { entity to it }
+                DashboardWidget.fromKey(entity.widgetKey)?.takeIf { it.isSwitchable }?.let { entity to it }
             }.sortedBy { it.first.position },
             isPinSet = pinStore.isPinSet,
             message = status.first,
             isBusy = status.second,
+            hasAccounts = status.third,
             pendingRestore = restore,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsState())
@@ -272,14 +278,18 @@ class SettingsViewModel @Inject constructor(
 
     fun moveWidget(widget: DashboardWidget, direction: Int) {
         viewModelScope.launch {
-            val current = widgetDao.getAll().sortedBy { it.position }.toMutableList()
+            // Only the cards on the list move, or a step past one that is not
+            // drawn any more would look like nothing happened.
+            val (listed, retired) = widgetDao.getAll().sortedBy { it.position }
+                .partition { DashboardWidget.fromKey(it.widgetKey)?.isSwitchable == true }
+            val current = listed.toMutableList()
             val index = current.indexOfFirst { it.widgetKey == widget.key }
             val target = index + direction
             if (index < 0 || target !in current.indices) return@launch
             val moved = current.removeAt(index)
             current.add(target, moved)
             widgetDao.upsertAll(
-                current.mapIndexed { position, entity -> entity.copy(position = position) },
+                (current + retired).mapIndexed { position, entity -> entity.copy(position = position) },
             )
         }
     }
@@ -313,4 +323,6 @@ data class SettingsState(
     val message: String? = null,
     val isBusy: Boolean = false,
     val pendingRestore: BackupSummary? = null,
+    /** True once there is real money in the app, when example data would only get in the way. */
+    val hasAccounts: Boolean = false,
 )

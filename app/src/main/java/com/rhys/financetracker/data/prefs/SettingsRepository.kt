@@ -62,6 +62,7 @@ class SettingsRepository @Inject constructor(
         val SHARED_PEOPLE = stringPreferencesKey("shared_people")
         val PAYEES_KEPT = stringSetPreferencesKey("payees_kept_as_people")
         val PAYEES_HIDDEN = stringSetPreferencesKey("payees_not_people")
+        val NOTIFICATIONS_ASKED = booleanPreferencesKey("notifications_asked")
     }
 
     /** Defaults chosen so a fresh install is immediately usable and private. */
@@ -125,6 +126,7 @@ class SettingsRepository @Inject constructor(
             },
             payeesKeptAsPeople = prefs[Keys.PAYEES_KEPT].orEmpty(),
             payeesNotPeople = prefs[Keys.PAYEES_HIDDEN].orEmpty(),
+            notificationsAsked = prefs[Keys.NOTIFICATIONS_ASKED] ?: false,
         )
     }
 
@@ -163,6 +165,9 @@ class SettingsRepository @Inject constructor(
     /** Who the Shared tab on Home covers; see [AppSettings.sharedPeopleIds]. */
     suspend fun setSharedPeople(ids: Set<Long>) =
         put(Keys.SHARED_PEOPLE, ids.sorted().joinToString(","))
+
+    /** Records that Android has been asked once for permission to show reminders. */
+    suspend fun setNotificationsAsked() = put(Keys.NOTIFICATIONS_ASKED, true)
 
     /**
      * Settles whether a payee is a person, overriding the app's own guess:
@@ -222,6 +227,8 @@ data class AppSettings(
     val payeesKeptAsPeople: Set<String> = emptySet(),
     /** Payees the user said are not people — PayPal, a shop. */
     val payeesNotPeople: Set<String> = emptySet(),
+    /** True once Android has been asked for permission to show reminders. */
+    val notificationsAsked: Boolean = false,
 ) {
     val isLockEnabled: Boolean get() = lockMethod != LockMethod.NONE
     val requiresPin: Boolean

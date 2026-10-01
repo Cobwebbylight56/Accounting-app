@@ -41,7 +41,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -83,6 +85,7 @@ fun SavingsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var pendingDelete by remember { mutableLongStateOf(0L) }
     var contributeTo by remember { mutableLongStateOf(0L) }
+    var showArchived by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(state.message) {
         state.message?.let {
@@ -100,7 +103,7 @@ fun SavingsScreen(
             }
         },
     ) { padding ->
-        if (state.goals.isEmpty()) {
+        if (state.goals.isEmpty() && state.archivedGoals.isEmpty()) {
             EmptyState(
                 icon = Icons.Outlined.Savings,
                 title = "No savings goals yet",
@@ -159,6 +162,29 @@ fun SavingsScreen(
                     onDelete = { pendingDelete = summary.goal.goal.id },
                 )
             }
+
+            // Archived goals were once gone for good: nothing anywhere
+            // listed them, so "Archive" was a delete that kept the data.
+            if (state.archivedGoals.isNotEmpty()) {
+                item {
+                    TextButton(onClick = { showArchived = !showArchived }) {
+                        Text(
+                            (if (showArchived) "Hide" else "Show") +
+                                " ${state.archivedGoals.size} archived " +
+                                if (state.archivedGoals.size == 1) "goal" else "goals",
+                        )
+                    }
+                }
+                if (showArchived) {
+                    items(state.archivedGoals, key = { "archived-${it.goal.goal.id}" }) { summary ->
+                        ArchivedGoalRow(
+                            summary = summary,
+                            onRestore = { viewModel.archive(summary.goal.goal.id, false) },
+                            onDelete = { pendingDelete = summary.goal.goal.id },
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -183,6 +209,25 @@ fun SavingsScreen(
             },
             onDismiss = { contributeTo = 0L },
         )
+    }
+}
+
+/** A goal that was put away, with a way to bring it back. */
+@Composable
+private fun ArchivedGoalRow(summary: GoalSummary, onRestore: () -> Unit, onDelete: () -> Unit) {
+    val goal = summary.goal
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(goal.goal.name, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = "${Money.format(goal.currentAmountMinor)} of " +
+                    Money.format(goal.goal.targetAmountMinor),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        TextButton(onClick = onRestore) { Text("Restore") }
+        TextButton(onClick = onDelete) { Text("Delete", color = MaterialTheme.colorScheme.error) }
     }
 }
 

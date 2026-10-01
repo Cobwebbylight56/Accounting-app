@@ -392,7 +392,7 @@ internal fun RecentTransactionsCard(
     val shown = if (showAll) all else all.take(TRANSACTIONS_SHOWN)
 
     SectionCard(
-        title = "This month",
+        title = "This month's payments",
         action = { TextButton(onClick = onAddTransaction) { Text("Add") } },
     ) {
         if (all.isEmpty()) {
@@ -594,8 +594,8 @@ private fun SavingsPlaceRow(
 @Composable
 internal fun CashInHandCard(
     state: DashboardState,
-    onRecordCash: (String, String, Boolean) -> Unit,
-    onCountCash: (String) -> Unit,
+    onRecordCash: (String, String, Boolean) -> Boolean,
+    onCountCash: (String) -> Boolean,
     onRemoveCash: (CashPotEntryEntity) -> Unit,
 ) {
     val colors = FinanceTheme.colors
@@ -647,24 +647,29 @@ internal fun CashInHandCard(
             Spacer(Modifier.width(8.dp))
             TextButton(
                 onClick = {
-                    onRecordCash(amount, note, true)
-                    amount = ""
-                    note = ""
+                    // Cleared only once it has gone in: a missing amount
+                    // used to wipe the note that had just been typed.
+                    if (onRecordCash(amount, note, true)) {
+                        amount = ""
+                        note = ""
+                    }
                 },
             ) { Text("Put in") }
             TextButton(
                 onClick = {
-                    onRecordCash(amount, note, false)
-                    amount = ""
-                    note = ""
+                    if (onRecordCash(amount, note, false)) {
+                        amount = ""
+                        note = ""
+                    }
                 },
             ) { Text("Spent") }
         }
         TextButton(
             onClick = {
-                onCountCash(amount)
-                amount = ""
-                note = ""
+                if (onCountCash(amount)) {
+                    amount = ""
+                    note = ""
+                }
             },
         ) { Text("I counted it: set the total to this amount") }
 
@@ -897,7 +902,7 @@ internal fun SpendingByCategoryCard(
     }
 
     SectionCard(
-        title = "Where the money went",
+        title = "Spending by category",
         subtitle = if (entries.isEmpty()) null else "Tap a slice to see what is in it",
     ) {
         DonutChart(

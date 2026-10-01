@@ -93,4 +93,10 @@ class MoneyTest {
         assertEquals("£1.2k", Money.formatCompact(123_456L))
         assertEquals("£45", Money.formatCompact(4_500L))
     }
+
+    @Test
+    fun `a compact figure under a pound overdrawn keeps its minus`() {
+        assertEquals("-£0", Money.formatCompact(-50L))
+        assertEquals("-£1.2k", Money.formatCompact(-123_456L))
+    }
 }

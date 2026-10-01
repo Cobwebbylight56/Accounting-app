@@ -24,6 +24,10 @@ class SavingsRepository @Inject constructor(
     fun observeWithProgress(): Flow<List<SavingsGoalWithProgress>> =
         goalDao.observeActiveWithProgress()
 
+    /** Every goal with its progress, archived ones included, last. */
+    fun observeWithProgressIncludingArchived(): Flow<List<SavingsGoalWithProgress>> =
+        goalDao.observeAllWithProgress()
+
     fun observe(id: Long): Flow<SavingsGoalWithProgress?> = goalDao.observeWithProgress(id)
 
     fun observeAll(): Flow<List<SavingsGoalEntity>> = goalDao.observeAll()

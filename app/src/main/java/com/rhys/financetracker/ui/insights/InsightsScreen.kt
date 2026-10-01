@@ -141,7 +141,10 @@ fun InsightsScreen(
                 InsightCard(
                     insight = insight,
                     onClick = insight.categoryId?.let {
-                        { onOpenCategory(insight.categoryId, insight.categoryName.orEmpty()) }
+                        {
+                            viewModel.openInLedger(insight.categoryId)
+                            onOpenCategory(insight.categoryId, insight.categoryName.orEmpty())
+                        }
                     },
                 )
             }

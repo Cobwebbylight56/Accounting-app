@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.MoreVert
@@ -33,7 +34,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -90,8 +93,16 @@ fun TransactionListScreen(
 
     LaunchedEffect(state.message) {
         state.message?.let {
-            snackbarHostState.showSnackbar(it)
+            val undoable = state.canUndoDelete
+            val result = snackbarHostState.showSnackbar(
+                message = it,
+                actionLabel = if (undoable) "Undo" else null,
+                duration = if (undoable) SnackbarDuration.Long else SnackbarDuration.Short,
+            )
             viewModel.clearMessage()
+            if (undoable) {
+                if (result == SnackbarResult.ActionPerformed) viewModel.undoDelete() else viewModel.forgetDeleted()
+            }
         }
     }
 
@@ -167,6 +178,25 @@ fun TransactionListScreen(
                                     showMenu = false
                                 },
                             )
+                            // The way to clear out a statement that went in
+                            // wrong: filter to it, then remove the lot. Only
+                            // offered once something narrows the list, so it
+                            // can never mean "everything".
+                            if (state.hasFilters && state.resultCount > 0) {
+                                HorizontalDivider()
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            "Delete these ${state.resultCount}",
+                                            color = MaterialTheme.colorScheme.error,
+                                        )
+                                    },
+                                    onClick = {
+                                        confirmDeleteShown = true
+                                        showMenu = false
+                                    },
+                                )
+                            }
                         }
                     }
                 },
@@ -177,7 +207,7 @@ fun TransactionListScreen(
             ExtendedFloatingActionButton(
                 onClick = onAddTransaction,
                 text = { Text("Add") },
-                icon = { Icon(Icons.Default.Search, contentDescription = null) },
+                icon = { Icon(Icons.Default.Add, contentDescription = null) },
             )
         },
     ) { padding ->

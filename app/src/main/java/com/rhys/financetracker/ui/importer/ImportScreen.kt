@@ -127,6 +127,13 @@ fun ImportScreen(
         }
     }
 
+    // On the review page the phone's back button does what the arrow does —
+    // back to the columns — rather than throwing the whole import away.
+    BackHandler(
+        enabled = state.step == ImportStep.REVIEW && state.whatWasRead == null,
+        onBack = viewModel::goToMapping,
+    )
+
     val pickFile = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
     ) { uri -> uri?.let(viewModel::openFile) }

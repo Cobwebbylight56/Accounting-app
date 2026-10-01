@@ -57,7 +57,9 @@ object Money {
         val symbol = runCatching { Currency.getInstance(currencyCode).getSymbol(Locale.UK) }
             .getOrDefault("")
         val major = minorUnits / MINOR_UNITS_PER_MAJOR
-        val sign = if (major < 0) "-" else ""
+        // Taken from the pence, not the pounds: -£0.50 has no whole pounds,
+        // and showed as "£0" as if nothing were owed.
+        val sign = if (minorUnits < 0) "-" else ""
         val magnitude = abs(major)
         return when {
             magnitude >= 1_000_000 -> "$sign$symbol%.1fm".format(magnitude / 1_000_000.0)

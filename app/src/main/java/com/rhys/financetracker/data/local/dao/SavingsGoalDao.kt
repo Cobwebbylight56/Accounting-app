@@ -17,6 +17,10 @@ import kotlinx.coroutines.flow.Flow
  * the net of every transaction tagged with the goal, plus any manual
  * adjustment.  Both cases are resolved in SQL so the progress bars stay correct
  * without any bookkeeping in Kotlin.
+ *
+ * A linked account's balance follows the same rule as AccountDao.COUNTS:
+ * entries dated before its balance date are already inside that balance.
+ * Without it a goal on a saver showed more than the saver itself held.
  */
 @Dao
 interface SavingsGoalDao {
@@ -31,12 +35,16 @@ interface SavingsGoalDao {
                         SELECT SUM(CASE WHEN t.type = 'INCOME' THEN t.amount_minor ELSE -t.amount_minor END)
                         FROM transactions t
                         WHERE t.account_id = a2.id AND t.is_archived = 0
+                          AND (t.date > a2.opening_balance_date
+                            OR (t.date = a2.opening_balance_date AND t.source = 'MANUAL'))
                     ), 0)
                     + IFNULL((
                         SELECT SUM(t2.amount_minor)
                         FROM transactions t2
                         WHERE t2.transfer_account_id = a2.id AND t2.type = 'TRANSFER'
                           AND t2.is_archived = 0
+                          AND (t2.date > a2.opening_balance_date
+                            OR (t2.date = a2.opening_balance_date AND t2.source = 'MANUAL'))
                     ), 0)
                 FROM accounts a2 WHERE a2.id = g.account_id
             ) ELSE IFNULL((
@@ -52,6 +60,7 @@ interface SavingsGoalDao {
     )
     fun observeActiveWithProgress(): Flow<List<SavingsGoalWithProgress>>
 
+    /** As [observeActiveWithProgress], archived goals included (last), for bringing one back. */
     @Query(
         """
         SELECT g.*, a.name AS account_name,
@@ -62,12 +71,50 @@ interface SavingsGoalDao {
                         SELECT SUM(CASE WHEN t.type = 'INCOME' THEN t.amount_minor ELSE -t.amount_minor END)
                         FROM transactions t
                         WHERE t.account_id = a2.id AND t.is_archived = 0
+                          AND (t.date > a2.opening_balance_date
+                            OR (t.date = a2.opening_balance_date AND t.source = 'MANUAL'))
                     ), 0)
                     + IFNULL((
                         SELECT SUM(t2.amount_minor)
                         FROM transactions t2
                         WHERE t2.transfer_account_id = a2.id AND t2.type = 'TRANSFER'
                           AND t2.is_archived = 0
+                          AND (t2.date > a2.opening_balance_date
+                            OR (t2.date = a2.opening_balance_date AND t2.source = 'MANUAL'))
+                    ), 0)
+                FROM accounts a2 WHERE a2.id = g.account_id
+            ) ELSE IFNULL((
+                SELECT SUM(CASE WHEN t3.type = 'EXPENSE' THEN -t3.amount_minor ELSE t3.amount_minor END)
+                FROM transactions t3
+                WHERE t3.savings_goal_id = g.id AND t3.is_archived = 0
+            ), 0) END AS current_amount_minor
+        FROM savings_goals g
+        LEFT JOIN accounts a ON a.id = g.account_id
+        ORDER BY g.is_archived ASC, g.sort_order ASC, g.name ASC
+        """,
+    )
+    fun observeAllWithProgress(): Flow<List<SavingsGoalWithProgress>>
+
+    @Query(
+        """
+        SELECT g.*, a.name AS account_name,
+            g.manual_adjustment_minor
+            + CASE WHEN g.account_id IS NOT NULL THEN (
+                SELECT a2.opening_balance_minor
+                    + IFNULL((
+                        SELECT SUM(CASE WHEN t.type = 'INCOME' THEN t.amount_minor ELSE -t.amount_minor END)
+                        FROM transactions t
+                        WHERE t.account_id = a2.id AND t.is_archived = 0
+                          AND (t.date > a2.opening_balance_date
+                            OR (t.date = a2.opening_balance_date AND t.source = 'MANUAL'))
+                    ), 0)
+                    + IFNULL((
+                        SELECT SUM(t2.amount_minor)
+                        FROM transactions t2
+                        WHERE t2.transfer_account_id = a2.id AND t2.type = 'TRANSFER'
+                          AND t2.is_archived = 0
+                          AND (t2.date > a2.opening_balance_date
+                            OR (t2.date = a2.opening_balance_date AND t2.source = 'MANUAL'))
                     ), 0)
                 FROM accounts a2 WHERE a2.id = g.account_id
             ) ELSE IFNULL((

@@ -309,39 +309,75 @@ fun NotificationSettingsScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
+    val context = LocalContext.current
+    val allowed = com.rhys.financetracker.ui.components.rememberNotificationsAllowed()
+    // Asking is only possible on Android 13 and later, and only until it has
+    // been refused for good; after that the phone's own settings are the way.
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
-    ) { /* The switches work either way; the system decides whether they show. */ }
+    ) { granted ->
+        if (!granted) com.rhys.financetracker.ui.components.openNotificationSettings(context)
+    }
+    val allow: () -> Unit = {
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            com.rhys.financetracker.ui.components.openNotificationSettings(context)
+        }
+    }
+    // Turning a reminder on is the moment to make sure it can actually show.
+    val switchOn: (Boolean, (Boolean) -> Unit) -> Unit = { enabled, set ->
+        if (enabled && !allowed) allow()
+        set(enabled)
+    }
+    val anyOn = state.settings.notifyBills || state.settings.notifyOverdue ||
+        state.settings.notifyLowBalance || state.settings.notifyGoals
 
     SettingsSubScreen("Notifications", onBack, snackbarHostState) {
+        if (!allowed && anyOn) {
+            androidx.compose.material3.Surface(
+                color = MaterialTheme.colorScheme.errorContainer,
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Your phone is blocking this app's notifications",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                    )
+                    Text(
+                        text = "None of the reminders below can appear until they're allowed.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                    )
+                    TextButton(onClick = allow) { Text("Allow notifications") }
+                }
+            }
+        }
         SettingsSwitch(
             title = "Bills due soon",
             subtitle = "A reminder a few days before each payment",
             checked = state.settings.notifyBills,
-            onCheckedChange = { enabled ->
-                if (enabled) {
-                    permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-                }
-                viewModel.setNotifyBills(enabled)
-            },
+            onCheckedChange = { switchOn(it, viewModel::setNotifyBills) },
         )
         SettingsSwitch(
             title = "Overdue payments",
             subtitle = "When a bill's due date has passed",
             checked = state.settings.notifyOverdue,
-            onCheckedChange = viewModel::setNotifyOverdue,
+            onCheckedChange = { switchOn(it, viewModel::setNotifyOverdue) },
         )
         SettingsSwitch(
             title = "Low balance",
             subtitle = "When an account drops below the level you set for it",
             checked = state.settings.notifyLowBalance,
-            onCheckedChange = viewModel::setNotifyLowBalance,
+            onCheckedChange = { switchOn(it, viewModel::setNotifyLowBalance) },
         )
         SettingsSwitch(
             title = "Savings milestones",
             subtitle = "At a quarter, half, three quarters and complete",
             checked = state.settings.notifyGoals,
-            onCheckedChange = viewModel::setNotifyGoals,
+            onCheckedChange = { switchOn(it, viewModel::setNotifyGoals) },
         )
 
         SettingsGroupHeader("When to check")
@@ -575,10 +611,10 @@ fun DashboardLayoutScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    SettingsSubScreen("Dashboard layout", onBack, snackbarHostState) {
+    SettingsSubScreen("What Home shows", onBack, snackbarHostState) {
         SettingsNote(
             "Turn cards on and off, and use the arrows to change the order they appear in " +
-                "on your home screen.",
+                "on Home, below the tiles and the month's figures.",
         )
         state.widgets.forEachIndexed { index, (entity, widget) ->
             Row(

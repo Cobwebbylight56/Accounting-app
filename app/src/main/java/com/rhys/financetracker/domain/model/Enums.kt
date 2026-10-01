@@ -192,19 +192,25 @@ enum class DashboardWidget(val key: String, val title: String, val defaultVisibl
     BALANCE_SUMMARY("balance_summary", "Balances", true),
     MONTH_SUMMARY("month_summary", "This month", true),
     DISPOSABLE_INCOME("disposable_income", "Left to spend", true),
-    UPCOMING_BILLS("upcoming_bills", "Upcoming bills", true),
+    UPCOMING_BILLS("upcoming_bills", "Coming up", true),
     OVERDUE_BILLS("overdue_bills", "Overdue", true),
-    RECENT_TRANSACTIONS("recent_transactions", "This month's transactions", true),
+    RECENT_TRANSACTIONS("recent_transactions", "This month's payments", true),
     SAVINGS_AND_CASH("savings_and_cash", "Savings", true),
     CASH_IN_HAND("cash_in_hand", "Cash pot", true),
     SAVINGS_PROGRESS("savings_progress", "Savings goals", true),
     SPENDING_BY_CATEGORY("spending_by_category", "Spending by category", true),
     INSIGHTS("insights", "Advice", true),
-    INCOME_VS_EXPENSE("income_vs_expense", "Income vs expenses", true),
+    INCOME_VS_EXPENSE("income_vs_expense", "Income against spending", true),
     NET_WORTH("net_worth", "Net worth", false),
     ACCOUNTS_LIST("accounts_list", "Accounts", false),
-    EXTERNAL_DATA("external_data", "Rates & data", false),
+    EXTERNAL_DATA("external_data", "Rates and figures", false),
     ;
+
+    /**
+     * False for the cards Home's tiles and month list replaced: they are no
+     * longer drawn, so a switch for them would do nothing.
+     */
+    val isSwitchable: Boolean get() = this != BALANCE_SUMMARY && this != MONTH_SUMMARY
 
     companion object {
         fun fromKey(key: String): DashboardWidget? = entries.firstOrNull { it.key == key }

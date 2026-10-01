@@ -211,6 +211,14 @@ fun SetupScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
+    // The phone's back button does what the arrow does: one step back. It
+    // used to leave setup altogether, halfway through and with the person
+    // already made.
+    androidx.activity.compose.BackHandler(
+        enabled = state.step != SetupStep.NAME && state.step != SetupStep.DONE,
+        onBack = viewModel::back,
+    )
+
     Scaffold(
         topBar = {
             TopAppBar(
