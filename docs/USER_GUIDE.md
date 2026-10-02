@@ -151,11 +151,19 @@ on the filter icon tells you how many filters are active.
 
 Everything can be edited. Tap any entry to open it.
 
-**Money in from people** — "Bank credit H Payne", "Faster payment from…", or
-just a person's name — is filed as **Income → Transfers & payments**. The
-category exists on both sides now, and switching a payment between Expense and
-Income keeps it. Older "Bank credit" payments that were saved as expenses are
-turned round the first time you open this version.
+**Money with people is a transfer, not spending.** Money you send to someone and
+money they send you — "Faster payment to Hannah Payne", "Bank credit H Payne",
+a standing order to a person — goes under **Transfers & payments**, a transfer
+category. It still moves your balance the right way, but it isn't counted in
+spending or income, the Spending tab or the category charts. **Money with
+people** is where it's added up, person by person.
+
+In the editor it shows on the **Transfer** tab as **With a person**, with **I
+sent** or **They sent me**; **Between my accounts** is the usual move from one
+of your own accounts to another. PayPal, Revolut and card readers are mostly
+shopping, so they're **Payment apps** — spending — unless the payment is plainly
+to a person. Older "Bank credit" payments saved as money out are turned round
+the first time you open this version, even ones you've edited.
 
 **Your category goes for the whole payee.** Change the category of one
 payment and every other payment to the same payee moves with it — the edit

@@ -119,11 +119,11 @@ object DefaultData {
         SeedCategory("Christmas fund", CategoryKind.SAVING, "#C62828", "Redeem", parent = "Savings"),
 
         SeedCategory("People & services", CategoryKind.EXPENSE, "#8D6E63", "Payments"),
-        // The same name on both sides: money sent to someone is the expense,
-        // money a person sends you is the income. With only the expense one,
-        // a payment in from a person could not be filed under it at all.
-        SeedCategory("Transfers & payments", CategoryKind.EXPENSE, "#455A64", "SwapHoriz"),
-        SeedCategory("Transfers & payments", CategoryKind.INCOME, "#1B9A94", "SwapHoriz"),
+        // Money sent to and from people: a transfer, left out of spending and
+        // income, whichever way it went. See TransactionDao's aggregates.
+        SeedCategory("Transfers & payments", CategoryKind.TRANSFER, "#455A64", "SwapHoriz"),
+        // PayPal, Revolut, card readers: spending through an app.
+        SeedCategory("Payment apps", CategoryKind.EXPENSE, "#546E7A", "Payments"),
         SeedCategory("Card spending", CategoryKind.EXPENSE, "#78909C", "Payments"),
 
         // ------------------------------------------------------------ cash

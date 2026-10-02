@@ -156,4 +156,37 @@ class CategoryMarkTest {
         assertEquals(s.fuel, dao.getById(b)!!.categoryId)
         assertTrue(dao.getById(b)!!.categoryByUser)
     }
+
+    @Test
+    fun `the upgrade makes money with people a transfer and keeps PayPal as spending`() = runBlocking {
+        val s = setUp()
+        val dao = s.db.categoryDao()
+        val oldOut = dao.insert(CategoryEntity(name = "Transfers & payments", kind = CategoryKind.EXPENSE, colorHex = "#000000"))
+        val oldIn = dao.insert(CategoryEntity(name = "Transfers & payments", kind = CategoryKind.INCOME, colorHex = "#000000"))
+        val paypal = entry(s, "PAYPAL PAYMENT 1", oldOut)
+        val fromHannah = entry(s, "Bank credit H Payne", oldIn)
+
+        Migrations.MIGRATION_10_11.migrate(s.db.openHelper.writableDatabase)
+
+        val transfer = dao.getByNameAndKind("Transfers & payments", CategoryKind.TRANSFER)!!
+        val apps = dao.getByNameAndKind("Payment apps", CategoryKind.EXPENSE)!!
+        assertEquals(transfer.id, s.db.transactionDao().getById(fromHannah)!!.categoryId)
+        assertEquals(apps.id, s.db.transactionDao().getById(paypal)!!.categoryId)
+        assertNull(dao.getByNameAndKind("Transfers & payments", CategoryKind.INCOME))
+        assertNull(dao.getByNameAndKind("Transfers & payments", CategoryKind.EXPENSE))
+    }
+
+    @Test
+    fun `money under a transfer category is not counted as spending`() = runBlocking {
+        val s = setUp()
+        val transfer = s.db.categoryDao().insert(
+            CategoryEntity(name = "Transfers & payments", kind = CategoryKind.TRANSFER, colorHex = "#000000"),
+        )
+        entry(s, "FASTER PAYMENT TO HANNAH PAYNE", transfer)
+        entry(s, "TESCO STORES", s.groceries)
+        val totals = s.db.transactionDao().getIncomeExpense(
+            LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31), null, null,
+        )!!
+        assertEquals(4_000L, totals.expenseMinor)
+    }
 }

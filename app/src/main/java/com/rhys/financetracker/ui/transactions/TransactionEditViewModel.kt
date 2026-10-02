@@ -121,10 +121,17 @@ class TransactionEditViewModel @Inject constructor(
             return
         }
         loaded = existing
+        // Money with a person is kept as money in or out — so balances move —
+        // under a transfer category, so it is not spending. Here it shows as
+        // what it is: a transfer, with a person.
+        val withPerson = existing.type != TransactionType.TRANSFER &&
+            existing.categoryId?.let { categoryRepository.get(it)?.kind } == CategoryKind.TRANSFER
         form.value = TransactionForm(
             description = existing.description,
             amountText = Money.formatPlain(existing.amountMinor),
-            type = existing.type,
+            type = if (withPerson) TransactionType.TRANSFER else existing.type,
+            withPerson = withPerson,
+            received = existing.type == TransactionType.INCOME,
             date = existing.date,
             accountId = existing.accountId,
             transferAccountId = existing.transferAccountId,
@@ -153,7 +160,7 @@ class TransactionEditViewModel @Inject constructor(
             before.payee.isNotBlank() &&
             current.categoryId != null &&
             current.categoryId != before.categoryId &&
-            current.type != TransactionType.TRANSFER
+            current.effectiveType != TransactionType.TRANSFER
 
     fun update(transform: (TransactionForm) -> TransactionForm) {
         form.value = transform(form.value)
@@ -161,8 +168,19 @@ class TransactionEditViewModel @Inject constructor(
 
     fun setType(type: TransactionType) {
         val previous = form.value.categoryId
+        val from = form.value.effectiveType
+        // Turning money in or out into a transfer: when it names a person, it
+        // is money with them, the way it went; otherwise a move between the
+        // user's own accounts, as before.
+        val withPerson = type == TransactionType.TRANSFER && from != TransactionType.TRANSFER &&
+            (
+                com.rhys.financetracker.data.importer.MerchantCategoriser.isMoneyWithAPerson(form.value.description, from) ||
+                    PayeeNames.readsLikeMoneyIn(form.value.description)
+                )
         form.value = form.value.copy(
             type = type,
+            withPerson = withPerson,
+            received = if (withPerson) from == TransactionType.INCOME else form.value.received,
             // A category from the other side of the books would be meaningless.
             categoryId = null,
             transferAccountId = if (type == TransactionType.TRANSFER) {
@@ -188,6 +206,32 @@ class TransactionEditViewModel @Inject constructor(
                 }
             }
         }
+        if (withPerson) fileWithPeople()
+    }
+
+    /** Between the user's own accounts, or money with a person. */
+    fun setWithPerson(withPerson: Boolean) {
+        form.value = form.value.copy(
+            withPerson = withPerson,
+            transferAccountId = if (withPerson) null else form.value.transferAccountId,
+        )
+        if (withPerson) fileWithPeople()
+    }
+
+    /** For money with a person: whether it was sent or received. */
+    fun setReceived(received: Boolean) {
+        form.value = form.value.copy(received = received)
+    }
+
+    /** Puts money with a person under "Transfers & payments" unless a transfer category is chosen. */
+    private fun fileWithPeople() {
+        viewModelScope.launch {
+            val current = form.value.categoryId?.let { categoryRepository.get(it) }
+            if (current?.kind != CategoryKind.TRANSFER || current.name == SYSTEM_TRANSFER) {
+                val people = categoryRepository.peopleTransfers()
+                form.value = form.value.copy(categoryId = people.id)
+            }
+        }
     }
 
     fun save() {
@@ -204,11 +248,14 @@ class TransactionEditViewModel @Inject constructor(
             val fresh = TransactionEntity(
                 id = if (transactionId == Routes.NEW_ID) 0L else transactionId,
                 amountMinor = Money.parseOrNull(current.amountText) ?: 0L,
-                type = current.type,
+                // Money with a person is stored as money in or out, so the
+                // balance moves the right way; its transfer category keeps it
+                // out of spending.
+                type = current.effectiveType,
                 date = current.date,
                 description = current.description.trim(),
                 accountId = current.accountId ?: 0L,
-                transferAccountId = current.transferAccountId,
+                transferAccountId = if (current.withPersonTransfer) null else current.transferAccountId,
                 categoryId = current.categoryId,
                 personId = current.personId,
                 savingsGoalId = current.savingsGoalId,
@@ -280,9 +327,9 @@ class TransactionEditViewModel @Inject constructor(
             amountError != null -> amountError
             dateError != null -> dateError
             current.accountId == null -> "Choose an account"
-            current.type == TransactionType.TRANSFER && current.transferAccountId == null ->
+            current.type == TransactionType.TRANSFER && !current.withPerson && current.transferAccountId == null ->
                 "Choose the account the money is going to"
-            current.type == TransactionType.TRANSFER &&
+            current.type == TransactionType.TRANSFER && !current.withPerson &&
                 current.transferAccountId == current.accountId ->
                 "A transfer must be between two different accounts"
             else -> null
@@ -319,11 +366,30 @@ data class TransactionForm(
     val tags: String = "",
     val isCleared: Boolean = true,
     val isConfirmed: Boolean = true,
+    /** On the Transfer tab: money with a person, rather than between the user's own accounts. */
+    val withPerson: Boolean = false,
+    /** For money with a person: they sent it, rather than the user. */
+    val received: Boolean = false,
     val descriptionError: String? = null,
     val amountError: String? = null,
     val dateError: String? = null,
     val errorSummary: String? = null,
 )
+
+/** A transfer with a person rather than between the user's own accounts. */
+val TransactionForm.withPersonTransfer: Boolean
+    get() = type == TransactionType.TRANSFER && withPerson
+
+/** How it is stored: money with a person is money in or out under a transfer category. */
+val TransactionForm.effectiveType: TransactionType
+    get() = when {
+        !withPersonTransfer -> type
+        received -> TransactionType.INCOME
+        else -> TransactionType.EXPENSE
+    }
+
+/** The app's own category for moves between accounts, which is not for people. */
+private const val SYSTEM_TRANSFER = "Transfer"
 
 data class TransactionEditState(
     val isNew: Boolean = true,

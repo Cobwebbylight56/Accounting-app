@@ -202,7 +202,7 @@ class PayeeRepository @Inject constructor(
         private val VAGUE = listOf("Card spending")
 
         /** Categories that mean money sent to a person. */
-        private val PEOPLE = listOf("People & services", "Transfers & payments")
+        private val PEOPLE = listOf("People & services", "Transfers & payments", "Payment apps")
 
         /** Categories that mean money in from a person. */
         private val PEOPLE_IN = PEOPLE + listOf("Gifts", "Money from people")

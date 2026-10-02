@@ -111,6 +111,31 @@ fun TransactionEditScreen(
                 optionLabel = { it.displayName },
             )
 
+            // A transfer is either between the user's own accounts or money
+            // with a person — moved, not spent, so left out of spending.
+            if (state.form.type == TransactionType.TRANSFER) {
+                SegmentedChoice(
+                    options = listOf(false, true),
+                    selected = state.form.withPerson,
+                    onSelect = viewModel::setWithPerson,
+                    optionLabel = { if (it) "With a person" else "Between my accounts" },
+                )
+                if (state.form.withPerson) {
+                    SegmentedChoice(
+                        options = listOf(false, true),
+                        selected = state.form.received,
+                        onSelect = viewModel::setReceived,
+                        optionLabel = { if (it) "They sent me" else "I sent" },
+                    )
+                    Text(
+                        text = "Money moved to or from someone — it moves your balance but isn't " +
+                            "counted as spending or income. Money with people shows who sent what.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
             LabelledTextField(
                 label = "What was it?",
                 value = state.form.description,
@@ -134,7 +159,12 @@ fun TransactionEditScreen(
             )
 
             DropdownField(
-                label = if (state.form.type == TransactionType.TRANSFER) "From account" else "Account",
+                label = when {
+                    state.form.type != TransactionType.TRANSFER -> "Account"
+                    !state.form.withPerson -> "From account"
+                    state.form.received -> "Into account"
+                    else -> "From account"
+                },
                 options = state.accounts,
                 selected = state.accounts.firstOrNull { it.id == state.form.accountId },
                 onSelect = { account -> viewModel.update { it.copy(accountId = account.id) } },
@@ -142,7 +172,7 @@ fun TransactionEditScreen(
                 optionColor = { colorFromHex(it.colorHex) },
             )
 
-            if (state.form.type == TransactionType.TRANSFER) {
+            if (state.form.type == TransactionType.TRANSFER && !state.form.withPerson) {
                 DropdownField(
                     label = "To account",
                     options = state.accounts.filter { it.id != state.form.accountId },

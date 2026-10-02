@@ -176,12 +176,11 @@ class SentToPeopleViewModel @Inject constructor(
     fun turnRound(name: String, toMoneyIn: List<PayeeEntry>, toMoneyOut: List<PayeeEntry>) {
         viewModelScope.launch {
             var turned = 0
+            val category = categoryRepository.peopleTransfers()
             if (toMoneyIn.isNotEmpty()) {
-                val category = categoryRepository.findOrCreate(MONEY_FROM_PEOPLE, CategoryKind.INCOME, "#1B9A94")
                 turned += transactionRepository.turnRound(toMoneyIn.map { it.id }, com.rhys.financetracker.domain.model.TransactionType.INCOME, category.id)
             }
             if (toMoneyOut.isNotEmpty()) {
-                val category = categoryRepository.findOrCreate(MONEY_TO_PEOPLE, CategoryKind.EXPENSE, "#C8402A")
                 turned += transactionRepository.turnRound(toMoneyOut.map { it.id }, com.rhys.financetracker.domain.model.TransactionType.EXPENSE, category.id)
             }
             message.value = "$name: $turned " + (if (turned == 1) "payment" else "payments") + " turned round."
@@ -869,9 +868,6 @@ private fun YearGraphCard(
     }
 }
 
-/** Where payments turned round go: "Transfers & payments", on whichever side they now sit. */
-private const val MONEY_FROM_PEOPLE = "Transfers & payments"
-private const val MONEY_TO_PEOPLE = "Transfers & payments"
 
 /**
  * Every payment with one person, each ticked to swap sides: sent becomes

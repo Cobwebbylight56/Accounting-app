@@ -27,7 +27,7 @@ object MerchantCategoriser {
      * app re-sorts everything it filed by itself — never anything the user
      * filed — so old payments follow the improved rules too.
      */
-    const val RULES_VERSION = 2
+    const val RULES_VERSION = 3
 
     /**
      * The category for [description], or null when nothing matches.
@@ -45,11 +45,11 @@ object MerchantCategoriser {
 
         learnedCategory(description, learned)?.let { return it }
 
-        val rules = if (type == TransactionType.INCOME) INCOME_RULES else EXPENSE_RULES
-        rules.firstOrNull { rule -> rule.keywords.any { matches(text, it) } }?.let { return it.category }
-        // Money in from nothing but a person's name — "H PAYNE" — is them
-        // paying you, not wages from a company called that.
-        if (type == TransactionType.INCOME && PayeeNames.isPersonName(PayeeNames.of(description))) return PEOPLE_IN
+        ruleCategory(description, type)?.let { return it }
+        // Money to or from nothing but a person's name — "Faster payment to H
+        // PAYNE", "H PAYNE" — is money with that person: a transfer, not
+        // spending or wages from a company called that.
+        if (isMoneyWithAPerson(description, type)) return PEOPLE_IN
         return null
     }
 
@@ -395,9 +395,12 @@ object MerchantCategoriser {
             "tymit", "laybuy", "zilch", "monzo flex", "credit union",
         ),
 
-        // -- money moved to a person, which no rule can name --------------
+        // -- payment apps: mostly shopping, sometimes a person ---------------
+        // Spending, not a transfer: most of what goes through PayPal or a card
+        // reader is buying something. Money plainly to a person is caught
+        // below, after every rule has had its say.
         rule(
-            "Transfers & payments",
+            PAYMENT_APPS,
             "paypal", "revolut", "wise ", "transferwise", "western union", "moneygram",
             "gocardless", "sumup", "izettle", "square up", "stripe",
         ),
@@ -439,8 +442,33 @@ object MerchantCategoriser {
         ),
     )
 
-    /** Where money in from a person goes: the money-in side of "Transfers & payments". */
+    /** The built-in list's answer alone: no learning, no person check. */
+    fun ruleCategory(description: String, type: TransactionType = TransactionType.EXPENSE): String? {
+        val text = TransactionFingerprint.normaliseDescription(description)
+        if (text.isBlank()) return null
+        val rules = if (type == TransactionType.INCOME) INCOME_RULES else EXPENSE_RULES
+        return rules.firstOrNull { rule -> rule.keywords.any { matches(text, it) } }?.category
+    }
+
+    /**
+     * Where money with a person goes, either way: "Transfers & payments", a
+     * transfer category that spending and income totals leave out.
+     */
     const val PEOPLE_IN = "Transfers & payments"
+
+    /** PayPal, Revolut, card readers: spending through an app. */
+    const val PAYMENT_APPS = "Payment apps"
+
+    /**
+     * True when [description] is money sent to or from a person by name —
+     * not a shop, a bill or a company. Money in only needs the name; money
+     * out also needs the bank's wording for a transfer, as a card payment to
+     * a sole trader carries a name too.
+     */
+    fun isMoneyWithAPerson(description: String, type: TransactionType): Boolean {
+        if (!PayeeNames.isPersonName(PayeeNames.of(description))) return false
+        return type == TransactionType.INCOME || PayeeNames.looksLikeAPerson(description)
+    }
 
     /**
      * How much of a remembered merchant must match before a prefix counts.

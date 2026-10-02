@@ -50,6 +50,7 @@ interface TransactionDao {
             ta.name AS transfer_account_name,
             c.name AS category_name,
             c.color_hex AS category_color,
+            c.kind AS category_kind,
             p.name AS person_name,
             p.color_hex AS person_color
         """
@@ -251,6 +252,11 @@ interface TransactionDao {
     // earned; counted as either, savings were "in with everything else" and a
     // month that saved looked like a month that overspent. Where that money
     // went is the Savings card's business, via observePotFlow.
+    //
+    // Money filed under a transfer category — "Transfers & payments", money
+    // sent to or from people — is left out for the same reason: £500 to
+    // Hannah moves the balance but is not spending, and £500 back is not
+    // income. Money with people is where it is counted.
 
     @Query(
         """
@@ -261,7 +267,7 @@ interface TransactionDao {
         LEFT JOIN accounts a ON a.id = t.account_id
         LEFT JOIN categories c ON c.id = t.category_id
         WHERE t.is_archived = 0
-          AND (c.kind IS NULL OR c.kind <> 'SAVING')
+          AND (c.kind IS NULL OR c.kind NOT IN ('SAVING', 'TRANSFER'))
           AND t.date BETWEEN :start AND :end
           AND (:accountId IS NULL OR t.account_id = :accountId)
           AND (:everyone = 1 OR COALESCE(t.person_id, a.person_id) IN (:personIds))
@@ -284,7 +290,7 @@ interface TransactionDao {
         LEFT JOIN accounts a ON a.id = t.account_id
         LEFT JOIN categories c ON c.id = t.category_id
         WHERE t.is_archived = 0
-          AND (c.kind IS NULL OR c.kind <> 'SAVING')
+          AND (c.kind IS NULL OR c.kind NOT IN ('SAVING', 'TRANSFER'))
           AND t.date BETWEEN :start AND :end
           AND (:accountId IS NULL OR t.account_id = :accountId)
           AND (:personId IS NULL OR COALESCE(t.person_id, a.person_id) = :personId)
@@ -308,7 +314,7 @@ interface TransactionDao {
         LEFT JOIN categories c ON c.id = t.category_id
         LEFT JOIN accounts a ON a.id = t.account_id
         WHERE t.is_archived = 0
-          AND (c.kind IS NULL OR c.kind <> 'SAVING')
+          AND (c.kind IS NULL OR c.kind NOT IN ('SAVING', 'TRANSFER'))
           AND t.type = :type
           AND t.date BETWEEN :start AND :end
           AND (:accountId IS NULL OR t.account_id = :accountId)
@@ -477,7 +483,7 @@ interface TransactionDao {
         LEFT JOIN categories c ON c.id = t.category_id
         LEFT JOIN accounts a ON a.id = t.account_id
         WHERE t.is_archived = 0
-          AND (c.kind IS NULL OR c.kind <> 'SAVING')
+          AND (c.kind IS NULL OR c.kind NOT IN ('SAVING', 'TRANSFER'))
           AND t.type = :type
           AND t.date BETWEEN :start AND :end
           AND (:accountId IS NULL OR t.account_id = :accountId)
@@ -503,7 +509,7 @@ interface TransactionDao {
         LEFT JOIN accounts a ON a.id = t.account_id
         LEFT JOIN categories c ON c.id = t.category_id
         WHERE t.is_archived = 0
-          AND (c.kind IS NULL OR c.kind <> 'SAVING')
+          AND (c.kind IS NULL OR c.kind NOT IN ('SAVING', 'TRANSFER'))
           AND t.date BETWEEN :start AND :end
           AND (:accountId IS NULL OR t.account_id = :accountId)
           AND (:everyone = 1 OR COALESCE(t.person_id, a.person_id) IN (:personIds))
@@ -528,7 +534,7 @@ interface TransactionDao {
         LEFT JOIN accounts a ON a.id = t.account_id
         LEFT JOIN categories c ON c.id = t.category_id
         WHERE t.is_archived = 0
-          AND (c.kind IS NULL OR c.kind <> 'SAVING')
+          AND (c.kind IS NULL OR c.kind NOT IN ('SAVING', 'TRANSFER'))
           AND t.date BETWEEN :start AND :end
           AND (:accountId IS NULL OR t.account_id = :accountId)
           AND (:personId IS NULL OR COALESCE(t.person_id, a.person_id) = :personId)
@@ -555,7 +561,7 @@ interface TransactionDao {
         LEFT JOIN people p ON p.id = COALESCE(t.person_id, a.person_id)
         LEFT JOIN categories c ON c.id = t.category_id
         WHERE t.is_archived = 0 AND t.date BETWEEN :start AND :end
-          AND (c.kind IS NULL OR c.kind <> 'SAVING')
+          AND (c.kind IS NULL OR c.kind NOT IN ('SAVING', 'TRANSFER'))
         -- Grouped on the whole expression, not the output alias: both
         -- `transactions` and `accounts` carry a `person_id`, so a bare
         -- `GROUP BY person_id` is ambiguous to SQLite.
@@ -880,15 +886,18 @@ interface TransactionDao {
     )
     suspend fun getAppFiled(): List<TransactionEntity>
 
-    /** Money out read from a statement and filed by the app, for checking its direction. */
+    /** Every payment in or out that is not a move between accounts. */
     @Query(
-        """
-        SELECT * FROM transactions
-        WHERE is_archived = 0 AND type = 'EXPENSE' AND category_by_user = 0
-          AND transfer_account_id IS NULL AND source = 'STATEMENT'
-        """,
+        "SELECT * FROM transactions WHERE is_archived = 0 AND type IN ('INCOME', 'EXPENSE') " +
+            "AND transfer_account_id IS NULL",
     )
-    suspend fun getAppFiledStatementOut(): List<TransactionEntity>
+    suspend fun getIncomeAndExpenseNotMoves(): List<TransactionEntity>
+
+    /** Every payment out that is not a move between accounts, for checking its direction. */
+    @Query(
+        "SELECT * FROM transactions WHERE is_archived = 0 AND type = 'EXPENSE' AND transfer_account_id IS NULL",
+    )
+    suspend fun getPaymentsOutNotMoves(): List<TransactionEntity>
 
     /** Payees the user filed themselves, commonest first. */
     @Query(
@@ -896,7 +905,8 @@ interface TransactionDao {
         SELECT t.description AS description, c.name AS category_name
         FROM transactions t
         JOIN categories c ON c.id = t.category_id
-        WHERE t.is_archived = 0 AND t.description != '' AND c.kind IN ('INCOME', 'EXPENSE')
+        WHERE t.is_archived = 0 AND t.description != '' AND t.type IN ('INCOME', 'EXPENSE')
+          AND c.kind IN ('INCOME', 'EXPENSE', 'TRANSFER')
           AND t.category_by_user = 1
         GROUP BY t.description, c.name
         ORDER BY COUNT(*) DESC

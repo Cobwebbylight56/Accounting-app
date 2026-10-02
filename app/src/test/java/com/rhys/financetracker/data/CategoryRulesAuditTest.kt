@@ -127,4 +127,14 @@ class CategoryRulesAuditTest {
         assertEquals("Salary", MerchantCategoriser.categoryFor("ACME LTD SALARY", income))
         assertEquals("Refunds", MerchantCategoriser.categoryFor("AMAZON REFUND", income))
     }
+
+    @Test
+    fun `money to a person is a transfer, but PayPal shopping is still spending`() {
+        assertEquals("Transfers & payments", MerchantCategoriser.categoryFor("FASTER PAYMENT TO HANNAH PAYNE"))
+        assertEquals("Transfers & payments", MerchantCategoriser.categoryFor("STANDING ORDER A EVANS"))
+        assertEquals("Payment apps", MerchantCategoriser.categoryFor("PAYPAL PAYMENT 88213"))
+        assertEquals("Shopping", MerchantCategoriser.categoryFor("PAYPAL *EBAY"))
+        // A shop is never a person, whatever the wording.
+        assertEquals("Groceries", MerchantCategoriser.categoryFor("PAYMENT TO TESCO STORES"))
+    }
 }

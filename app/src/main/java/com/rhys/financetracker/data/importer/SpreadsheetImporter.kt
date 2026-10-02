@@ -1038,7 +1038,8 @@ class SpreadsheetImporter @Inject constructor(
         // every row the reader had rightly called "Savings" was filed under a
         // second, ordinary category of the same name — and savings never saw
         // any of it.
-        for (pot in listOf(CategoryKind.SAVING, CategoryKind.CASH)) {
+        // So is "Transfers & payments": money with people, on either side.
+        for (pot in listOf(CategoryKind.SAVING, CategoryKind.CASH, CategoryKind.TRANSFER)) {
             categoryDao.getByNameAndKind(name, pot)?.let { return it.id to outcome }
         }
         val kind = if (type == TransactionType.INCOME) CategoryKind.INCOME else CategoryKind.EXPENSE

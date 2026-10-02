@@ -15,7 +15,7 @@ object Refiling {
     val VAGUE = listOf("Card spending")
 
     /** Categories too loose to move anything into from a specific one: a transfer could be anything. */
-    val WEAK = listOf("Transfers & payments", "People & services")
+    val WEAK = listOf("Transfers & payments", "People & services", "Payment apps")
 
     /**
      * The category [description] should be under instead of [current], or

@@ -52,6 +52,10 @@ class CategoryRepository @Inject constructor(
         return categoryDao.getByNameAndKind(current.name, kind)
     }
 
+    /** "Transfers & payments": money with people, a transfer rather than spending. */
+    suspend fun peopleTransfers(): CategoryEntity =
+        findOrCreate(PEOPLE_TRANSFERS, CategoryKind.TRANSFER, "#455A64")
+
     suspend fun findOrCreate(name: String, kind: CategoryKind, colorHex: String): CategoryEntity {
         categoryDao.getByNameAndKind(name, kind)?.let { return it }
         val entity = CategoryEntity(name = name.trim(), kind = kind, colorHex = colorHex)
@@ -119,10 +123,8 @@ class CategoryRepository @Inject constructor(
         }
         return candidate
     }
-}
 
-/** A top-level category together with its children. */
-data class CategoryGroup(
-    val parent: CategoryEntity,
-    val children: List<CategoryEntity>,
-)
+    companion object {
+        const val PEOPLE_TRANSFERS = "Transfers & payments"
+    }
+}

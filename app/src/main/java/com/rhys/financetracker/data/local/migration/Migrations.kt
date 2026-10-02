@@ -408,8 +408,61 @@ object Migrations {
         )
     }
 
+    /**
+     * 10 → 11: money with people becomes a transfer, not spending.
+     *
+     * "Transfers & payments" was a spending category, and since 1.38 a
+     * money-in one too. It becomes a single transfer-kind category, which
+     * every total leaves out:
+     *
+     * - The money-in one held only money from people (bank credits, a name),
+     *   so its payments and bills move across whole.
+     * - The spending one also held PayPal, Revolut and card readers — mostly
+     *   shopping — so it is renamed "Payment apps" and stays spending. The
+     *   payments in it that are plainly to a person are moved across by the
+     *   app on its next start (TidyUpRepository), where a person can be told
+     *   from a shop.
+     *
+     * Payments keep their direction: money sent still leaves the account.
+     */
+    val MIGRATION_10_11 = Migration(10, 11) { db ->
+        val people = "'Transfers & payments'"
+        val apps = "'Payment apps'"
+        db.execSQL(
+            "INSERT INTO categories (name, kind, color_hex, icon_key, parent_id, monthly_budget_minor, " +
+                "sort_order, is_system, is_archived, created_at, updated_at) " +
+                "SELECT $people, 'TRANSFER', '#455A64', 'SwapHoriz', NULL, NULL, " +
+                "IFNULL((SELECT MAX(sort_order) FROM categories), 0) + 1, 0, 0, 0, 0 " +
+                "WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = $people COLLATE NOCASE AND kind = 'TRANSFER')",
+        )
+        val transfer = "(SELECT id FROM categories WHERE name = $people COLLATE NOCASE AND kind = 'TRANSFER' LIMIT 1)"
+
+        // Money in from people: across, whole.
+        val moneyIn = "(SELECT id FROM categories WHERE name = $people COLLATE NOCASE AND kind = 'INCOME')"
+        db.execSQL("UPDATE transactions SET category_id = $transfer WHERE category_id IN $moneyIn")
+        db.execSQL("UPDATE recurring_rules SET category_id = $transfer WHERE category_id IN $moneyIn")
+        db.execSQL("UPDATE categories SET parent_id = NULL WHERE parent_id IN $moneyIn")
+        db.execSQL("DELETE FROM categories WHERE id IN $moneyIn")
+
+        // The spending one: "Payment apps", merged into one already there.
+        val spending = "(SELECT id FROM categories WHERE name = $people COLLATE NOCASE AND kind = 'EXPENSE')"
+        val existingApps = "(SELECT id FROM categories WHERE name = $apps COLLATE NOCASE AND kind = 'EXPENSE' LIMIT 1)"
+        db.execSQL(
+            "UPDATE transactions SET category_id = $existingApps " +
+                "WHERE category_id IN $spending AND $existingApps IS NOT NULL",
+        )
+        db.execSQL(
+            "UPDATE recurring_rules SET category_id = $existingApps " +
+                "WHERE category_id IN $spending AND $existingApps IS NOT NULL",
+        )
+        db.execSQL(
+            "DELETE FROM categories WHERE id IN $spending AND $existingApps IS NOT NULL",
+        )
+        db.execSQL("UPDATE categories SET name = $apps WHERE id IN $spending")
+    }
+
     val ALL: Array<Migration> = arrayOf(
         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
-        MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10,
+        MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11,
     )
 }

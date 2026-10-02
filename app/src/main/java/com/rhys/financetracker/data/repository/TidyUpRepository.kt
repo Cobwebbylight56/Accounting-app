@@ -113,7 +113,7 @@ class TidyUpRepository @Inject constructor(
             linkOwnAccounts(account.id, isSaver = account.holding == Holding.SET_ASIDE)
         }
 
-        val turned = turnRoundCredits()
+        val turned = turnRoundCredits() + moveMoneyWithPeople()
         val categorised = categoriseUnsorted()
         val refiled = resort(remember = false) + turned
         val bills = addStillPaidBills()
@@ -265,7 +265,7 @@ class TidyUpRepository @Inject constructor(
                 .take(NOTE_EXAMPLES)
                 .map { it.key }
             val noted = if (alsoNote > 0) {
-                listOf("$alsoNote bank credits → money in") + examples.take(NOTE_EXAMPLES - 1)
+                listOf("$alsoNote payments with people → transfers") + examples.take(NOTE_EXAMPLES - 1)
             } else {
                 examples
             }
@@ -286,24 +286,51 @@ class TidyUpRepository @Inject constructor(
     suspend fun resortIfRulesChanged() {
         if (settingsRepository.settings.first().resortedRulesVersion >= MerchantCategoriser.RULES_VERSION) return
         val turned = turnRoundCredits()
+        val people = moveMoneyWithPeople()
         categoriseUnsorted()
-        resort(remember = true, alsoNote = turned)
+        resort(remember = true, alsoNote = turned + people)
     }
 
     /**
-     * Money that came in but was read from an older statement as going out:
-     * "Bank credit H Payne £500" as a payment *to* H Payne. Turned to money
-     * in under "Transfers & payments". Only statement rows the app filed —
-     * never one the user has touched — and only wording that cannot mean a
-     * payment out. Returns how many were turned.
+     * Money that came in but was recorded as going out: "Bank credit H Payne
+     * £500" as a payment *to* H Payne — read that way from an older statement,
+     * or saved that way in the editor before the category could be found on
+     * the money-in side. Turned to money in, under "Transfers & payments".
+     *
+     * Only wording that cannot mean a payment out, so it is safe to do even
+     * to payments the user has edited: they chose the category, never "this
+     * bank credit was money leaving". Returns how many were turned.
      */
+    /**
+     * Payments plainly to or from a person — "Faster payment to Hannah
+     * Payne", a bank credit from H Payne — moved into "Transfers & payments",
+     * the transfer category spending and income leave out. Only from where
+     * they could have been filed before people money was a transfer: the
+     * payment-apps category it used to share, or nowhere at all.
+     */
+    private suspend fun moveMoneyWithPeople(): Int {
+        val transfer = categoryRepository.peopleTransfers()
+        val from = listOfNotNull(
+            categoryDao.getByNameAndKind(MerchantCategoriser.PAYMENT_APPS, CategoryKind.EXPENSE)?.id,
+        ).toSet()
+        val rows = transactionDao.getIncomeAndExpenseNotMoves().filter { row ->
+            (row.categoryId == null || row.categoryId in from) &&
+                MerchantCategoriser.isMoneyWithAPerson(row.description, row.type)
+        }
+        val now = Instant.now().toEpochMilli()
+        rows.map { it.id }.chunked(BATCH).forEach { transactionDao.setCategory(it, transfer.id, now) }
+        return rows.size
+    }
+
     private suspend fun turnRoundCredits(): Int {
-        val wrong = transactionDao.getAppFiledStatementOut().filter { row ->
+        val wrong = transactionDao.getPaymentsOutNotMoves().filter { row ->
             MONEY_IN_WORDING.containsMatchIn(TransactionFingerprint.normaliseDescription(row.description))
         }
         if (wrong.isEmpty()) return 0
-        val category = categoryRepository.findOrCreate(MerchantCategoriser.PEOPLE_IN, CategoryKind.INCOME, "#1B9A94")
-        return transactionRepository.turnRound(wrong.map { it.id }, TransactionType.INCOME, category.id, byUser = false)
+        val category = categoryRepository.peopleTransfers()
+        val (theirs, apps) = wrong.partition { it.categoryByUser }
+        return transactionRepository.turnRound(theirs.map { it.id }, TransactionType.INCOME, category.id, byUser = true) +
+            transactionRepository.turnRound(apps.map { it.id }, TransactionType.INCOME, category.id, byUser = false)
     }
 
     /**
@@ -341,7 +368,7 @@ class TidyUpRepository @Inject constructor(
 
     /** The category called [name], preferring the savings and cash kinds, as the importer does. */
     private suspend fun categoryIdFor(name: String, type: TransactionType): Long? {
-        for (kind in listOf(CategoryKind.SAVING, CategoryKind.CASH)) {
+        for (kind in listOf(CategoryKind.SAVING, CategoryKind.CASH, CategoryKind.TRANSFER)) {
             categoryDao.getByNameAndKind(name, kind)?.let { return it.id }
         }
         val kind = if (type == TransactionType.INCOME) CategoryKind.INCOME else CategoryKind.EXPENSE
@@ -358,7 +385,7 @@ class TidyUpRepository @Inject constructor(
          * mistake. "Card spending" is not one: a card was used in a shop, and
          * a shop sharing a word with a card's name is not a payment to it.
          */
-        val LOOSE = listOf("Transfers & payments", "Credit & loans", "Car finance", "Mortgage")
+        val LOOSE = listOf("Transfers & payments", "Payment apps", "Credit & loans", "Car finance", "Mortgage")
 
         private const val BATCH = 400
 

@@ -29,7 +29,14 @@ data class TransactionWithDetails(
     @ColumnInfo(name = "category_color") val categoryColor: String?,
     @ColumnInfo(name = "person_name") val personName: String?,
     @ColumnInfo(name = "person_color") val personColor: String?,
-)
+    /** The category's side; TRANSFER for money with people, which is not spending. */
+    @ColumnInfo(name = "category_kind") val categoryKind: com.rhys.financetracker.domain.model.CategoryKind? = null,
+) {
+    /** Money moved to or from a person rather than spent or earned. */
+    val isPersonTransfer: Boolean
+        get() = categoryKind == com.rhys.financetracker.domain.model.CategoryKind.TRANSFER &&
+            transaction.type != com.rhys.financetracker.domain.model.TransactionType.TRANSFER
+}
 
 /** An account with its computed running balance. */
 data class AccountWithBalance(

@@ -70,7 +70,8 @@ object PayeeNames {
         if (words.any { word -> word.any { !it.isLetter() && it != '\'' && it != '-' } }) return false
         if (words.any { it in NOT_A_NAME }) return false
         if (words.none { it.length >= 2 }) return false
-        return MerchantCategoriser.categoryFor(name) == null
+        // The list alone: asking categoryFor would ask this again.
+        return MerchantCategoriser.ruleCategory(name) == null
     }
 
     /** True when money in reads like it came from somebody: a transfer, or "from" a name. */

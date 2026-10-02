@@ -162,7 +162,10 @@ class SpendingViewModel @Inject constructor(
                     val row = byKey[DateUtils.yearMonthKey(candidate)]
                     MonthPoint(candidate, row?.incomeMinor ?: 0L, row?.expenseMinor ?: 0L)
                 },
+                // Money to people is a transfer, not spending; Money with
+                // people is where it is shown.
                 payees = payments
+                    .filterNot { it.isPersonTransfer }
                     .groupBy { PayeeNames.of(it.transaction.description).ifBlank { it.transaction.description.trim() } }
                     .map { (name, rows) -> PayeeTotal(name, rows.sumOf { it.transaction.amountMinor }, rows.size) }
                     .sortedByDescending { it.totalMinor }
@@ -192,7 +195,7 @@ class SpendingViewModel @Inject constructor(
             val upTo = if (m == DateUtils.currentYearMonth()) DateUtils.today().dayOfMonth else days
             fun running(rows: List<com.rhys.financetracker.data.local.projection.TransactionWithDetails>, length: Int): List<Long> {
                 val byDay = LongArray(length)
-                rows.forEach { row ->
+                rows.filterNot { it.isPersonTransfer }.forEach { row ->
                     val day = row.transaction.date.dayOfMonth
                     if (day in 1..length) byDay[day - 1] += row.transaction.amountMinor
                 }
