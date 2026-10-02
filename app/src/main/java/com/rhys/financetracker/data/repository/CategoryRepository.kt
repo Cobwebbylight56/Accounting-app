@@ -128,3 +128,9 @@ class CategoryRepository @Inject constructor(
         const val PEOPLE_TRANSFERS = "Transfers & payments"
     }
 }
+
+/** A top-level category together with its children. */
+data class CategoryGroup(
+    val parent: CategoryEntity,
+    val children: List<CategoryEntity>,
+)
