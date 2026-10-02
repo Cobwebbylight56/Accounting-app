@@ -449,6 +449,15 @@ Tap an account (in Accounts, or on a person's page) to open its page:
 
 The pencil at the top edits the account; **Import statements** adds to it.
 
+### Statements printed newest first (Lloyds and others)
+
+Some banks — Lloyds among them, especially statements printed in a branch —
+list the newest payment at the top and write dates as "01 Jun 26". The app
+turns them the right way round before reading, so the running balance still
+proves which way each payment went, and a row that the PDF splits over two
+lines (the description on one, the date and balance on the next) is put back
+together.
+
 ### Statements with a side panel (Nationwide and others)
 
 Some statements print account details down the right-hand side — IBAN, sort

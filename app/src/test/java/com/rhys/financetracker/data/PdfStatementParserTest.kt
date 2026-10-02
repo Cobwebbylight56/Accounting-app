@@ -695,4 +695,52 @@ class PdfStatementParserTest {
         )
         assertEquals(listOf(LocalDate.of(2026, 3, 2), LocalDate.of(2026, 3, 28)), rows.map { it.date })
     }
+
+    /** A Lloyds saver statement printed in branch, as the app read it. */
+    private val lloydsSaver = listOf(
+        "LLOYDS BANK ",
+        "Monthly Saver statement ",
+        "This statement was printed in Branch ",
+        "30-84-59 on 12 June 2026 at 10:14. ",
+        "Rhys Evans Sort code:  Account number:  ",
+        "Date Description Type In (£) Out (£) Balance (£) ",
+        "01 Jun 26 EVANS RHYS SAVER FP26151049441832 FPI 250.00 1500.00 ",
+        "01 May 26 EVANS RHYS SAVER FP26120049319058 FPI 250.00 1250.00 ",
+        "01 Apr 26 EVANS RHYS SAVER FP26090049483798 FPI 250.00 1000.00 ",
+        "02 Mar 26 EVANS RHYS SAVER FP26060049912005 FPI 250.00 750.00 ",
+        "04 Feb 26 RHYS EVANS SAVER 04059556257381026 FPI 250.00 500.00 ",
+        "14 Jan 26 RHYSE VANS SAVER 14648339923246775 FPI 249.00 250.00 ",
+        "RHYS EVANS SAVER 04200390237050891 FPI 1.00 ",
+        "14 Jan 26 1.00 ",
+        "LIovds Bank plc Registered Office: 25 Gresham Street, London EC2V TAN. Registered in England ana Wales No. 2065. Authorised by th ",
+        "registration number 119278.",
+    )
+
+    @Test
+    fun `a Lloyds statement, newest first with two-digit years, reads every row the right way`() {
+        val rows = PdfStatementParser.parse(lloydsSaver)
+        assertEquals(7, rows.size)
+        // Oldest first, whatever order the page was in.
+        assertEquals(LocalDate.of(2026, 1, 14), rows.first().date)
+        assertEquals(LocalDate.of(2026, 6, 1), rows.last().date)
+        // Every one is money paid in — the balance only ever rises.
+        assertTrue(rows.all { it.moneyOutMinor == null && it.moneyInMinor != null })
+        assertEquals(listOf(100L, 24_900L, 25_000L, 25_000L, 25_000L, 25_000L, 25_000L), rows.map { it.moneyInMinor })
+        assertEquals(150_000L, rows.last().balanceMinor)
+        // The row split over two lines keeps its description and its balance.
+        assertEquals("RHYS EVANS SAVER 04200390237050891 FPI", rows.first().description)
+        assertEquals(100L, rows.first().balanceMinor)
+    }
+
+    @Test
+    fun `a company number in the footer is not taken for the year`() {
+        assertEquals(2026, PdfStatementParser.inferYear(lloydsSaver, thisYear = 2026))
+    }
+
+    @Test
+    fun `a two-digit year is read, but not one that is really an amount`() {
+        assertEquals(LocalDate.of(2026, 6, 1), PdfStatementParser.leadingDate("01 Jun 26 SAVER 250.00", 2026))
+        // "01 Mar 12.50": the date has no year here; 12.50 is money.
+        assertNull(PdfStatementParser.leadingDate("01 Mar 12.50"))
+    }
 }

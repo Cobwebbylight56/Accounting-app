@@ -371,10 +371,75 @@ object PdfStatementParser {
      * through it, so a layout that works cannot be broken by this.
      */
     private fun readLinesHowever(lines: List<String>, documentYear: Int?): List<ReadLine> {
-        val direct = readLines(lines, documentYear)
-        if (direct.size >= MIN_ROWS) return direct
-        val stitched = readLines(stitch(lines), documentYear)
-        return if (stitched.size > direct.size) stitched else direct
+        val joined = joinSplitRows(lines)
+        val direct = readLines(joined, documentYear)
+        val best = if (direct.size >= MIN_ROWS) {
+            direct
+        } else {
+            val stitched = readLines(stitch(joined), documentYear)
+            if (stitched.size > direct.size) stitched else direct
+        }
+        return oldestFirst(best)
+    }
+
+    /**
+     * The rows oldest first, whichever way the bank printed them.
+     *
+     * Lloyds and others list the newest payment at the top. Everything below
+     * — the running balance most of all — reads a statement in date order: a
+     * balance going from £1,500 down the page to £1,250 is £250 *in* when the
+     * page runs backwards, and was read as £250 out. Turned round, the
+     * arithmetic is right again, rows within a day included.
+     */
+    private fun oldestFirst(read: List<ReadLine>): List<ReadLine> {
+        if (read.size < 2) return read
+        val pairs = read.zipWithNext()
+        val backwards = pairs.count { (a, b) -> b.date.isBefore(a.date) }
+        val forwards = pairs.count { (a, b) -> b.date.isAfter(a.date) }
+        return if (backwards > forwards) read.reversed() else read
+    }
+
+    /**
+     * Mends a row the text came out of in two pieces: the description and
+     * amount on one line with no date, and the date with the balance on the
+     * line after —
+     *
+     * ```
+     * RHYS EVANS SAVER 04200390237050891 FPI 1.00
+     * 14 Jan 26 1.00
+     * ```
+     *
+     * — which is one payment of £1.00 leaving a balance of £1.00. Read as it
+     * stood, the first line was taken as a second payment on the day above
+     * and the balance thrown away.
+     */
+    private fun joinSplitRows(lines: List<String>): List<String> {
+        val out = mutableListOf<String>()
+        var i = 0
+        while (i < lines.size) {
+            val line = lines[i].trim()
+            val next = lines.getOrNull(i + 1)?.trim()
+            if (next != null &&
+                leadingDate(line, ANY_YEAR) == null &&
+                trailingFigures(line).isNotEmpty() &&
+                describe(line).isNotBlank() &&
+                leadingDate(next, ANY_YEAR) != null &&
+                trailingFigures(next).isNotEmpty()
+            ) {
+                val tokens = next.split(WHITESPACE).filter { it.isNotEmpty() }
+                val start = trailingRunStart(tokens)
+                val dateText = tokens.take(start).joinToString(" ")
+                // Only when the dated line is nothing but a date and figures.
+                if (leadingDate(dateText, ANY_YEAR) != null && describe(next).isBlank()) {
+                    out += "$dateText $line ${tokens.drop(start).joinToString(" ")}"
+                    i += 2
+                    continue
+                }
+            }
+            out += lines[i]
+            i++
+        }
+        return out
     }
 
     /**
@@ -824,7 +889,7 @@ object PdfStatementParser {
         """(?i)\b(direct debit|standing order|card payment|contactless|debit card|""" +
             """cash withdrawal|withdrawal|atm|cash machine|bill payment|payment to|""" +
             """purchase|pay at pump|faster payment to|transfer to|charge|fee|""" +
-            """overdraft interest|interest charged|debit interest|transfer out)\b""",
+            """overdraft interest|interest charged|debit interest|transfer out|fpo)\b""",
     )
 
     /**
@@ -840,7 +905,7 @@ object PdfStatementParser {
             """dividend|bacs credit|credit from|credit interest|interest paid|""" +
             """transfer from|paid in|deposit|bgc|giro|payment received|""" +
             """faster payment received|credit transfer|bank credit|credited|""" +
-            """received from|receipt|receipts|interest|transfer in|credit in)\b""",
+            """received from|receipt|receipts|interest|transfer in|credit in|fpi)\b""",
     )
 
     /** Markers meaning the money arrived rather than left. */
@@ -870,7 +935,11 @@ object PdfStatementParser {
             val (d, name, y) = match.destructured
             val month = MONTHS[name.lowercase().take(3)] ?: return null
             val year = y.toInt().let { if (it < 100) 2000 + it else it }
-            return runCatching { LocalDate.of(year, month, d.toInt()) }.getOrNull()
+            // A two-digit "year" far from the statement's own is the start of
+            // the description ("01 Mar 24 HOUR GARAGE"), not a year.
+            val stray = y.length == 2 && fallbackYear != null && fallbackYear != ANY_YEAR &&
+                kotlin.math.abs(year - fallbackYear) > 1
+            if (!stray) return runCatching { LocalDate.of(year, month, d.toInt()) }.getOrNull()
         }
         // "01 Mar" with the year in the statement heading. Only read when a
         // year was found in the document: guessing one files transactions in
@@ -892,10 +961,20 @@ object PdfStatementParser {
      * The latest year present is used, since a statement covering a year end
      * mentions both and the later one is where most of its rows sit.
      */
-    internal fun inferYear(lines: List<String>): Int? =
-        lines.flatMap { YEAR.findAll(it).map { match -> match.value.toInt() } }
-            .filter { it in FIRST_PLAUSIBLE_YEAR..LAST_PLAUSIBLE_YEAR }
+    internal fun inferYear(lines: List<String>, thisYear: Int = LocalDate.now().year): Int? {
+        // Never a year still to come: "Registered in England and Wales No.
+        // 2065" in a Lloyds footer was taken as the statement's year, and
+        // every row dated "26" was then thrown out as not belonging to it.
+        val plausible = FIRST_PLAUSIBLE_YEAR..(thisYear + 1)
+        // A year written as part of a date — "12 June 2026", "June 2026",
+        // "01/03/2026" — says far more than a four-digit number anywhere.
+        val inDates = lines.flatMap { line -> YEAR_IN_DATE.findAll(line).map { it.groupValues[1].toInt() } }
+            .filter { it in plausible }
+        if (inDates.isNotEmpty()) return inDates.max()
+        return lines.flatMap { YEAR.findAll(it).map { match -> match.value.toInt() } }
+            .filter { it in plausible }
             .maxOrNull()
+    }
 
     /**
      * The run of figures at the end of a line, in order.
@@ -1059,14 +1138,23 @@ object PdfStatementParser {
     private val DATE_PATTERNS by lazy { listOf(NUMERIC_DATE, NAMED_DATE, SHORT_DATE) }
 
     private val YEAR = Regex("""\b(19|20)\d{2}\b""")
+
+    /** A year inside a date: `12 June 2026`, `June 2026`, `01/03/2026`. */
+    private val YEAR_IN_DATE = Regex(
+        """(?i)(?:\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+|\b\d{1,2}[/.-]\d{1,2}[/.-])((?:19|20)\d{2})\b""",
+    )
     private const val FIRST_PLAUSIBLE_YEAR = 1990
     private const val LAST_PLAUSIBLE_YEAR = 2100
 
     /** `01/03/2026`, `1-3-26`, `01.03.2026` — at the start of the line. */
     private val NUMERIC_DATE = Regex("""^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})""")
 
-    /** `01 Mar 2026`, `1 March 2026`. */
-    private val NAMED_DATE = Regex("""^(\d{1,2})\s+([A-Za-z]{3,9})\.?\s+(\d{4})""")
+    /**
+     * `01 Mar 2026`, `1 March 2026`, and Lloyds' `01 Jun 26`. A two-digit
+     * year must stand alone — `01 Mar 12.50` is a date and an amount, not
+     * the year 2012.
+     */
+    private val NAMED_DATE = Regex("""^(\d{1,2})\s+([A-Za-z]{3,9})\.?\s+(\d{4}|\d{2})(?![\d.,])""")
 
     /**
      * A money token: optional sign or bracket, digits with two decimal places,
