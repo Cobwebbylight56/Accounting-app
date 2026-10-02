@@ -104,6 +104,7 @@ object DefaultData {
 
         // ------------------------------------------------------------ misc
         SeedCategory("Shopping", CategoryKind.EXPENSE, "#00695C", "ShoppingBag"),
+        SeedCategory("Hobbies", CategoryKind.EXPENSE, "#5E35B1", "Palette"),
         SeedCategory("Pets", CategoryKind.EXPENSE, "#8D6E63", "Pets"),
         SeedCategory("Health", CategoryKind.EXPENSE, "#D81B60", "MedicalServices"),
         SeedCategory("Education", CategoryKind.EXPENSE, "#3949AB", "School"),
@@ -118,6 +119,11 @@ object DefaultData {
         SeedCategory("Christmas fund", CategoryKind.SAVING, "#C62828", "Redeem", parent = "Savings"),
 
         SeedCategory("People & services", CategoryKind.EXPENSE, "#8D6E63", "Payments"),
+        // The same name on both sides: money sent to someone is the expense,
+        // money a person sends you is the income. With only the expense one,
+        // a payment in from a person could not be filed under it at all.
+        SeedCategory("Transfers & payments", CategoryKind.EXPENSE, "#455A64", "SwapHoriz"),
+        SeedCategory("Transfers & payments", CategoryKind.INCOME, "#1B9A94", "SwapHoriz"),
         SeedCategory("Card spending", CategoryKind.EXPENSE, "#78909C", "Payments"),
 
         // ------------------------------------------------------------ cash

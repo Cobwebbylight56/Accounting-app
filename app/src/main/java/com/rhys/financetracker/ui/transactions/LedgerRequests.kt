@@ -45,6 +45,11 @@ class LedgerRequests @Inject constructor() {
         )
     }
 
+    /** Every payment matching [text], whenever it was — one subscription's history, say. */
+    fun openSearchAll(text: String) {
+        pending.value = TransactionFilter(text = text)
+    }
+
     /** Everything on one account, in and out. */
     fun openAccount(accountId: Long) {
         pending.value = TransactionFilter(accountIds = setOf(accountId))

@@ -27,7 +27,7 @@ object MerchantCategoriser {
      * app re-sorts everything it filed by itself — never anything the user
      * filed — so old payments follow the improved rules too.
      */
-    const val RULES_VERSION = 1
+    const val RULES_VERSION = 2
 
     /**
      * The category for [description], or null when nothing matches.
@@ -46,7 +46,11 @@ object MerchantCategoriser {
         learnedCategory(description, learned)?.let { return it }
 
         val rules = if (type == TransactionType.INCOME) INCOME_RULES else EXPENSE_RULES
-        return rules.firstOrNull { rule -> rule.keywords.any { matches(text, it) } }?.category
+        rules.firstOrNull { rule -> rule.keywords.any { matches(text, it) } }?.let { return it.category }
+        // Money in from nothing but a person's name — "H PAYNE" — is them
+        // paying you, not wages from a company called that.
+        if (type == TransactionType.INCOME && PayeeNames.isPersonName(PayeeNames.of(description))) return PEOPLE_IN
+        return null
     }
 
     /**
@@ -426,7 +430,17 @@ object MerchantCategoriser {
         rule("Interest", "interest", "gross int", "credit interest"),
         rule("Refunds", "refund", "reversal", "chargeback", "reimbursement", "rebate"),
         rule("Selling", "vinted", "depop", "gumtree", "facebook mktp", "ebay payout"),
+        // Money a person sent: "Bank credit H Payne", "Faster payment from J
+        // Smith". Last, so wages, benefits and refunds are named first.
+        rule(
+            PEOPLE_IN,
+            "bank credit", "faster payment from", "faster payment received", "fp from", "payment from",
+            "transfer from", "credit from", "received from", "mobile payment from",
+        ),
     )
+
+    /** Where money in from a person goes: the money-in side of "Transfers & payments". */
+    const val PEOPLE_IN = "Transfers & payments"
 
     /**
      * How much of a remembered merchant must match before a prefix counts.

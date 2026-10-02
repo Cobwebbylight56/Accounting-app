@@ -240,6 +240,7 @@ private fun NavGraphBuilder.topLevelDestinations(
     composable(Routes.SPENDING) {
         com.rhys.financetracker.ui.spending.SpendingScreen(
             onOpenLedger = { navController.navigate(Routes.LEDGER) },
+            onOpenSubscriptions = { navController.navigate(Routes.SUBSCRIPTIONS) },
         )
     }
 
@@ -297,6 +298,24 @@ private fun NavGraphBuilder.topLevelDestinations(
             onOpenSortSpending = { navController.navigate(Routes.SORT_SPENDING) },
             onOpenSentToPeople = { navController.navigate(Routes.SENT_TO_PEOPLE) },
             onOpenSortEverything = { navController.navigate(Routes.SORT_EVERYTHING) },
+            onOpenSubscriptions = { navController.navigate(Routes.SUBSCRIPTIONS) },
+            onOpenCards = { navController.navigate(Routes.CARDS) },
+        )
+    }
+
+    composable(Routes.SUBSCRIPTIONS) {
+        com.rhys.financetracker.ui.subscriptions.SubscriptionsScreen(
+            onBack = { navController.popBackStack() },
+            onOpenLedger = { navController.navigate(Routes.LEDGER) },
+        )
+    }
+
+    composable(Routes.CARDS) {
+        com.rhys.financetracker.ui.accounts.CardsScreen(
+            onBack = { navController.popBackStack() },
+            onOpenAccount = { navController.navigate(Routes.accountView(it)) },
+            onImportStatement = { navController.navigate(Routes.importForAccount(it)) },
+            onAddCard = { navController.navigate(Routes.accountEdit()) },
         )
     }
 

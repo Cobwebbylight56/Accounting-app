@@ -880,6 +880,16 @@ interface TransactionDao {
     )
     suspend fun getAppFiled(): List<TransactionEntity>
 
+    /** Money out read from a statement and filed by the app, for checking its direction. */
+    @Query(
+        """
+        SELECT * FROM transactions
+        WHERE is_archived = 0 AND type = 'EXPENSE' AND category_by_user = 0
+          AND transfer_account_id IS NULL AND source = 'STATEMENT'
+        """,
+    )
+    suspend fun getAppFiledStatementOut(): List<TransactionEntity>
+
     /** Payees the user filed themselves, commonest first. */
     @Query(
         """

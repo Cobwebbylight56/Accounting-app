@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountBalance
 import androidx.compose.material.icons.outlined.AutoFixHigh
 import androidx.compose.material.icons.outlined.Category
+import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.EventRepeat
 import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.People
@@ -43,6 +44,8 @@ fun MoreScreen(
     onOpenSortSpending: () -> Unit = {},
     onOpenSentToPeople: () -> Unit = {},
     onOpenSortEverything: () -> Unit = {},
+    onOpenSubscriptions: () -> Unit = {},
+    onOpenCards: () -> Unit = {},
 ) {
     Scaffold(
         topBar = { TopAppBar(title = { Text("More") }) },
@@ -91,6 +94,18 @@ fun MoreScreen(
                 subtitle = "Unsorted payments by who they went to — file each in one tap",
                 icon = Icons.Outlined.Category,
                 onClick = onOpenSortSpending,
+            )
+            SettingsItem(
+                title = "Subscriptions",
+                subtitle = "What you pay every month, and which have stopped",
+                icon = Icons.Outlined.EventRepeat,
+                onClick = onOpenSubscriptions,
+            )
+            SettingsItem(
+                title = "Credit cards",
+                subtitle = "What's owed on each card, what goes on it, its statements",
+                icon = Icons.Outlined.CreditCard,
+                onClick = onOpenCards,
             )
             SettingsItem(
                 title = "Money with people",

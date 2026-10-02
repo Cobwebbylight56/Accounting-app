@@ -38,11 +38,24 @@ class AppLockManager @Inject constructor(
     private var backgroundedAt: Long? = null
     private var scope: CoroutineScope? = null
 
-    /** Called once from `MainActivity`, which owns the coroutine scope. */
+    /** Whether the app has been opened since it started, so a second window is not a new start. */
+    private var started = false
+
+    /**
+     * Called from every `MainActivity` as it is created, which owns the
+     * coroutine scope.
+     *
+     * Only the first window after the app starts locks straight away. Opening
+     * a statement from Files or Downloads creates another window, and it used
+     * to lock again every time — asking for the fingerprint seconds after it
+     * was given. A window opened while the app is already running is covered
+     * by the usual idle timeout in [onStart] instead.
+     */
     fun attach(scope: CoroutineScope) {
         this.scope = scope
+        if (started) return
+        started = true
         scope.launch {
-            // Lock immediately at launch if a lock is configured.
             val settings = settingsRepository.settings.first()
             _isLocked.value = settings.isLockEnabled && pinStore.isPinSet
         }

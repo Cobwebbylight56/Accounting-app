@@ -116,4 +116,15 @@ class CategoryRulesAuditTest {
         // A different payee is not claimed.
         assertEquals("Fuel", MerchantCategoriser.categoryFor("SHELL NEWPORT", learned = learned))
     }
+
+    @Test
+    fun `money in from a person is a transfer, not uncategorised`() {
+        val income = com.rhys.financetracker.domain.model.TransactionType.INCOME
+        assertEquals("Transfers & payments", MerchantCategoriser.categoryFor("Bank credit H Payne", income))
+        assertEquals("Transfers & payments", MerchantCategoriser.categoryFor("FASTER PAYMENT FROM HANNAH PAYNE", income))
+        assertEquals("Transfers & payments", MerchantCategoriser.categoryFor("H PAYNE", income))
+        // Wages, benefits and refunds still come first.
+        assertEquals("Salary", MerchantCategoriser.categoryFor("ACME LTD SALARY", income))
+        assertEquals("Refunds", MerchantCategoriser.categoryFor("AMAZON REFUND", income))
+    }
 }

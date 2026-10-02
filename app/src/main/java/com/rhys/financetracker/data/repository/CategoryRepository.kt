@@ -41,6 +41,17 @@ class CategoryRepository @Inject constructor(
      * relies on this so that a spreadsheet row naming an unknown category
      * produces a real, correctly coloured category rather than "Uncategorised".
      */
+    /**
+     * The category called the same as [id] on the [kind] side, if there is
+     * one — "Transfers & payments" exists for money out and money in.
+     */
+    suspend fun sameNameAs(id: Long, kind: CategoryKind): CategoryEntity? {
+        val current = categoryDao.getById(id) ?: return null
+        // Savings and cash belong on every side already.
+        if (current.kind == kind || current.kind.isAPot) return current
+        return categoryDao.getByNameAndKind(current.name, kind)
+    }
+
     suspend fun findOrCreate(name: String, kind: CategoryKind, colorHex: String): CategoryEntity {
         categoryDao.getByNameAndKind(name, kind)?.let { return it }
         val entity = CategoryEntity(name = name.trim(), kind = kind, colorHex = colorHex)

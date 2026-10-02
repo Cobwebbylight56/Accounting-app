@@ -151,6 +151,12 @@ on the filter icon tells you how many filters are active.
 
 Everything can be edited. Tap any entry to open it.
 
+**Money in from people** — "Bank credit H Payne", "Faster payment from…", or
+just a person's name — is filed as **Income → Transfers & payments**. The
+category exists on both sides now, and switching a payment between Expense and
+Income keeps it. Older "Bank credit" payments that were saved as expenses are
+turned round the first time you open this version.
+
 **Your category goes for the whole payee.** Change the category of one
 payment and every other payment to the same payee moves with it — the edit
 screen says how many before you save ("the other 14 move too"). The bank's
@@ -560,6 +566,32 @@ statements sort them the same way.
 The app also now knows many more shops, websites and outings by name — high
 street chains, online shops (Amazon, eBay, Shein, Temu, ASOS…), cinemas,
 bowling, theme parks, ticket sites, pubs and takeaways.
+
+### Subscriptions
+
+**More → Subscriptions** (or the button on the Spending tab) lists everything
+your statements show being paid at a steady rhythm — every week, month or year,
+at much the same amount. Each row has a dot for each of the last twelve months
+it was paid in, so a gap stands out, and says which account or card pays it.
+
+* **Still being paid** — paid on time up to your latest statement.
+* **Missed a payment — may have stopped** — one payment due hasn't appeared.
+  Worth checking it was cancelled, and not just moved to another card.
+* **Stopped** — two or more missed.
+
+It's judged against the latest statement you've imported for each account, so
+a card you haven't imported lately doesn't make everything on it look stopped.
+The total at the top is what the ones still going cost a month and a year, and
+the graph shows what they came to each month. Tap one to see every payment.
+
+### Credit cards
+
+**More → Credit cards** shows each credit card and pay-later account: what's
+owed, how much of the limit that is (amber past three-quarters), what went on
+it this month and last, a graph of what was owed at each month end, and the
+subscriptions it pays. **Import statement** imports that card's statement
+straight into it. If a card's statement reads the wrong way round, use **Copy
+read text** on the import screen and send it in.
 
 ### Money with people
 

@@ -51,6 +51,12 @@ object Routes {
     const val SETTINGS_DASHBOARD = "settings/dashboard"
     const val IMPORT = "import"
 
+    /** Subscriptions and regular payments, and whether each is still being paid. */
+    const val SUBSCRIPTIONS = "subscriptions"
+
+    /** Each credit card and pay-later account: what is owed and what goes on it. */
+    const val CARDS = "cards"
+
     /** Payments filtered by another page, as a page of its own with a back arrow. */
     const val LEDGER = "ledger"
 

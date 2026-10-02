@@ -99,6 +99,7 @@ class TidyUpRepository @Inject constructor(
     private val importer: SpreadsheetImporter,
     private val billFinder: BillFinderRepository,
     private val settingsRepository: com.rhys.financetracker.data.prefs.SettingsRepository,
+    private val transactionRepository: TransactionRepository,
 ) {
 
     suspend fun sortEverything(): TidyUpResult {
@@ -112,8 +113,9 @@ class TidyUpRepository @Inject constructor(
             linkOwnAccounts(account.id, isSaver = account.holding == Holding.SET_ASIDE)
         }
 
+        val turned = turnRoundCredits()
         val categorised = categoriseUnsorted()
-        val refiled = resort(remember = false)
+        val refiled = resort(remember = false) + turned
         val bills = addStillPaidBills()
 
         val cleared = accountRepository.archivePaidOffLoans(
@@ -231,7 +233,7 @@ class TidyUpRepository @Inject constructor(
      * or else where the built-in list says. Returns how many moved; with
      * [remember], Home is told what moved and can put it back.
      */
-    suspend fun resort(remember: Boolean = true): Int {
+    suspend fun resort(remember: Boolean = true, alsoNote: Int = 0): Int {
         // Payees filed in 1.34, before entries carried the mark: mark them now.
         val chosen = settingsRepository.settings.first().categoryPayeesChosen
         val rows = transactionDao.getAppFiled()
@@ -262,9 +264,14 @@ class TidyUpRepository @Inject constructor(
                 .entries.sortedByDescending { (_, group) -> group.sumOf { it.row.amountMinor } }
                 .take(NOTE_EXAMPLES)
                 .map { it.key }
+            val noted = if (alsoNote > 0) {
+                listOf("$alsoNote bank credits → money in") + examples.take(NOTE_EXAMPLES - 1)
+            } else {
+                examples
+            }
             settingsRepository.setResorted(
                 rulesVersion = MerchantCategoriser.RULES_VERSION,
-                summary = if (moves.isEmpty()) "" else ResortNote(moves.size, examples).encode(),
+                summary = if (moves.isEmpty() && alsoNote == 0) "" else ResortNote(moves.size + alsoNote, noted).encode(),
                 undo = moves.joinToString(",") { "${it.row.id}:${it.row.categoryId}" },
             )
         }
@@ -278,8 +285,25 @@ class TidyUpRepository @Inject constructor(
      */
     suspend fun resortIfRulesChanged() {
         if (settingsRepository.settings.first().resortedRulesVersion >= MerchantCategoriser.RULES_VERSION) return
+        val turned = turnRoundCredits()
         categoriseUnsorted()
-        resort(remember = true)
+        resort(remember = true, alsoNote = turned)
+    }
+
+    /**
+     * Money that came in but was read from an older statement as going out:
+     * "Bank credit H Payne £500" as a payment *to* H Payne. Turned to money
+     * in under "Transfers & payments". Only statement rows the app filed —
+     * never one the user has touched — and only wording that cannot mean a
+     * payment out. Returns how many were turned.
+     */
+    private suspend fun turnRoundCredits(): Int {
+        val wrong = transactionDao.getAppFiledStatementOut().filter { row ->
+            MONEY_IN_WORDING.containsMatchIn(TransactionFingerprint.normaliseDescription(row.description))
+        }
+        if (wrong.isEmpty()) return 0
+        val category = categoryRepository.findOrCreate(MerchantCategoriser.PEOPLE_IN, CategoryKind.INCOME, "#1B9A94")
+        return transactionRepository.turnRound(wrong.map { it.id }, TransactionType.INCOME, category.id, byUser = false)
     }
 
     /**
@@ -337,6 +361,11 @@ class TidyUpRepository @Inject constructor(
         val LOOSE = listOf("Transfers & payments", "Credit & loans", "Car finance", "Mortgage")
 
         private const val BATCH = 400
+
+        /** Wording that only ever means money arriving, at the start of a statement line. */
+        private val MONEY_IN_WORDING = Regex(
+            """^(bank credit|faster payment received|fp received|credit from|transfer from|payment from|received from)\b""",
+        )
 
         /** How many of the biggest moves Home names. */
         private const val NOTE_EXAMPLES = 3

@@ -869,9 +869,9 @@ private fun YearGraphCard(
     }
 }
 
-/** The category money from people goes under when it is turned round. */
-private const val MONEY_FROM_PEOPLE = "Money from people"
-private const val MONEY_TO_PEOPLE = "People & services"
+/** Where payments turned round go: "Transfers & payments", on whichever side they now sit. */
+private const val MONEY_FROM_PEOPLE = "Transfers & payments"
+private const val MONEY_TO_PEOPLE = "Transfers & payments"
 
 /**
  * Every payment with one person, each ticked to swap sides: sent becomes

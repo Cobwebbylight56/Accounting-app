@@ -70,9 +70,12 @@ class MainActivity : FragmentActivity() {
 
         appLockManager.attach(lifecycleScope)
         incomingFile.value = fileFrom(intent)
-        // Only on a fresh start: not after rotating, and not when Android
-        // brings the app back from the background.
-        val freshStart = savedInstanceState == null
+        // Only once each time the app starts: not after rotating, not when
+        // Android brings it back, not for a second window opened to import a
+        // statement, and not when the app was opened with a statement at all
+        // — that is someone wanting to get on with it.
+        val freshStart = savedInstanceState == null && !introPlayed && incomingFile.value == null
+        introPlayed = true
 
         setContent {
             val settings by settingsRepository.settings
@@ -173,5 +176,8 @@ class MainActivity : FragmentActivity() {
 
     private companion object {
         const val LARGE_TEXT_SCALE = 1.2f
+
+        /** Set once the intro has had its chance this time the app is running. */
+        var introPlayed = false
     }
 }

@@ -160,6 +160,7 @@ class TransactionEditViewModel @Inject constructor(
     }
 
     fun setType(type: TransactionType) {
+        val previous = form.value.categoryId
         form.value = form.value.copy(
             type = type,
             // A category from the other side of the books would be meaningless.
@@ -170,6 +171,23 @@ class TransactionEditViewModel @Inject constructor(
                 null
             },
         )
+        // But where the same category exists on the new side, keep it: turning
+        // "Bank credit H Payne" from Expense to Income keeps "Transfers &
+        // payments" rather than leaving it uncategorised.
+        val kind = when (type) {
+            TransactionType.INCOME -> CategoryKind.INCOME
+            TransactionType.EXPENSE -> CategoryKind.EXPENSE
+            TransactionType.TRANSFER -> CategoryKind.TRANSFER
+        }
+        if (previous != null) {
+            viewModelScope.launch {
+                categoryRepository.sameNameAs(previous, kind)?.let { same ->
+                    if (form.value.type == type && form.value.categoryId == null) {
+                        form.value = form.value.copy(categoryId = same.id)
+                    }
+                }
+            }
+        }
     }
 
     fun save() {

@@ -74,7 +74,11 @@ class SeedRepository @Inject constructor(
         val existing = database.categoryDao().getAll()
         if (existing.isEmpty()) return false
         val byName = existing.associateBy { it.name }.toMutableMap()
-        val missing = DefaultData.defaultCategories().filter { it.name !in byName }
+        // By name and side, whatever the case: "Transfers & payments" is wanted
+        // on both the money-out and money-in sides, and a "hobbies" the user
+        // made themselves is the same as the app's "Hobbies".
+        val have = existing.map { it.name.lowercase() to it.kind }.toSet()
+        val missing = DefaultData.defaultCategories().filter { (it.name.lowercase() to it.kind) !in have }
         if (missing.isEmpty()) return false
 
         var order = (existing.maxOfOrNull { it.sortOrder } ?: 0) + 1

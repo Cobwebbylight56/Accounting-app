@@ -289,6 +289,7 @@ class SpendingViewModel @Inject constructor(
 @Composable
 fun SpendingScreen(
     onOpenLedger: () -> Unit,
+    onOpenSubscriptions: () -> Unit = {},
     viewModel: SpendingViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -373,6 +374,12 @@ fun SpendingScreen(
                         selected = state.month,
                         onMonth = viewModel::showMonth,
                     )
+                }
+            }
+
+            item {
+                androidx.compose.material3.OutlinedButton(onClick = onOpenSubscriptions, modifier = Modifier.fillMaxWidth()) {
+                    Text("Subscriptions — what's still being paid")
                 }
             }
 

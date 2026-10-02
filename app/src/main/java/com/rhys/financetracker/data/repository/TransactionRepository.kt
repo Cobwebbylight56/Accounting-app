@@ -127,7 +127,13 @@ class TransactionRepository @Inject constructor(
      * added beside it. Moves between accounts are left alone. Returns how many
      * were turned.
      */
-    suspend fun turnRound(ids: List<Long>, toType: TransactionType, categoryId: Long?): Int {
+    suspend fun turnRound(
+        ids: List<Long>,
+        toType: TransactionType,
+        categoryId: Long?,
+        /** False when the app turns them by itself, so its own choice can still be improved on. */
+        byUser: Boolean = true,
+    ): Int {
         val now = Instant.now().toEpochMilli()
         var turned = 0
         ids.forEach { id ->
@@ -137,7 +143,7 @@ class TransactionRepository @Inject constructor(
                 entry.copy(
                     type = toType,
                     categoryId = categoryId,
-                    categoryByUser = categoryId != null,
+                    categoryByUser = byUser && categoryId != null,
                     importHash = entry.importHash?.let {
                         com.rhys.financetracker.data.importer.TransactionFingerprint.of(
                             accountId = entry.accountId,

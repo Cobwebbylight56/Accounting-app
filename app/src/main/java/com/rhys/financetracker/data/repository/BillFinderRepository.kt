@@ -28,6 +28,25 @@ class BillFinderRepository @Inject constructor(
     private val accountDao: AccountDao,
 ) {
 
+    /**
+     * Every subscription and regular payment in the last year of
+     * statements, and whether each is still being paid; see
+     * [com.rhys.financetracker.data.importer.SubscriptionTracker].
+     */
+    suspend fun subscriptions(): List<com.rhys.financetracker.data.importer.SubscriptionTracker.Subscription> {
+        val since = DateUtils.today().minusDays(LOOK_BACK_DAYS)
+        val payments = transactionDao.paymentsOutSince(since, null).map {
+            RecurringDetector.Payment(
+                description = it.description,
+                amountMinor = it.amountMinor,
+                date = it.date,
+                categoryName = it.categoryName,
+                accountId = it.accountId,
+            )
+        }
+        return com.rhys.financetracker.data.importer.SubscriptionTracker.track(payments)
+    }
+
     /** Regular payments on [accountId] (every account when null) not yet set up as bills. */
     suspend fun find(accountId: Long? = null): List<RecurringDetector.RegularPayment> {
         val since = DateUtils.today().minusDays(LOOK_BACK_DAYS)
