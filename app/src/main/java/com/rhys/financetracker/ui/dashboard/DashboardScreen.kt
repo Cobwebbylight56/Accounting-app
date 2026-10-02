@@ -15,15 +15,12 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -48,7 +45,9 @@ import com.rhys.financetracker.core.time.DateUtils
 import com.rhys.financetracker.domain.model.DashboardWidget
 import com.rhys.financetracker.ui.components.EmptyState
 import com.rhys.financetracker.ui.components.LoadingState
+import com.rhys.financetracker.ui.components.PeriodBar
 import com.rhys.financetracker.ui.components.SectionCard
+import com.rhys.financetracker.ui.components.swipeToStep
 import com.rhys.financetracker.ui.components.StatEmphasis
 import com.rhys.financetracker.ui.components.StatTile
 
@@ -134,6 +133,22 @@ fun DashboardScreen(
                 }
             }
         },
+        // The month sits at the bottom, under the thumb, wherever Home is
+        // scrolled to; a swipe across the page steps it too.
+        bottomBar = {
+            if (showsHome) {
+                PeriodBar(
+                    label = DateUtils.formatMonth(state.month),
+                    position = state.month.year * 12 + state.month.monthValue,
+                    onPrevious = viewModel::showPreviousMonth,
+                    onNext = viewModel::showNextMonth,
+                    canGoNext = !state.isCurrentMonth,
+                    subtitle = if (state.isCurrentMonth) null else "Looking back",
+                    onToday = if (state.isCurrentMonth) null else viewModel::showCurrentMonth,
+                    overSystemBar = false,
+                )
+            }
+        },
     ) { padding ->
         when {
             state.isLoading -> LoadingState(Modifier.padding(padding))
@@ -150,7 +165,12 @@ fun DashboardScreen(
             else -> LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(padding),
+                    .padding(padding)
+                    .swipeToStep(
+                        onPrevious = viewModel::showPreviousMonth,
+                        onNext = viewModel::showNextMonth,
+                        canGoNext = !state.isCurrentMonth,
+                    ),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(
                     start = 16.dp,
                     end = 16.dp,
@@ -239,16 +259,6 @@ fun DashboardScreen(
                             }
                         }
                     }
-                }
-
-                item {
-                    MonthSelector(
-                        label = DateUtils.formatMonth(state.month),
-                        isCurrentMonth = state.isCurrentMonth,
-                        onPrevious = viewModel::showPreviousMonth,
-                        onNext = viewModel::showNextMonth,
-                        onToday = viewModel::showCurrentMonth,
-                    )
                 }
 
                 item { HomeTiles(state = state, onOpenAccounts = onOpenAccounts) }
@@ -362,41 +372,6 @@ private val REPLACED_BY_TILES = setOf(
     DashboardWidget.BALANCE_SUMMARY,
     DashboardWidget.MONTH_SUMMARY,
 )
-
-/** Steps through months, and offers a way straight back to the current one. */
-@Composable
-private fun MonthSelector(
-    label: String,
-    isCurrentMonth: Boolean,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
-    onToday: () -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        IconButton(onClick = onPrevious) {
-            Icon(Icons.Default.ChevronLeft, contentDescription = "Previous month")
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = label, style = MaterialTheme.typography.titleLarge)
-            if (!isCurrentMonth) {
-                Text(
-                    text = "Looking back",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        if (!isCurrentMonth) {
-            TextButton(onClick = onToday) { Text("Today") }
-        }
-        IconButton(onClick = onNext, enabled = !isCurrentMonth) {
-            Icon(Icons.Default.ChevronRight, contentDescription = "Next month")
-        }
-    }
-}
 
 /**
  * Shown when the person picked has no accounts, but the app has some.

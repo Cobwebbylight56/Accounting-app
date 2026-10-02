@@ -18,13 +18,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -56,11 +51,13 @@ import com.rhys.financetracker.ui.components.BreakdownView
 import com.rhys.financetracker.ui.components.CATEGORY_VIEWS
 import com.rhys.financetracker.ui.components.CategoryBreakdown
 import com.rhys.financetracker.ui.components.MonthTrend
+import com.rhys.financetracker.ui.components.PeriodBar
 import com.rhys.financetracker.ui.components.SectionCard
 import com.rhys.financetracker.ui.components.TREND_VIEWS
 import com.rhys.financetracker.ui.components.ViewSwitchButton
 import com.rhys.financetracker.ui.components.chartColorAt
 import com.rhys.financetracker.ui.components.rememberCardView
+import com.rhys.financetracker.ui.components.swipeToStep
 import com.rhys.financetracker.ui.theme.FinanceTheme
 import com.rhys.financetracker.ui.transactions.LedgerRequests
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -301,28 +298,33 @@ fun SpendingScreen(
     val (trendView, setTrendView) = rememberCardView("spending_trend_line", BreakdownView.LINE)
     val (payeeView, setPayeeView) = rememberCardView("spending_payees", BreakdownView.BARS)
 
-    Scaffold(topBar = { TopAppBar(title = { Text("Spending") }) }) { padding ->
+    Scaffold(
+        topBar = { TopAppBar(title = { Text("Spending") }) },
+        // The month sits at the bottom, under the thumb, wherever the page is
+        // scrolled to; a swipe across the page steps it too.
+        bottomBar = {
+            PeriodBar(
+                label = DateUtils.formatMonth(state.month),
+                position = state.month.year * 12 + state.month.monthValue,
+                onPrevious = viewModel::previousMonth,
+                onNext = viewModel::nextMonth,
+                canGoNext = !state.isCurrentMonth,
+                overSystemBar = false,
+            )
+        },
+    ) { padding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(16.dp, 0.dp, 16.dp, 96.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .swipeToStep(
+                    onPrevious = viewModel::previousMonth,
+                    onNext = viewModel::nextMonth,
+                    canGoNext = !state.isCurrentMonth,
+                ),
+            contentPadding = PaddingValues(16.dp, 0.dp, 16.dp, 24.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            item {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                    IconButton(onClick = viewModel::previousMonth) {
-                        Icon(Icons.Default.ChevronLeft, contentDescription = "Previous month")
-                    }
-                    Text(
-                        text = DateUtils.formatMonth(state.month),
-                        style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier.weight(1f),
-                    )
-                    IconButton(onClick = viewModel::nextMonth, enabled = !state.isCurrentMonth) {
-                        Icon(Icons.Default.ChevronRight, contentDescription = "Next month")
-                    }
-                }
-            }
-
             if (state.people.size > 1) {
                 item {
                     Row(

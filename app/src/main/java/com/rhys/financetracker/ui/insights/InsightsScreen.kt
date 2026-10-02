@@ -18,8 +18,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -50,9 +48,11 @@ import com.rhys.financetracker.ui.components.EmptyState
 import com.rhys.financetracker.ui.components.GroupedBarChart
 import com.rhys.financetracker.ui.components.BarGroup
 import com.rhys.financetracker.ui.components.LineChart
+import com.rhys.financetracker.ui.components.PeriodBar
 import com.rhys.financetracker.ui.components.ProgressBarRow
 import com.rhys.financetracker.ui.components.SectionCard
 import com.rhys.financetracker.ui.components.colorFromHex
+import com.rhys.financetracker.ui.components.swipeToStep
 import com.rhys.financetracker.ui.theme.FinanceTheme
 import kotlin.math.roundToInt
 
@@ -83,17 +83,17 @@ fun InsightsScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
-                actions = {
-                    IconButton(onClick = viewModel::showPreviousMonth) {
-                        Icon(Icons.Default.ChevronLeft, contentDescription = "Previous month")
-                    }
-                    IconButton(
-                        onClick = viewModel::showNextMonth,
-                        enabled = !state.isCurrentMonth,
-                    ) {
-                        Icon(Icons.Default.ChevronRight, contentDescription = "Next month")
-                    }
-                },
+            )
+        },
+        // The month sits at the bottom, under the thumb; a swipe across the
+        // page steps it too.
+        bottomBar = {
+            PeriodBar(
+                label = DateUtils.formatMonth(state.month),
+                position = state.month.year * 12 + state.month.monthValue,
+                onPrevious = viewModel::showPreviousMonth,
+                onNext = viewModel::showNextMonth,
+                canGoNext = !state.isCurrentMonth,
             )
         },
     ) { padding ->
@@ -116,17 +116,17 @@ fun InsightsScreen(
         }
 
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 96.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .swipeToStep(
+                    onPrevious = viewModel::showPreviousMonth,
+                    onNext = viewModel::showNextMonth,
+                    canGoNext = !state.isCurrentMonth,
+                ),
+            contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 24.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            item {
-                Text(
-                    text = DateUtils.formatMonth(state.month),
-                    style = MaterialTheme.typography.titleLarge,
-                )
-            }
-
             item { SavingsRateCard(report.savingsRate) }
 
             if (report.forecast.isReliable) {

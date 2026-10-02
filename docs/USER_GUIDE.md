@@ -235,7 +235,13 @@ If a card you expected is missing, that is where to switch it on.
 
 ### Looking back at an earlier month
 
-The arrows beside the month step back through history. The tiles then show
+The month sits in a bar pinned to the bottom of the screen, just above the
+tabs, with an arrow on each side — so it's under your thumb wherever you've
+scrolled to. Tap the left arrow, or **swipe right anywhere on the page**, to
+step back through history; swipe left to come forward again. (A swipe across a
+graph or a sideways-scrolling row of chips still belongs to that graph or row.)
+The same bar and swipe work on **Spending**, **Money with people** and
+**Advice**. The tiles then show
 each balance **as it stood at the end of that month** ("Balances at the end of
 August 2026"), so they match that month's money in and out. **Today** jumps back.
 
@@ -548,7 +554,7 @@ sooner it would be clear and the interest that would save. No rate yet? Tap
 ### The Spending tab
 
 The second tab is all about where the money goes, for one month at a time
-(arrows to step back), for everyone or one person:
+(the bar at the bottom, or a swipe, changes month), for everyone or one person:
 
 * **How much was spent**, what came in, and how that compares with last month.
 * **Where it went** — every category, tap one to see its payments.
@@ -623,7 +629,7 @@ shows their accounts, the Shared tab the shared ones — and the month you're
 looking at. A person's own page has the same card for their accounts.
 
 **See all** (or **More → Money with people**) opens every person for the
-month, with arrows to change month, and the year's graph under the totals with
+month, with the month in the bar at the bottom (or swipe to change it), and the year's graph under the totals with
 that month picked out. Switch to **Whole year** to see the year at once: the totals say who sent more over the year, and **Through the year** draws
 it month by month — for everyone, or tap a name to see just them. The button in
 its corner changes the graph: two lines (what you sent, and what they sent

@@ -34,8 +34,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.AlertDialog
@@ -79,6 +77,8 @@ import com.rhys.financetracker.data.repository.PersonLedger
 import com.rhys.financetracker.domain.model.CategoryKind
 import com.rhys.financetracker.ui.components.ColorDot
 import com.rhys.financetracker.ui.components.EmptyState
+import com.rhys.financetracker.ui.components.PeriodBar
+import com.rhys.financetracker.ui.components.swipeToStep
 import com.rhys.financetracker.ui.components.colorFromHex
 import com.rhys.financetracker.ui.theme.FinanceTheme
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -246,22 +246,28 @@ fun SentToPeopleScreen(
                 },
             )
         },
+        // The month or year sits at the bottom, under the thumb, wherever the
+        // page is scrolled to; a swipe across the page steps it too.
+        bottomBar = {
+            PeriodBar(
+                label = if (period == PeoplePeriod.YEAR) month.year.toString() else DateUtils.formatMonth(month),
+                position = if (period == PeoplePeriod.YEAR) month.year * 12 else month.year * 12 + month.monthValue,
+                onPrevious = viewModel::previous,
+                onNext = viewModel::next,
+                unit = if (period == PeoplePeriod.YEAR) "year" else "month",
+            )
+        },
     ) { padding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 96.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .swipeToStep(onPrevious = viewModel::previous, onNext = viewModel::next),
+            contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 24.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             item {
                 PeriodSwitch(period = period, onPeriod = viewModel::setPeriod)
-            }
-            item {
-                PeriodPicker(
-                    label = if (period == PeoplePeriod.YEAR) month.year.toString() else DateUtils.formatMonth(month),
-                    isYear = period == PeoplePeriod.YEAR,
-                    onPrevious = viewModel::previous,
-                    onNext = viewModel::next,
-                )
             }
             val list = money?.people
             val periodName = if (period == PeoplePeriod.YEAR) month.year.toString() else DateUtils.formatMonth(month)
@@ -391,25 +397,6 @@ private fun PeriodSwitch(period: PeoplePeriod, onPeriod: (PeoplePeriod) -> Unit)
             ) {
                 Text(if (option == PeoplePeriod.MONTH) "Month" else "Whole year")
             }
-        }
-    }
-}
-
-@Composable
-private fun PeriodPicker(label: String, isYear: Boolean, onPrevious: () -> Unit, onNext: () -> Unit) {
-    val unit = if (isYear) "year" else "month"
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = onPrevious) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous $unit")
-        }
-        Text(
-            text = label,
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.weight(1f),
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-        )
-        IconButton(onClick = onNext) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next $unit")
         }
     }
 }
