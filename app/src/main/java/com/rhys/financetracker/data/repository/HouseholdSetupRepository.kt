@@ -7,6 +7,7 @@ import com.rhys.financetracker.data.local.entity.AccountEntity
 import com.rhys.financetracker.data.local.entity.PersonEntity
 import com.rhys.financetracker.data.local.entity.RecurringRuleEntity
 import com.rhys.financetracker.data.local.seed.DefaultData
+import com.rhys.financetracker.domain.loan.LoanMaths
 import com.rhys.financetracker.domain.model.AccountType
 import com.rhys.financetracker.domain.model.Frequency
 import com.rhys.financetracker.domain.model.Holding
@@ -97,10 +98,14 @@ class HouseholdSetupRepository @Inject constructor(
         monthlyPaymentMinor: Long?,
         paymentDay: Int,
         payFromAccountId: Long?,
+        /** The yearly interest rate, kept on the account so payoff dates count interest. */
+        interestRatePercent: Double? = null,
+        /** Loan or mortgage as chosen; worked out from the name when not given. */
+        accountType: AccountType? = null,
     ): AppResult<Long> = runCatchingApp("Could not add that loan") {
         require(owedMinor > 0L) { "Enter how much is still owed" }
         val loanName = name.trim().ifEmpty { "Loan" }
-        val type = if (loanName.contains("mortgage", ignoreCase = true)) {
+        val type = accountType ?: if (loanName.contains("mortgage", ignoreCase = true)) {
             AccountType.MORTGAGE
         } else {
             AccountType.LOAN
@@ -114,6 +119,7 @@ class HouseholdSetupRepository @Inject constructor(
                     openingBalanceMinor = -owedMinor,
                     openingBalanceDate = DateUtils.today(),
                     creditLimitMinor = originalMinor?.takeIf { it >= owedMinor } ?: owedMinor,
+                    interestRatePercent = interestRatePercent,
                     colorHex = DefaultData.PALETTE.random(),
                 ),
             )
@@ -145,13 +151,18 @@ class HouseholdSetupRepository @Inject constructor(
         loanId
     }
 
-    /** Months left on a loan at a given monthly payment, or null when it never ends. */
-    fun monthsToClear(owedMinor: Long, monthlyPaymentMinor: Long?): Int? {
+    /** Months left on a loan at a given monthly payment, interest included; null when it never ends. */
+    fun monthsToClear(owedMinor: Long, monthlyPaymentMinor: Long?, ratePercent: Double? = null): Int? {
         if (monthlyPaymentMinor == null || monthlyPaymentMinor <= 0L) return null
-        return ((owedMinor + monthlyPaymentMinor - 1) / monthlyPaymentMinor).toInt()
+        return LoanMaths.monthsToClear(owedMinor, ratePercent ?: 0.0, monthlyPaymentMinor)
     }
 
-    /** When a loan paid at [monthlyPaymentMinor] a month will be clear, ignoring interest. */
-    fun clearBy(owedMinor: Long, monthlyPaymentMinor: Long?, today: LocalDate = DateUtils.today()): LocalDate? =
-        monthsToClear(owedMinor, monthlyPaymentMinor)?.let { today.plusMonths(it.toLong()) }
+    /** When a loan paid at [monthlyPaymentMinor] a month will be clear, interest included. */
+    fun clearBy(
+        owedMinor: Long,
+        monthlyPaymentMinor: Long?,
+        today: LocalDate = DateUtils.today(),
+        ratePercent: Double? = null,
+    ): LocalDate? =
+        monthsToClear(owedMinor, monthlyPaymentMinor, ratePercent)?.let { today.plusMonths(it.toLong()) }
 }

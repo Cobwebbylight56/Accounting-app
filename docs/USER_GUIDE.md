@@ -34,8 +34,13 @@ with one round button; it sets up the first person in four short steps:
 2. **Their pay** — yearly pay before tax and take-home after tax (optional).
 3. **Their accounts** — current accounts, savings, cards. Each goes under
    their name as it is added.
-4. **Loans to pay** — what is still owed, what was borrowed (optional), and
-   the monthly payment and which account it comes from (optional). With a
+4. **Loans to pay** — pick **Loan**, **Mortgage** or **Car finance**, then
+   fill in how much is left, the **interest rate** (% a year, from the
+   agreement or statement), the **time left** in years and months, and what
+   you **pay each month**. Don't know the monthly figure? Fill in the time
+   left and tap **Use £X a month** — it is worked out for you. As you type, a
+   summary shows when it will be clear, how many payments that is and how
+   much of it is interest. Pick which account it comes from. With a
    payment set, each month's payment comes off what is owed by itself, and
    **when a loan is paid off it disappears** — put away with its history, and
    its payment stopped. Credit cards stay, since £0 is normal for a card.
@@ -531,6 +536,14 @@ loans and mortgages. Home lists them all under **Cards, loans and pay later**:
 a card shows what's owed and how much of its limit is used; a pay-later plan or
 loan shows what's left and how much is paid off. A pay-later plan or loan
 disappears once it's paid off; a card stays.
+
+Open a loan or mortgage (tap it on Home or under Accounts) for its **Paying it
+off** card: what's left, the interest rate and the monthly payment; the month
+it will be clear and the interest still to pay; how much of this month's
+payment is interest; and a graph of the balance coming down. Tap **+£25**,
+**+£50**, **+£100** or **+£250** under **Pay more each month?** to see how much
+sooner it would be clear and the interest that would save. No rate yet? Tap
+**Add the interest rate** — older loans were added without one.
 
 ### The Spending tab
 

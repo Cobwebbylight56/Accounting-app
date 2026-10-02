@@ -180,10 +180,12 @@ class SetupViewModel @Inject constructor(
             form.value = current.copy(isBusy = true)
             val result = setup.addLoan(
                 personId = personId,
-                name = draft.name,
-                owedMinor = Money.parseOrNull(draft.owedText) ?: 0L,
+                name = draft.savedName,
+                owedMinor = draft.owedMinor ?: 0L,
                 originalMinor = Money.parseOrNull(draft.originalText),
-                monthlyPaymentMinor = Money.parseOrNull(draft.monthlyText),
+                monthlyPaymentMinor = draft.monthlyMinor,
+                interestRatePercent = draft.ratePercent,
+                accountType = draft.kind.accountType,
                 paymentDay = draft.dayText.toIntOrNull()?.coerceIn(1, 31) ?: 1,
                 payFromAccountId = draft.payFromAccountId
                     ?: state.value.accounts.firstOrNull { it.account.holding == Holding.SPEND }?.account?.id,

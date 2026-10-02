@@ -21,6 +21,7 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -37,6 +38,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,6 +53,7 @@ import androidx.lifecycle.viewModelScope
 import com.rhys.financetracker.core.money.Money
 import com.rhys.financetracker.core.result.AppResult
 import com.rhys.financetracker.core.time.DateUtils
+import com.rhys.financetracker.data.local.dao.RecurringRuleDao
 import com.rhys.financetracker.data.local.dao.TransactionDao
 import com.rhys.financetracker.data.local.dao.TransactionFilter
 import com.rhys.financetracker.data.local.projection.AccountWithBalance
@@ -59,9 +62,13 @@ import com.rhys.financetracker.data.local.projection.TransactionWithDetails
 import com.rhys.financetracker.data.repository.AccountRepository
 import com.rhys.financetracker.data.repository.ImportHistoryRepository
 import com.rhys.financetracker.data.repository.TransactionRepository
+import com.rhys.financetracker.domain.loan.LoanMaths
+import com.rhys.financetracker.domain.model.AccountType
 import com.rhys.financetracker.domain.model.TransactionType
 import com.rhys.financetracker.ui.components.ColorDot
+import com.rhys.financetracker.ui.components.LineSeries
 import com.rhys.financetracker.ui.components.SectionCard
+import com.rhys.financetracker.ui.components.TrendLineChart
 import com.rhys.financetracker.ui.components.colorFromHex
 import com.rhys.financetracker.ui.navigation.Routes
 import com.rhys.financetracker.ui.theme.FinanceTheme
@@ -95,8 +102,12 @@ data class AccountDetailState(
     /** The last year of months, oldest first, from the first statement on. */
     val coverage: List<MonthCover> = emptyList(),
     val monthEnds: List<MonthEnd> = emptyList(),
+    /** For a loan or mortgage: what goes into it each month, from its regular payment or lately. */
+    val monthlyPaymentMinor: Long? = null,
     val message: String? = null,
 ) {
+    /** True for borrowing that is paid off month by month. */
+    val isLoan: Boolean get() = account?.account?.type in LOAN_TYPES
     val missingMonths: List<YearMonth> get() = coverage.filterNot { it.isIn }.map { it.month }
 }
 
@@ -112,9 +123,10 @@ data class AccountDetailState(
 class AccountDetailViewModel @Inject constructor(
     accountRepository: AccountRepository,
     transactionRepository: TransactionRepository,
-    transactionDao: TransactionDao,
+    private val transactionDao: TransactionDao,
     private val importHistory: ImportHistoryRepository,
     private val ledgerRequests: LedgerRequests,
+    private val recurringRuleDao: RecurringRuleDao,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -135,14 +147,34 @@ class AccountDetailViewModel @Inject constructor(
         }
     }
 
+    /**
+     * For a loan: the regular payment set up into it, or else the average of
+     * what went into it over the last three months.
+     */
+    private val loanPayment = account.mapLatest { current ->
+        if (current == null || current.account.type !in LOAN_TYPES) return@mapLatest null
+        val planned = recurringRuleDao.getAllActive()
+            .filter { it.transferAccountId == accountId }
+            .sumOf { it.amountMinor }
+        if (planned > 0L) return@mapLatest planned
+        val thisMonth = DateUtils.currentYearMonth()
+        val paid = (1..3).map { back ->
+            val month = thisMonth.minusMonths(back.toLong())
+            transactionDao.getTransfersIn(accountId, month.atDay(1), month.atEndOfMonth())
+        }
+        (paid.sum() / 3).takeIf { it > 0L }
+    }
+
     val state: StateFlow<AccountDetailState> = combine(
         account,
         transactionRepository.search(TransactionFilter(accountIds = setOf(accountId), limit = RECENT)),
         importHistory.observeForAccount(accountId),
-        combine(transactionDao.observeStatementMonths(accountId), monthEnds) { months, ends -> months to ends },
+        combine(transactionDao.observeStatementMonths(accountId), monthEnds, loanPayment) { months, ends, payment ->
+            Triple(months, ends, payment)
+        },
         message,
     ) { current, recent, imports, monthsAndEnds, text ->
-        val (months, ends) = monthsAndEnds
+        val (months, ends, payment) = monthsAndEnds
         AccountDetailState(
             isLoading = false,
             account = current,
@@ -150,6 +182,7 @@ class AccountDetailViewModel @Inject constructor(
             imports = imports,
             coverage = coverageOf(months.mapNotNull { DateUtils.parseYearMonthKey(it) }),
             monthEnds = ends,
+            monthlyPaymentMinor = payment,
             message = text,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AccountDetailState())
@@ -265,6 +298,16 @@ fun AccountDetailScreen(
                         },
                         modifier = Modifier.weight(1f),
                     ) { Text("All payments") }
+                }
+            }
+
+            if (state.isLoan) {
+                item {
+                    PayingItOffCard(
+                        account = account,
+                        monthlyMinor = state.monthlyPaymentMinor,
+                        onEdit = { onEdit(account.account.id) },
+                    )
                 }
             }
 
@@ -440,10 +483,10 @@ private fun ImportRow(item: ImportBatchWithRemaining, onUndo: () -> Unit) {
 private fun MonthEndsCard(ends: List<MonthEnd>) {
     SectionCard(title = "Balance at each month end") {
         val oldestFirst = ends.sortedBy { it.month }
-        com.rhys.financetracker.ui.components.TrendLineChart(
+        TrendLineChart(
             labels = oldestFirst.map { DateUtils.monthNameShort(it.month.monthValue) },
             series = listOf(
-                com.rhys.financetracker.ui.components.LineSeries(
+                LineSeries(
                     name = "Balance",
                     values = oldestFirst.map { it.balanceMinor },
                     color = MaterialTheme.colorScheme.primary,
@@ -500,3 +543,152 @@ private fun PaymentRow(item: TransactionWithDetails, accountId: Long, onClick: (
         )
     }
 }
+
+/** Loans and mortgages: borrowing paid off month by month. */
+private val LOAN_TYPES = setOf(
+    AccountType.LOAN,
+    AccountType.MORTGAGE,
+)
+
+/**
+ * A loan or mortgage being paid off: when it will be clear, what the
+ * interest still comes to, a graph of the balance coming down, and what
+ * paying a little more each month would save.
+ */
+@Composable
+private fun PayingItOffCard(account: AccountWithBalance, monthlyMinor: Long?, onEdit: () -> Unit) {
+    val owed = (-account.balanceMinor).coerceAtLeast(0L)
+    val rate = account.account.interestRatePercent
+    SectionCard(title = "Paying it off") {
+        if (owed == 0L) {
+            Text("Nothing left to pay.", style = MaterialTheme.typography.bodyMedium)
+            return@SectionCard
+        }
+        Row(modifier = Modifier.fillMaxWidth()) {
+            LoanFigure("Left to pay", Money.format(owed), Modifier.weight(1f))
+            LoanFigure("Interest rate", rate?.let { "${trimRate(it)}% a year" } ?: "Not set", Modifier.weight(1f))
+            LoanFigure("Each month", monthlyMinor?.let { Money.format(it) } ?: "Not set", Modifier.weight(1f))
+        }
+        if (rate == null || monthlyMinor == null) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = when {
+                    rate == null && monthlyMinor == null ->
+                        "Add the interest rate, and set up the monthly payment under Regular payments, to see when it will be clear."
+                    rate == null -> "Add the interest rate to count interest in the dates below."
+                    else -> "Set up the monthly payment under Regular payments to see when it will be clear."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (rate == null) TextButton(onClick = onEdit) { Text("Add the interest rate") }
+        }
+        val monthly = monthlyMinor ?: return@SectionCard
+        val r = rate ?: 0.0
+        val months = LoanMaths.monthsToClear(owed, r, monthly)
+        Spacer(Modifier.height(10.dp))
+        if (months == null) {
+            Text(
+                text = "${Money.format(monthly)} a month doesn't cover the interest " +
+                    "(${Money.format(LoanMaths.interestThisMonth(owed, r))}) — " +
+                    "at this rate it is never paid off.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
+            return@SectionCard
+        }
+        val clear = DateUtils.currentYearMonth().plusMonths(months.toLong())
+        Text(
+            text = "Clear by ${DateUtils.formatMonth(clear)}",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            text = "${months / 12} years ${months % 12} months left" +
+                if (r > 0.0) {
+                    " · ${Money.format(LoanMaths.interestToPay(owed, r, monthly) ?: 0L)} interest still to pay"
+                } else {
+                    ""
+                },
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (r > 0.0) {
+            val interest = LoanMaths.interestThisMonth(owed, r)
+            Text(
+                text = "Of this month's ${Money.format(monthly)}, ${Money.format(interest)} is interest and " +
+                    "${Money.format((monthly - interest).coerceAtLeast(0L))} comes off what's owed.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        // The balance coming down: by month for a short loan, by year for a long one.
+        val plan = LoanMaths.schedule(owed, r, monthly)
+        if (plan.size >= 2) {
+            val step = if (plan.size > 36) 12 else 1
+            val points = listOf(owed) + plan.filterIndexed { i, _ -> (i + 1) % step == 0 || i == plan.lastIndex }.map { it.owedAfterMinor }
+            val labels = points.indices.map { i ->
+                val month = DateUtils.currentYearMonth().plusMonths((i * step).toLong().coerceAtMost(months.toLong()))
+                if (step == 12) month.year.toString().takeLast(2).let { "’$it" } else DateUtils.monthNameShort(month.monthValue)
+            }
+            Spacer(Modifier.height(10.dp))
+            TrendLineChart(
+                labels = labels,
+                series = listOf(
+                    LineSeries(
+                        "Left to pay",
+                        points,
+                        FinanceTheme.colors.chartOut,
+                    ),
+                ),
+                height = 170.dp,
+            )
+        }
+
+        // What paying a bit more each month would do.
+        Spacer(Modifier.height(10.dp))
+        Text("Pay more each month?", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+        var extra by rememberSaveable { mutableStateOf(0L) }
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OVERPAYMENTS.forEach { amount ->
+                FilterChip(
+                    selected = extra == amount,
+                    onClick = { extra = if (extra == amount) 0L else amount },
+                    label = { Text("+${Money.formatCompact(amount)}") },
+                )
+            }
+        }
+        if (extra > 0L) {
+            val result = LoanMaths.overpay(owed, r, monthly, extra)
+            if (result != null) {
+                val sooner = DateUtils.currentYearMonth().plusMonths((months - result.monthsSooner).toLong())
+                Text(
+                    text = "Paying ${Money.format(monthly + extra)} a month clears it by ${DateUtils.formatMonth(sooner)} — " +
+                        "${result.monthsSooner} months sooner" +
+                        (if (result.interestSavedMinor > 0L) ", saving ${Money.format(result.interestSavedMinor)} in interest." else "."),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = FinanceTheme.colors.positive,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LoanFigure(label: String, value: String, modifier: Modifier = Modifier) {
+    Column(modifier = modifier) {
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+/** 4.5 rather than 4.50 or 4.500000001. */
+private fun trimRate(rate: Double): String =
+    java.math.BigDecimal.valueOf(rate).setScale(2, java.math.RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
+
+/** Overpayments offered, in pence. */
+private val OVERPAYMENTS = listOf(2_500L, 5_000L, 10_000L, 25_000L)
