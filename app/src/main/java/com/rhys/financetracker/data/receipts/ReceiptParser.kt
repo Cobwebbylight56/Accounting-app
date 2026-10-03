@@ -1,9 +1,6 @@
 package com.rhys.financetracker.data.receipts
 
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.time.format.DateTimeFormatterBuilder
-import java.util.Locale
 
 /**
  * Pulls the shop, the total and the date out of the text read off a receipt
@@ -63,7 +60,7 @@ object ReceiptParser {
         for (line in lines) {
             for (pattern in DATES) {
                 for (match in pattern.regex.findAll(line)) {
-                    val date = pattern.read(match) ?: continue
+                    val date = pattern.read(match, today) ?: continue
                     if (date.year >= 2000 && !date.isAfter(today.plusDays(1))) return date
                 }
             }
@@ -127,27 +124,21 @@ object ReceiptParser {
     private const val TOP_LINES = 6
     private const val MAX_SHOP = 60
 
-    private class DatePattern(val regex: Regex, val read: (MatchResult) -> LocalDate?)
-
-    private val MONTH_NAME: DateTimeFormatter = DateTimeFormatterBuilder()
-        .parseCaseInsensitive()
-        .appendPattern("d MMM uuuu")
-        .toFormatter(Locale.UK)
+    private class DatePattern(val regex: Regex, val read: (MatchResult, LocalDate) -> LocalDate?)
 
     private val DATES = listOf(
         // 03/10/2026, 03-10-26, 3.10.2026 — UK order, day first.
-        DatePattern(Regex("""\b(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2}|\d{4})\b""")) { m ->
+        DatePattern(Regex("""\b(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2}|\d{4})\b""")) { m, _ ->
             val (d, mo, y) = m.destructured
             val year = y.toInt().let { if (it < 100) 2000 + it else it }
             runCatching { LocalDate.of(year, mo.toInt(), d.toInt()) }.getOrNull()
         },
-        // 3 Oct 2026, 03 October 2026.
-        DatePattern(Regex("""\b(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3,9})\.?,?\s+(\d{4})\b""")) { m ->
-            val (d, mo, y) = m.destructured
-            runCatching { LocalDate.parse("$d ${mo.take(3)} $y", MONTH_NAME) }.getOrNull()
+        // 3 Oct 2026, 30 Sept 2026, 2 Oct (this year, or last if that is ahead).
+        DatePattern(Regex("""\b\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]{3,9}\.?(?:,?\s+\d{4})?\b""")) { m, today ->
+            ScreenText.shortDate(m.value, today)
         },
         // 2026-10-03.
-        DatePattern(Regex("""\b(\d{4})-(\d{2})-(\d{2})\b""")) { m ->
+        DatePattern(Regex("""\b(\d{4})-(\d{2})-(\d{2})\b""")) { m, _ ->
             val (y, mo, d) = m.destructured
             runCatching { LocalDate.of(y.toInt(), mo.toInt(), d.toInt()) }.getOrNull()
         },

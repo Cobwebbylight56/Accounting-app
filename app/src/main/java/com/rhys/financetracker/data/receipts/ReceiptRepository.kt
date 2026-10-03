@@ -72,21 +72,96 @@ class ReceiptRepository @Inject constructor(
         name
     }
 
-    /** Reads the text off a kept picture; empty when nothing could be read. */
-    suspend fun readText(fileName: String): String = withContext(Dispatchers.IO) {
+    /** Everything read off a picture: as rows, as a receipt, and as a list of payments if it is one. */
+    data class Scan(
+        val text: String,
+        val reading: ReceiptParser.Reading,
+        val listed: List<ScreenText.ListedPayment>,
+    )
+
+    /** Reads the lines off a kept picture, with where each sat; empty when nothing could be read. */
+    suspend fun readLines(fileName: String): List<ScreenText.Line> = withContext(Dispatchers.IO) {
         val image = InputImage.fromFilePath(context, Uri.fromFile(fileFor(fileName)))
         val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
         try {
-            recognizer.process(image).await().text
+            recognizer.process(image).await().textBlocks.flatMap { block ->
+                block.lines.mapNotNull { line ->
+                    val box = line.boundingBox ?: return@mapNotNull null
+                    ScreenText.Line(line.text, box.left, box.top, box.right, box.bottom)
+                }
+            }
         } finally {
             recognizer.close()
         }
     }
 
-    /** What a kept picture says: shop, total and date, as far as they can be read. */
-    suspend fun read(fileName: String): Pair<String, ReceiptParser.Reading> {
-        val text = runCatching { readText(fileName) }.getOrDefault("")
-        return text to ReceiptParser.parse(text)
+    /** What a kept picture says, as far as it can be read. */
+    suspend fun read(fileName: String): Scan {
+        val lines = runCatching { readLines(fileName) }.getOrDefault(emptyList())
+        // Rows as the eye reads them, so "TOTAL" and its amount sit together.
+        val text = ScreenText.rowText(lines)
+        return Scan(text, ReceiptParser.parse(text), ScreenText.listedPayments(lines))
+    }
+
+    /**
+     * For each payment listed on a screenshot, the payment already in the
+     * app it is — the same amount within a day — or null. Each existing
+     * payment is only claimed once, so two £1.25 Tesco trips stay two.
+     */
+    suspend fun alreadyIn(listed: List<ScreenText.ListedPayment>): List<Long?> {
+        val claimed = mutableSetOf<Long>()
+        return listed.map { payment ->
+            val date = payment.date ?: return@map null
+            receiptDao.paymentsFor(payment.amountMinor, date.minusDays(1), date.plusDays(1), date)
+                .firstOrNull { it.id !in claimed }
+                ?.id
+                ?.also { claimed += it }
+        }
+    }
+
+    /**
+     * Adds payments read off a screenshot, into [accountId]. They stand in
+     * like payments from a bank alert: when the statement comes, each is
+     * matched to the bank's line and replaced by it. Returns how many were
+     * added.
+     */
+    suspend fun addListed(listed: List<ScreenText.ListedPayment>, accountId: Long): Int {
+        val learned = learned()
+        var added = 0
+        for (payment in listed) {
+            val date = payment.date ?: continue
+            val type = if (payment.isMoneyIn) TransactionType.INCOME else TransactionType.EXPENSE
+            val hash = "shot:${payment.amountMinor}:$date:${TransactionFingerprint.normaliseDescription(payment.payee)}"
+            if (transactionDao.countWithHash(hash) > 0) continue
+            transactionDao.insert(
+                TransactionEntity(
+                    amountMinor = payment.amountMinor,
+                    type = type,
+                    date = date,
+                    description = payment.payee,
+                    accountId = accountId,
+                    categoryId = categoryIdFor(payment.payee, type, learned),
+                    importHash = hash,
+                    source = RecordSource.LIVE,
+                ),
+            )
+            added++
+        }
+        return added
+    }
+
+    private suspend fun learned(): Map<String, String> =
+        transactionDao.getUserFiledDescriptions(SpreadsheetImporter.LEARNED_PAYEE_LIMIT)
+            .filterNot { it.categoryName in Refiling.VAGUE }
+            .associate { TransactionFingerprint.normaliseDescription(it.description) to it.categoryName }
+
+    private suspend fun categoryIdFor(payee: String, type: TransactionType, learned: Map<String, String>): Long? {
+        val name = MerchantCategoriser.categoryFor(payee, type, learned) ?: return null
+        for (kind in listOf(CategoryKind.TRANSFER, CategoryKind.SAVING, CategoryKind.CASH)) {
+            categoryDao.getByNameAndKind(name, kind)?.let { return it.id }
+        }
+        val kind = if (type == TransactionType.INCOME) CategoryKind.INCOME else CategoryKind.EXPENSE
+        return categoryDao.getByNameAndKind(name, kind)?.id
     }
 
     /** Payments a receipt for [amountMinor] on [date] could be for, the likeliest first. */
@@ -125,11 +200,7 @@ class ReceiptRepository @Inject constructor(
         reading: ReceiptParser.Reading?,
         text: String?,
     ): Long {
-        val learned = transactionDao.getUserFiledDescriptions(SpreadsheetImporter.LEARNED_PAYEE_LIMIT)
-            .filterNot { it.categoryName in Refiling.VAGUE }
-            .associate { TransactionFingerprint.normaliseDescription(it.description) to it.categoryName }
-        val categoryId = MerchantCategoriser.categoryFor(shop, TransactionType.EXPENSE, learned)
-            ?.let { name -> categoryDao.getByNameAndKind(name, CategoryKind.EXPENSE)?.id }
+        val categoryId = categoryIdFor(shop, TransactionType.EXPENSE, learned())
         val id = transactionDao.insert(
             TransactionEntity(
                 amountMinor = amountMinor,

@@ -512,6 +512,15 @@ shown for you to check or correct. Then:
   can check it. When the statement comes in, it is matched to the bank's line,
   not added twice.
 
+**A screenshot of a list of payments.** Take a screenshot of Google Wallet's
+payments on a card (or a banking app's list) and scan or share it: each row is
+read as its own payment — shop, amount and date (the year worked out when the
+list leaves it off). Ones already in the app are marked and left unticked; tick
+or untick any, pick the account they were paid from, and **Add** them in one
+go. A row cut off at the bottom of the screen, with no date showing, is left
+out. When the statement comes, each is matched to the bank's line and
+replaced by it, so nothing is counted twice.
+
 **Share a screenshot in.** From the gallery or any app, share a picture and
 choose **Add as a receipt**.
 

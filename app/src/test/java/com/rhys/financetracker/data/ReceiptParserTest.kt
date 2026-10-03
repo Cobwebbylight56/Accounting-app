@@ -100,4 +100,19 @@ class ReceiptParserTest {
     fun `a date in the future is a misreading`() {
         assertNull(ReceiptParser.parse("Shop\nTOTAL 5.00\n03/10/29", today).date)
     }
+
+    @Test
+    fun `a Google Wallet payment's own page`() {
+        val text = """
+            ASDA PETROL 4275
+            £30.00
+            30 Sept 2026, 14:22
+            Nationwide Visa •••• 4321
+        """.trimIndent()
+        val reading = ReceiptParser.parse(text, today)
+        assertEquals("Asda Petrol 4275", reading.shop)
+        assertEquals(3_000L, reading.totalMinor)
+        assertEquals(LocalDate.of(2026, 9, 30), reading.date)
+        assertEquals("4321", reading.cardEnding)
+    }
 }

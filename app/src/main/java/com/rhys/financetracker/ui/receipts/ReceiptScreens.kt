@@ -113,6 +113,13 @@ private const val ACCOUNTS_WAIT_MILLIS = 2_000L
 
 enum class ScanStage { PICK, READING, REVIEW }
 
+/** A payment on a screenshot of a list, whether it is in the app already, and whether to add it. */
+data class ListedRow(
+    val payment: com.rhys.financetracker.data.receipts.ScreenText.ListedPayment,
+    val alreadyIn: Boolean,
+    val selected: Boolean,
+)
+
 data class ScanState(
     val stage: ScanStage = ScanStage.PICK,
     val fileName: String? = null,
@@ -127,6 +134,10 @@ data class ScanState(
     /** Set once the receipt is kept with a payment: where to go next. */
     val doneWith: Long? = null,
     val addedNew: Boolean = false,
+    /** Payments listed on a screenshot like Google Wallet's, when it is one. */
+    val listed: List<ListedRow> = emptyList(),
+    /** Set once listed payments have been added. */
+    val listAdded: Int? = null,
 ) {
     val amountMinor: Long? get() = Money.parseOrNull(amountText)?.takeIf { it > 0L }
 }
@@ -165,21 +176,34 @@ class ReceiptScanViewModel @Inject constructor(
                 _state.update { it.copy(stage = ScanStage.PICK, message = "That picture couldn't be opened. Try another.") }
                 return@launch
             }
-            val (text, reading) = receipts.read(fileName)
+            val scan = receipts.read(fileName)
+            val text = scan.text
+            val reading = scan.reading
             val settings = settingsRepository.settings.first()
             val spending = accounts.value.ifEmpty {
                 withTimeoutOrNull(ACCOUNTS_WAIT_MILLIS) { accounts.first { it.isNotEmpty() } }.orEmpty()
             }
+            // A screenshot of a list of payments — Google Wallet, a banking
+            // app — is several payments, not one receipt.
+            val listed = if (attachTo == Routes.NEW_ID && scan.listed.size >= 2) {
+                val already = receipts.alreadyIn(scan.listed)
+                scan.listed.mapIndexed { i, payment -> ListedRow(payment, already[i] != null, already[i] == null) }
+            } else {
+                emptyList()
+            }
+            val cardAccount = reading.cardEnding?.let { settings.liveCardAccounts[it] }
             _state.update {
                 it.copy(
                     stage = ScanStage.REVIEW,
                     fileName = fileName,
                     text = text,
                     reading = reading,
+                    listed = listed,
                     shop = reading.shop.orEmpty(),
                     amountText = reading.totalMinor?.let(Money::formatPlain).orEmpty(),
                     date = reading.date ?: LocalDate.now(),
-                    accountId = settings.defaultAccountId?.takeIf { id -> spending.any { a -> a.id == id } }
+                    accountId = cardAccount?.takeIf { id -> spending.any { a -> a.id == id } }
+                        ?: settings.defaultAccountId?.takeIf { id -> spending.any { a -> a.id == id } }
                         ?: spending.firstOrNull { a -> a.holding == Holding.SPEND }?.id
                         ?: spending.firstOrNull()?.id,
                     message = if (text.isBlank()) {
@@ -254,6 +278,25 @@ class ReceiptScanViewModel @Inject constructor(
         }
     }
 
+    fun toggleListed(index: Int) = _state.update { current ->
+        current.copy(
+            listed = current.listed.mapIndexed { i, row -> if (i == index) row.copy(selected = !row.selected) else row },
+        )
+    }
+
+    /** Adds the ticked payments from a screenshot of a list. */
+    fun addListed() {
+        val current = _state.value
+        val account = current.accountId ?: run {
+            _state.update { it.copy(message = "Pick which account paid.") }
+            return
+        }
+        viewModelScope.launch {
+            val added = receipts.addListed(current.listed.filter { it.selected }.map { it.payment }, account)
+            _state.update { it.copy(listAdded = added) }
+        }
+    }
+
     /** Starts again with another picture. */
     fun startAgain() {
         _state.value.fileName?.let { name -> viewModelScope.launch { receipts.discard(name) } }
@@ -290,6 +333,16 @@ fun ReceiptScanScreen(
 
     LaunchedEffect(state.doneWith) {
         state.doneWith?.let { id -> if (state.addedNew) onAddedPayment(id) else onKeptWithPayment(id) }
+    }
+    LaunchedEffect(state.listAdded) {
+        state.listAdded?.let { added ->
+            android.widget.Toast.makeText(
+                context,
+                if (added == 1) "1 payment added" else "$added payments added",
+                android.widget.Toast.LENGTH_SHORT,
+            ).show()
+            onBack()
+        }
     }
 
     val choose = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -364,7 +417,16 @@ fun ReceiptScanScreen(
                     )
                 }
 
-                ScanStage.REVIEW -> {
+                ScanStage.REVIEW -> if (state.listed.isNotEmpty()) {
+                    ListedPayments(
+                        state = state,
+                        accounts = accounts,
+                        onToggle = viewModel::toggleListed,
+                        onAccount = viewModel::setAccount,
+                        onAdd = viewModel::addListed,
+                        onStartAgain = viewModel::startAgain,
+                    )
+                } else {
                     val file = state.fileName?.let(viewModel::fileFor)
                     if (file != null) {
                         ReceiptImage(
@@ -433,6 +495,75 @@ fun ReceiptScanScreen(
     if (enlarged) {
         state.fileName?.let { name -> ReceiptViewer(file = viewModel.fileFor(name), onClose = { enlarged = false }) }
     }
+}
+
+/** The payments on a screenshot of a list, ticked to add unless they are in the app already. */
+@Composable
+private fun ListedPayments(
+    state: ScanState,
+    accounts: List<AccountEntity>,
+    onToggle: (Int) -> Unit,
+    onAccount: (Long) -> Unit,
+    onAdd: () -> Unit,
+    onStartAgain: () -> Unit,
+) {
+    val chosen = state.listed.count { it.selected }
+    val already = state.listed.count { it.alreadyIn }
+    Text(
+        "${state.listed.size} payments on this screenshot",
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+    )
+    Text(
+        if (already > 0) {
+            "$already of them ${if (already == 1) "is" else "are"} in the app already and left unticked. " +
+                "Tick or untick any, then add them."
+        } else {
+            "Untick any you don't want, then add them."
+        },
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    state.listed.forEachIndexed { index, row ->
+        Card(modifier = Modifier.fillMaxWidth().clickable { onToggle(index) }) {
+            Row(modifier = Modifier.padding(horizontal = 6.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.Checkbox(checked = row.selected, onCheckedChange = { onToggle(index) })
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(row.payment.payee, style = MaterialTheme.typography.bodyLarge, maxLines = 2)
+                    Text(
+                        listOfNotNull(
+                            row.payment.date?.let(DateUtils::format),
+                            "In the app already".takeIf { row.alreadyIn },
+                        ).joinToString(" · "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Text(
+                    (if (row.payment.isMoneyIn) "+" else "") + Money.format(row.payment.amountMinor),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(end = 8.dp),
+                )
+            }
+        }
+    }
+    DropdownField(
+        label = "Paid from",
+        options = accounts,
+        selected = accounts.firstOrNull { it.id == state.accountId },
+        onSelect = { onAccount(it.id) },
+        optionLabel = { it.name },
+    )
+    Button(onClick = onAdd, enabled = chosen > 0, modifier = Modifier.fillMaxWidth().height(52.dp)) {
+        Text(if (chosen == 1) "Add 1 payment" else "Add $chosen payments")
+    }
+    Text(
+        "When the statement comes in, each is matched to the bank's line and replaced by it, so " +
+            "nothing is counted twice.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    TextButton(onClick = onStartAgain) { Text("Use a different picture") }
 }
 
 @Composable
