@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.AccountBalance
 import androidx.compose.material.icons.outlined.AutoFixHigh
 import androidx.compose.material.icons.outlined.Category
@@ -46,6 +47,7 @@ fun MoreScreen(
     onOpenSortEverything: () -> Unit = {},
     onOpenSubscriptions: () -> Unit = {},
     onOpenCards: () -> Unit = {},
+    onScanReceipt: () -> Unit = {},
 ) {
     Scaffold(
         topBar = { TopAppBar(title = { Text("More") }) },
@@ -94,6 +96,12 @@ fun MoreScreen(
                 subtitle = "Unsorted payments by who they went to — file each in one tap",
                 icon = Icons.Outlined.Category,
                 onClick = onOpenSortSpending,
+            )
+            SettingsItem(
+                title = "Scan a receipt",
+                subtitle = "Photo, picture or screenshot — read and kept with its payment",
+                icon = Icons.Outlined.ReceiptLong,
+                onClick = onScanReceipt,
             )
             SettingsItem(
                 title = "Subscriptions",

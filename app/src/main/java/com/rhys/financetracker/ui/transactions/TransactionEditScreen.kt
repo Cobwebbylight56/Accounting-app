@@ -56,6 +56,7 @@ import com.rhys.financetracker.ui.components.colorFromHex
 @Composable
 fun TransactionEditScreen(
     onBack: () -> Unit,
+    onScanReceipt: () -> Unit = {},
     viewModel: TransactionEditViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -263,6 +264,17 @@ fun TransactionEditScreen(
                         viewModel.update { it.copy(isCleared = checked) }
                     },
                 )
+            }
+
+            // A receipt, photo or screenshot kept with the payment; a new one
+            // can be started from a receipt instead of typed in.
+            if (state.isNew) {
+                androidx.compose.material3.OutlinedButton(
+                    onClick = onScanReceipt,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Scan a receipt instead") }
+            } else {
+                com.rhys.financetracker.ui.receipts.PaymentReceipts(transactionId = viewModel.transactionId)
             }
 
             Spacer(Modifier.height(8.dp))

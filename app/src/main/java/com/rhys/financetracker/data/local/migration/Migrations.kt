@@ -461,8 +461,25 @@ object Migrations {
         db.execSQL("UPDATE categories SET name = $apps WHERE id IN $spending")
     }
 
+    /** Receipts: photos and screenshots kept with a payment. */
+    val MIGRATION_11_12 = Migration(11, 12) { db ->
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `receipts` (" +
+                "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "`transaction_id` INTEGER NOT NULL, " +
+                "`file_name` TEXT NOT NULL, " +
+                "`shop` TEXT, " +
+                "`total_minor` INTEGER, " +
+                "`receipt_date` TEXT, " +
+                "`read_text` TEXT, " +
+                "`added_at` INTEGER NOT NULL, " +
+                "FOREIGN KEY(`transaction_id`) REFERENCES `transactions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_receipts_transaction_id` ON `receipts` (`transaction_id`)")
+    }
+
     val ALL: Array<Migration> = arrayOf(
         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
-        MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11,
+        MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
     )
 }

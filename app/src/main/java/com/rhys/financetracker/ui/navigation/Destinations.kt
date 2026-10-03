@@ -50,6 +50,7 @@ object Routes {
     const val SETTINGS_EXTERNAL_DATA = "settings/external"
     const val SETTINGS_DASHBOARD = "settings/dashboard"
     const val SETTINGS_LIVE_PAYMENTS = "settings/live"
+    const val RECEIPT_SCAN = "receipts/scan"
     const val IMPORT = "import"
 
     /** Subscriptions and regular payments, and whether each is still being paid. */
@@ -89,6 +90,11 @@ object Routes {
      */
     fun importForAccount(accountId: Long = NEW_ID): String = "$IMPORT?$ARG_ACCOUNT_ID=$accountId"
 
+    /** Scanning a receipt: to keep with payment [attachTo], or to find or add one; [image] when shared in. */
+    fun receiptScan(attachTo: Long = NEW_ID, image: android.net.Uri? = null): String =
+        "$RECEIPT_SCAN?$ARG_ATTACH_TO=$attachTo" +
+            image?.let { "&$ARG_IMAGE=" + android.net.Uri.encode(it.toString()) }.orEmpty()
+
     /** Money with people for one person's accounts. */
     fun sentToPeople(personId: Long): String = "$SENT_TO_PEOPLE?$ARG_PERSON_ID=$personId"
 
@@ -108,6 +114,9 @@ object Routes {
 
     /** Optional so the plain `import` route still matches. */
     const val ARG_ACCOUNT_ID = "accountId"
+    const val ARG_ATTACH_TO = "attachTo"
+    const val ARG_IMAGE = "image"
+    const val RECEIPT_SCAN_PATTERN = "$RECEIPT_SCAN?$ARG_ATTACH_TO={$ARG_ATTACH_TO}&$ARG_IMAGE={$ARG_IMAGE}"
     const val ARG_PERSON_ID = "personId"
     const val SENT_TO_PEOPLE_PATTERN = "$SENT_TO_PEOPLE?$ARG_PERSON_ID={$ARG_PERSON_ID}"
     const val IMPORT_PATTERN =

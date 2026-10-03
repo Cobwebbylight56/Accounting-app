@@ -86,8 +86,17 @@ fun FinanceNavHost(
 ) {
     // A statement opened from outside the app goes straight to the importer,
     // wherever the user happened to be.
+    val context = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(importFile) {
-        if (importFile != null) navController.navigate(Routes.importForAccount())
+        if (importFile == null) return@LaunchedEffect
+        // A picture shared in is a receipt; anything else is a statement.
+        val type = runCatching { context.contentResolver.getType(importFile) }.getOrNull().orEmpty()
+        if (type.startsWith("image/")) {
+            navController.navigate(Routes.receiptScan(image = importFile))
+            onImportFileHandled()
+        } else {
+            navController.navigate(Routes.importForAccount())
+        }
     }
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
@@ -300,6 +309,7 @@ private fun NavGraphBuilder.topLevelDestinations(
             onOpenSortEverything = { navController.navigate(Routes.SORT_EVERYTHING) },
             onOpenSubscriptions = { navController.navigate(Routes.SUBSCRIPTIONS) },
             onOpenCards = { navController.navigate(Routes.CARDS) },
+            onScanReceipt = { navController.navigate(Routes.receiptScan()) },
         )
     }
 
@@ -358,7 +368,39 @@ private fun NavGraphBuilder.editorDestinations(
         route = Routes.TRANSACTION_EDIT_PATTERN,
         arguments = listOf(navArgument(Routes.ARG_ID) { type = NavType.StringType }),
     ) {
-        TransactionEditScreen(onBack = { navController.popBackStack() })
+        TransactionEditScreen(
+            onBack = { navController.popBackStack() },
+            onScanReceipt = {
+                navController.navigate(Routes.receiptScan()) {
+                    popUpTo(Routes.TRANSACTION_EDIT_PATTERN) { inclusive = true }
+                }
+            },
+        )
+    }
+
+    composable(
+        route = Routes.RECEIPT_SCAN_PATTERN,
+        arguments = listOf(
+            navArgument(Routes.ARG_ATTACH_TO) {
+                type = NavType.LongType
+                defaultValue = Routes.NEW_ID
+            },
+            navArgument(Routes.ARG_IMAGE) {
+                type = NavType.StringType
+                nullable = true
+                defaultValue = null
+            },
+        ),
+    ) {
+        com.rhys.financetracker.ui.receipts.ReceiptScanScreen(
+            onBack = { navController.popBackStack() },
+            onKeptWithPayment = { navController.popBackStack() },
+            onAddedPayment = { id ->
+                navController.navigate(Routes.transactionEdit(id)) {
+                    popUpTo(Routes.RECEIPT_SCAN_PATTERN) { inclusive = true }
+                }
+            },
+        )
     }
 
     composable(Routes.ACCOUNTS) {

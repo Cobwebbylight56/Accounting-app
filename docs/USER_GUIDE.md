@@ -497,6 +497,33 @@ as money coming back.
 held are recognised — ones now read with their shop's name are updated in
 place, not added twice — and the payments that were missed are added.
 
+### Receipts, photos and screenshots
+
+**Scan a receipt** (More → Scan a receipt, or **Scan a receipt instead** when
+adding a payment): take a photo of a paper receipt, or choose a picture or a
+screenshot — an online order, a bank app, a till receipt. The shop, the total
+and the date are read off it on your phone (nothing is sent anywhere) and
+shown for you to check or correct. Then:
+
+* **Is it one of these?** — payments of that amount from around that date are
+  listed; tap the right one and the receipt is kept with it.
+* **Add as a new payment** — if it isn't there yet, it is added from the
+  receipt, filed into a category like any other payment, and opened so you
+  can check it. When the statement comes in, it is matched to the bank's line,
+  not added twice.
+
+**Share a screenshot in.** From the gallery or any app, share a picture and
+choose **Add as a receipt**.
+
+**On any payment.** Open a payment and, under **Receipts and photos**, tap
+**Take a photo** or **Add a picture** to keep one with it. Tap a picture to see
+it full size — pinch to zoom — or to remove it.
+
+Pictures are kept in the app's own storage, so deleting them from your gallery
+doesn't lose them. They aren't part of a backup file, so they stay on this
+phone. Reading needs Google Play services, which fetches the reading part the
+first time; if a receipt can't be read, just type what it says.
+
 ### Live payments from your bank's alerts
 
 Rather than waiting for the statement, the app can add a payment the moment

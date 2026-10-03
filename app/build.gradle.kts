@@ -204,6 +204,10 @@ dependencies {
     implementation(libs.androidx.documentfile)
     implementation(libs.pdfbox.android)
 
+    // Reading receipts: on-device text recognition through Google Play
+    // services, so the model is not carried in the APK.
+    implementation(libs.mlkit.text.recognition)
+
     // Dependency injection
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

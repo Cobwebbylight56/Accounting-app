@@ -50,7 +50,7 @@ class TransactionEditViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
-    private val transactionId: Long = savedStateHandle.get<String>(Routes.ARG_ID)?.toLongOrNull()
+    val transactionId: Long = savedStateHandle.get<String>(Routes.ARG_ID)?.toLongOrNull()
         ?: Routes.NEW_ID
 
     private val form = MutableStateFlow(TransactionForm())

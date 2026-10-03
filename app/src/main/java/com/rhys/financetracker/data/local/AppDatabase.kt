@@ -57,6 +57,7 @@ import com.rhys.financetracker.data.local.entity.TransactionEntity
         IncomeChangeEntity::class,
         com.rhys.financetracker.data.local.entity.ImportBatchEntity::class,
         com.rhys.financetracker.data.local.entity.ImportBatchEntryEntity::class,
+        com.rhys.financetracker.data.local.entity.ReceiptEntity::class,
     ],
     version = AppDatabase.DATABASE_VERSION,
     exportSchema = true,
@@ -77,9 +78,10 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun cashPotDao(): CashPotDao
     abstract fun incomeChangeDao(): IncomeChangeDao
     abstract fun importBatchDao(): com.rhys.financetracker.data.local.dao.ImportBatchDao
+    abstract fun receiptDao(): com.rhys.financetracker.data.local.dao.ReceiptDao
 
     companion object {
-        const val DATABASE_VERSION = 11
+        const val DATABASE_VERSION = 12
         const val DATABASE_NAME = "finance_tracker.db"
     }
 }
