@@ -21,6 +21,16 @@ interface ReceiptDao {
     @Query("SELECT * FROM receipts WHERE transaction_id = :transactionId ORDER BY added_at ASC")
     fun observeFor(transactionId: Long): Flow<List<ReceiptEntity>>
 
+    /** What was read off the newest receipt on [transactionId] that had any writing on it. */
+    @Query(
+        """
+        SELECT read_text FROM receipts
+        WHERE transaction_id = :transactionId AND read_text IS NOT NULL AND read_text != ''
+        ORDER BY added_at DESC LIMIT 1
+        """,
+    )
+    suspend fun latestTextFor(transactionId: Long): String?
+
     /** Every picture still in use, to tidy away any left behind. */
     @Query("SELECT file_name FROM receipts")
     suspend fun fileNames(): List<String>

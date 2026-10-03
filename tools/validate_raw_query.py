@@ -36,7 +36,7 @@ conditions = [
     "t.date >= ?", "t.date <= ?",
     f"(t.account_id IN ({ph}) OR t.transfer_account_id IN ({ph}))",
     "t.category_id IS NULL",
-    f"t.category_id IN ({ph})",
+    f"(t.category_id IN ({ph}) OR t.id IN (SELECT sp.transaction_id FROM transaction_splits sp WHERE sp.category_id IN ({ph})))",
     f"COALESCE(t.person_id, a.person_id) IN ({ph})",
     f"t.type IN ({ph})",
     "t.amount_minor >= ?", "t.amount_minor <= ?",

@@ -185,6 +185,28 @@ class BackupSerializer @Inject constructor() {
         createdAt = json.optLong("createdAt", System.currentTimeMillis()),
     )
 
+    // ------------------------------------------------------------ splits
+
+    fun splitToJson(part: com.rhys.financetracker.data.local.entity.TransactionSplitEntity): JSONObject =
+        JSONObject().apply {
+            put("id", part.id)
+            put("transactionId", part.transactionId)
+            putOpt("categoryId", part.categoryId)
+            put("amountMinor", part.amountMinor)
+            put("label", part.label)
+            put("position", part.position)
+        }
+
+    fun splitFromJson(json: JSONObject): com.rhys.financetracker.data.local.entity.TransactionSplitEntity =
+        com.rhys.financetracker.data.local.entity.TransactionSplitEntity(
+            id = json.optLong("id", 0L),
+            transactionId = json.optLong("transactionId", 0L),
+            categoryId = json.optLongOrNull("categoryId"),
+            amountMinor = json.optLong("amountMinor", 0L),
+            label = json.optString("label", ""),
+            position = json.optInt("position", 0),
+        )
+
     // ----------------------------------------------------------- cash pot
 
     fun cashPotEntryToJson(entry: CashPotEntryEntity): JSONObject = JSONObject().apply {

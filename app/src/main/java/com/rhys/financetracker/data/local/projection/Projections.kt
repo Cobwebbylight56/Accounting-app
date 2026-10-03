@@ -31,6 +31,8 @@ data class TransactionWithDetails(
     @ColumnInfo(name = "person_color") val personColor: String?,
     /** The category's side; TRANSFER for money with people, which is not spending. */
     @ColumnInfo(name = "category_kind") val categoryKind: com.rhys.financetracker.domain.model.CategoryKind? = null,
+    /** How many parts it is split into across categories; 0 when it is not split. */
+    @ColumnInfo(name = "split_count") val splitCount: Int = 0,
 ) {
     /** Money moved to or from a person rather than spent or earned. */
     val isPersonTransfer: Boolean

@@ -47,6 +47,7 @@ class TransactionEditViewModel @Inject constructor(
     private val peopleRepository: PeopleRepository,
     private val savingsRepository: SavingsRepository,
     private val payeeRepository: PayeeRepository,
+    private val splitRepository: com.rhys.financetracker.data.receipts.SplitRepository,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -54,6 +55,13 @@ class TransactionEditViewModel @Inject constructor(
         ?: Routes.NEW_ID
 
     private val form = MutableStateFlow(TransactionForm())
+
+    /** The parts this payment is split into, if it is split. */
+    val splitParts: kotlinx.coroutines.flow.Flow<List<com.rhys.financetracker.data.local.dao.SplitPart>> =
+        splitRepository.observeParts(transactionId)
+
+    /** How many items its receipt lists, to offer splitting by them. */
+    suspend fun receiptItemCount(): Int = splitRepository.receiptItems(transactionId).size
     private val saved = MutableStateFlow(false)
     private val message = MutableStateFlow<String?>(null)
 
@@ -284,6 +292,8 @@ class TransactionEditViewModel @Inject constructor(
 
             when (val result = transactionRepository.save(entity)) {
                 is AppResult.Success -> {
+                    // A split payment's parts follow a new amount.
+                    if (transactionId != Routes.NEW_ID) splitRepository.reconcile(transactionId)
                     val categoryId = current.categoryId
                     if (categoryId != null && movesOthers(current, original.value)) {
                         payeeRepository.fileEveryPaymentLike(entity.description, entity.type, categoryId, entity.id)

@@ -478,8 +478,39 @@ object Migrations {
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_receipts_transaction_id` ON `receipts` (`transaction_id`)")
     }
 
+    /** Split payments, and the categories chosen for receipt items. */
+    val MIGRATION_12_13 = Migration(12, 13) { db ->
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `transaction_splits` (" +
+                "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "`transaction_id` INTEGER NOT NULL, " +
+                "`category_id` INTEGER, " +
+                "`amount_minor` INTEGER NOT NULL, " +
+                "`label` TEXT NOT NULL, " +
+                "`position` INTEGER NOT NULL, " +
+                "FOREIGN KEY(`transaction_id`) REFERENCES `transactions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE, " +
+                "FOREIGN KEY(`category_id`) REFERENCES `categories`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_transaction_splits_transaction_id` ON `transaction_splits` (`transaction_id`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_transaction_splits_category_id` ON `transaction_splits` (`category_id`)",
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `receipt_item_choices` (" +
+                "`item_key` TEXT NOT NULL, " +
+                "`category_id` INTEGER NOT NULL, " +
+                "PRIMARY KEY(`item_key`), " +
+                "FOREIGN KEY(`category_id`) REFERENCES `categories`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_receipt_item_choices_category_id` ON `receipt_item_choices` (`category_id`)",
+        )
+    }
+
     val ALL: Array<Migration> = arrayOf(
         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
-        MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
+        MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
     )
 }

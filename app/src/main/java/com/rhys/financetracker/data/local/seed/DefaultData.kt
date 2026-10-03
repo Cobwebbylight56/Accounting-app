@@ -104,6 +104,11 @@ object DefaultData {
 
         // ------------------------------------------------------------ misc
         SeedCategory("Shopping", CategoryKind.EXPENSE, "#00695C", "ShoppingBag"),
+        // What a split payment's parts go to: the T-shirt in the big shop,
+        // the drink and crisps on the fuel receipt.
+        SeedCategory("Clothes", CategoryKind.EXPENSE, "#AD1457", "Checkroom"),
+        SeedCategory("Household", CategoryKind.EXPENSE, "#00897B", "CleaningServices"),
+        SeedCategory("Snacks & drinks", CategoryKind.EXPENSE, "#F57C00", "LocalCafe"),
         SeedCategory("Hobbies", CategoryKind.EXPENSE, "#5E35B1", "Palette"),
         SeedCategory("Pets", CategoryKind.EXPENSE, "#8D6E63", "Pets"),
         SeedCategory("Health", CategoryKind.EXPENSE, "#D81B60", "MedicalServices"),

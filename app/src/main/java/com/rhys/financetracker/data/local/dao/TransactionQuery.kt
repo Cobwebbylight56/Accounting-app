@@ -116,7 +116,11 @@ object TransactionQuery {
         if (filter.onlyUncategorised) {
             conditions += "t.category_id IS NULL"
         } else if (filter.categoryIds.isNotEmpty()) {
-            conditions += "t.category_id IN (${filter.categoryIds.joinToString(", ") { "?" }})"
+            // A split payment shows under each category it has a part in.
+            val placeholders = filter.categoryIds.joinToString(", ") { "?" }
+            conditions += "(t.category_id IN ($placeholders) OR t.id IN " +
+                "(SELECT sp.transaction_id FROM transaction_splits sp WHERE sp.category_id IN ($placeholders)))"
+            args.addAll(filter.categoryIds)
             args.addAll(filter.categoryIds)
         }
 

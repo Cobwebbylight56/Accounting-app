@@ -25,6 +25,7 @@ object Routes {
     const val MORE = "more"
 
     const val TRANSACTION_EDIT = "transaction/edit"
+    const val TRANSACTION_SPLIT = "transaction/split"
     const val ACCOUNTS = "accounts"
     const val ACCOUNT_EDIT = "account/edit"
     const val ACCOUNT_VIEW = "account/view"
@@ -73,6 +74,7 @@ object Routes {
     const val NEW_ID = 0L
 
     fun transactionEdit(id: Long = NEW_ID): String = "$TRANSACTION_EDIT/$id"
+    fun transactionSplit(id: Long): String = "$TRANSACTION_SPLIT/$id"
     fun accountEdit(id: Long = NEW_ID): String = "$ACCOUNT_EDIT/$id"
     fun accountView(id: Long): String = "$ACCOUNT_VIEW/$id"
     fun personEdit(id: Long = NEW_ID): String = "$PERSON_EDIT/$id"
@@ -103,6 +105,7 @@ object Routes {
 
     /** Route patterns, with the argument placeholder Navigation expects. */
     const val TRANSACTION_EDIT_PATTERN = "$TRANSACTION_EDIT/{$ARG_ID}"
+    const val TRANSACTION_SPLIT_PATTERN = "$TRANSACTION_SPLIT/{$ARG_ID}"
     const val ACCOUNT_EDIT_PATTERN = "$ACCOUNT_EDIT/{$ARG_ID}"
     const val ACCOUNT_VIEW_PATTERN = "$ACCOUNT_VIEW/{$ARG_ID}"
     const val PERSON_EDIT_PATTERN = "$PERSON_EDIT/{$ARG_ID}"

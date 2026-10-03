@@ -96,6 +96,10 @@ class BackupManager @Inject constructor(
                 ),
             )
             put(
+                BackupFormat.KEY_SPLITS,
+                serializer.writeArray(database.splitDao().getAll(), serializer::splitToJson),
+            )
+            put(
                 BackupFormat.KEY_CASH_POT,
                 serializer.writeArray(
                     database.cashPotDao().getAll(),
@@ -250,6 +254,14 @@ class BackupManager @Inject constructor(
                 json.optJSONArray(BackupFormat.KEY_EXTERNAL_DATA),
                 serializer::externalFromJson,
             )
+            // Split payments: only parts whose payment came back too.
+            val transactionIds = transactions.map { it.id }.toSet()
+            val categoryIds = categories.map { it.id }.toSet()
+            val splits = serializer.readArray(
+                json.optJSONArray(BackupFormat.KEY_SPLITS),
+                serializer::splitFromJson,
+            ).filter { it.transactionId in transactionIds }
+                .map { part -> part.copy(categoryId = part.categoryId?.takeIf { it in categoryIds }) }
 
             if (accounts.isEmpty() && transactions.isEmpty()) {
                 error("That file does not look like a Finance Tracker backup")
@@ -262,6 +274,7 @@ class BackupManager @Inject constructor(
             database.withTransaction {
                 // Children before parents when deleting, parents before children
                 // when inserting, so foreign keys hold at every step.
+                database.splitDao().deleteAll()
                 database.transactionDao().deleteAll()
                 database.recurringRuleDao().deleteAll()
                 database.savingsGoalDao().deleteAll()
@@ -279,6 +292,7 @@ class BackupManager @Inject constructor(
                 database.savingsGoalDao().insertAll(goals)
                 database.recurringRuleDao().insertAll(rules)
                 database.transactionDao().insertAll(transactions)
+                database.splitDao().insertAll(splits)
                 database.monthlySnapshotDao().insertAll(snapshots)
                 database.externalDataDao().upsertAll(external)
                 database.cashPotDao().insertAll(cashPot)

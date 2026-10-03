@@ -57,6 +57,7 @@ import com.rhys.financetracker.ui.components.colorFromHex
 fun TransactionEditScreen(
     onBack: () -> Unit,
     onScanReceipt: () -> Unit = {},
+    onSplit: (Long) -> Unit = {},
     viewModel: TransactionEditViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -275,6 +276,9 @@ fun TransactionEditScreen(
                 ) { Text("Scan a receipt instead") }
             } else {
                 com.rhys.financetracker.ui.receipts.PaymentReceipts(transactionId = viewModel.transactionId)
+                if (state.form.type == TransactionType.EXPENSE) {
+                    SplitButton(viewModel = viewModel, onSplit = { onSplit(viewModel.transactionId) })
+                }
             }
 
             Spacer(Modifier.height(8.dp))
@@ -298,5 +302,35 @@ fun TransactionEditScreen(
             onConfirm = viewModel::delete,
             onDismiss = { showDeleteConfirm = false },
         )
+    }
+}
+
+/**
+ * "Split by category": how the payment is split, or how many items its
+ * receipt has to split it by.
+ */
+@Composable
+private fun SplitButton(viewModel: TransactionEditViewModel, onSplit: () -> Unit) {
+    val parts by viewModel.splitParts.collectAsStateWithLifecycle(initialValue = emptyList())
+    val items by androidx.compose.runtime.produceState(initialValue = 0, parts) { value = viewModel.receiptItemCount() }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        androidx.compose.material3.OutlinedButton(onClick = onSplit, modifier = Modifier.fillMaxWidth()) {
+            Text(
+                when {
+                    parts.isNotEmpty() -> "Split into ${parts.size} parts — change"
+                    items >= 2 -> "Split by what's on the receipt ($items items)"
+                    else -> "Split by category"
+                },
+            )
+        }
+        if (parts.isNotEmpty()) {
+            Text(
+                parts.groupBy { it.categoryName ?: "Its own category" }
+                    .map { (name, rows) -> "$name ${com.rhys.financetracker.core.money.Money.format(rows.sumOf { it.amountMinor })}" }
+                    .joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }

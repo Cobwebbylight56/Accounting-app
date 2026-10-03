@@ -370,12 +370,20 @@ private fun NavGraphBuilder.editorDestinations(
     ) {
         TransactionEditScreen(
             onBack = { navController.popBackStack() },
+            onSplit = { navController.navigate(Routes.transactionSplit(it)) },
             onScanReceipt = {
                 navController.navigate(Routes.receiptScan()) {
                     popUpTo(Routes.TRANSACTION_EDIT_PATTERN) { inclusive = true }
                 }
             },
         )
+    }
+
+    composable(
+        route = Routes.TRANSACTION_SPLIT_PATTERN,
+        arguments = listOf(navArgument(Routes.ARG_ID) { type = NavType.StringType }),
+    ) {
+        com.rhys.financetracker.ui.receipts.SplitScreen(onBack = { navController.popBackStack() })
     }
 
     composable(
@@ -395,6 +403,11 @@ private fun NavGraphBuilder.editorDestinations(
         com.rhys.financetracker.ui.receipts.ReceiptScanScreen(
             onBack = { navController.popBackStack() },
             onKeptWithPayment = { navController.popBackStack() },
+            onSplitPayment = { id ->
+                navController.navigate(Routes.transactionSplit(id)) {
+                    popUpTo(Routes.RECEIPT_SCAN_PATTERN) { inclusive = true }
+                }
+            },
             onAddedPayment = { id ->
                 navController.navigate(Routes.transactionEdit(id)) {
                     popUpTo(Routes.RECEIPT_SCAN_PATTERN) { inclusive = true }

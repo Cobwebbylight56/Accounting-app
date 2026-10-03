@@ -52,7 +52,21 @@ interface TransactionDao {
             c.color_hex AS category_color,
             c.kind AS category_kind,
             p.name AS person_name,
-            p.color_hex AS person_color
+            p.color_hex AS person_color,
+            (SELECT COUNT(*) FROM transaction_splits sp WHERE sp.transaction_id = t.id) AS split_count
+        """
+
+        /**
+         * Payments as category totals see them: a split payment as its parts,
+         * each in its own category (a part with none in the payment's), and
+         * any other payment as itself.
+         */
+        const val PARTS = """
+            SELECT t.id, t.type, t.date, t.account_id, t.person_id, t.is_archived,
+                   COALESCE(s.category_id, t.category_id) AS category_id,
+                   COALESCE(s.amount_minor, t.amount_minor) AS amount_minor
+            FROM transactions t
+            LEFT JOIN transaction_splits s ON s.transaction_id = t.id
         """
 
         const val DETAIL_JOINS = """
@@ -235,6 +249,7 @@ interface TransactionDao {
     @RawQuery(
         observedEntities = [
             TransactionEntity::class,
+            com.rhys.financetracker.data.local.entity.TransactionSplitEntity::class,
             AccountEntity::class,
             CategoryEntity::class,
             PersonEntity::class,
@@ -309,8 +324,8 @@ interface TransactionDao {
                IFNULL(c.name, 'Uncategorised') AS category_name,
                c.color_hex AS category_color,
                SUM(t.amount_minor) AS total_minor,
-               COUNT(*) AS transaction_count
-        FROM transactions t
+               COUNT(DISTINCT t.id) AS transaction_count
+        FROM ($PARTS) t
         LEFT JOIN categories c ON c.id = t.category_id
         LEFT JOIN accounts a ON a.id = t.account_id
         WHERE t.is_archived = 0
@@ -478,8 +493,8 @@ interface TransactionDao {
                IFNULL(c.name, 'Uncategorised') AS category_name,
                c.color_hex AS category_color,
                SUM(t.amount_minor) AS total_minor,
-               COUNT(*) AS transaction_count
-        FROM transactions t
+               COUNT(DISTINCT t.id) AS transaction_count
+        FROM ($PARTS) t
         LEFT JOIN categories c ON c.id = t.category_id
         LEFT JOIN accounts a ON a.id = t.account_id
         WHERE t.is_archived = 0

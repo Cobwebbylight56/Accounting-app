@@ -413,6 +413,13 @@ private fun TransactionRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (item.splitCount > 0) {
+                    com.rhys.financetracker.ui.receipts.SplitDropDown(
+                        transactionId = entry.id,
+                        partCount = item.splitCount,
+                        ownCategory = item.categoryName,
+                    )
+                }
             }
             Spacer(Modifier.width(8.dp))
             Column(horizontalAlignment = Alignment.End) {

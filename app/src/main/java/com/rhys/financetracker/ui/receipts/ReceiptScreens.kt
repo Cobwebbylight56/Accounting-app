@@ -134,6 +134,8 @@ data class ScanState(
     /** Set once the receipt is kept with a payment: where to go next. */
     val doneWith: Long? = null,
     val addedNew: Boolean = false,
+    /** The receipt kept has several items: split the payment by them next. */
+    val splitNext: Boolean = false,
     /** Payments listed on a screenshot like Google Wallet's, when it is one. */
     val listed: List<ListedRow> = emptyList(),
     /** Set once listed payments have been added. */
@@ -248,7 +250,8 @@ class ReceiptScanViewModel @Inject constructor(
         viewModelScope.launch {
             receipts.attach(transactionId, fileName, current.reading, current.text)
             kept = true
-            _state.update { it.copy(doneWith = transactionId) }
+            val items = com.rhys.financetracker.data.receipts.ReceiptItems.itemsIn(current.text.orEmpty())
+            _state.update { it.copy(doneWith = transactionId, splitNext = items.size >= 2) }
         }
     }
 
@@ -324,6 +327,7 @@ fun ReceiptScanScreen(
     onBack: () -> Unit,
     onKeptWithPayment: (Long) -> Unit,
     onAddedPayment: (Long) -> Unit,
+    onSplitPayment: (Long) -> Unit = onKeptWithPayment,
     viewModel: ReceiptScanViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -332,7 +336,13 @@ fun ReceiptScanScreen(
     var enlarged by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.doneWith) {
-        state.doneWith?.let { id -> if (state.addedNew) onAddedPayment(id) else onKeptWithPayment(id) }
+        state.doneWith?.let { id ->
+            when {
+                state.addedNew -> onAddedPayment(id)
+                state.splitNext -> onSplitPayment(id)
+                else -> onKeptWithPayment(id)
+            }
+        }
     }
     LaunchedEffect(state.listAdded) {
         state.listAdded?.let { added ->

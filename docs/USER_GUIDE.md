@@ -533,6 +533,39 @@ doesn't lose them. They aren't part of a backup file, so they stay on this
 phone. Reading needs Google Play services, which fetches the reading part the
 first time; if a receipt can't be read, just type what it says.
 
+### Splitting a payment across categories
+
+One shop can be several kinds of spending: food at Tesco, but a T-shirt and
+washing-up liquid too; fuel at the pump, but a drink and crisps with it. Split
+the payment and each part counts in its own category — Spending, the graphs
+and Advice all see £45.40 of Fuel and £3.20 of Snacks & drinks, not £48.60 of
+Fuel. The payment itself is unchanged.
+
+**From a receipt.** Scan a receipt with several items and keep it with a
+payment, and the app goes straight to splitting it: every item on the receipt
+is listed with its price and a suggested category — unleaded is Fuel, crisps
+and drinks Snacks & drinks, a T-shirt Clothes, washing-up liquid Household,
+toothpaste Personal, nappies Children. Food and anything else it doesn't
+recognise is left as **Same as the payment**, which for a supermarket is
+Groceries. Check them, change any, and **Save the split**. Discounts on the
+receipt come off the item above them. The categories you choose for items are
+remembered, so the same item goes in the same place next time.
+
+**By hand.** Open a payment and tap **Split by category**, then **Add a part**
+for anything in another category — what it was, the amount and the category.
+Whatever the parts don't cover stays in the payment's own category as **the
+rest**. The parts can't come to more than the payment.
+
+**Seeing the breakdown.** In the list of payments, a split payment shows
+**Split · 3 parts** under it — tap it to drop down every part with its
+category and amount. On the payment itself, the split is summed up by
+category under **Receipts and photos**. Tapping a category on Spending shows
+every payment with a part in it.
+
+If you change a split payment's amount, the rest takes up the difference.
+**Don't split this payment** puts it back to one category. Clothes, Household
+and Snacks & drinks are new categories for this. Splits are kept in backups.
+
 ### Live payments from your bank's alerts
 
 Rather than waiting for the statement, the app can add a payment the moment
