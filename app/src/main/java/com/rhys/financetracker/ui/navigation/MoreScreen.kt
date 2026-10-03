@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Assessment
 import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.AccountBalance
 import androidx.compose.material.icons.outlined.AutoFixHigh
@@ -49,6 +50,7 @@ fun MoreScreen(
     onOpenCards: () -> Unit = {},
     onScanReceipt: () -> Unit = {},
     onOpenInbox: () -> Unit = {},
+    onOpenReports: () -> Unit = {},
 ) {
     Scaffold(
         topBar = { TopAppBar(title = { Text("More") }) },
@@ -60,12 +62,6 @@ fun MoreScreen(
                 .verticalScroll(rememberScrollState()),
         ) {
             SettingsGroupHeader("Set things up")
-            SettingsItem(
-                title = "Accounts",
-                subtitle = "Current accounts, savings, cards, loans and pay later",
-                icon = Icons.Outlined.AccountBalance,
-                onClick = onOpenAccounts,
-            )
             SettingsItem(
                 title = "People",
                 subtitle = "Everyone whose money you are keeping track of",
@@ -93,10 +89,10 @@ fun MoreScreen(
                 onClick = onOpenInbox,
             )
             SettingsItem(
-                title = "Credit cards",
-                subtitle = "What's owed on each card, what goes on it, its statements",
-                icon = Icons.Outlined.CreditCard,
-                onClick = onOpenCards,
+                title = "Reports & exports",
+                subtitle = "Monthly and yearly reports to print, save or share",
+                icon = Icons.Outlined.Assessment,
+                onClick = onOpenReports,
             )
             SettingsItem(
                 title = "Settings",

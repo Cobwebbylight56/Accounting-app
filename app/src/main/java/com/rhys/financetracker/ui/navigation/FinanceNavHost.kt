@@ -232,9 +232,9 @@ private fun NavGraphBuilder.topLevelDestinations(
             addActions = addActions(navController),
             inboxRoutes = inboxRoutes(navController),
             onOpenInbox = { navController.navigate(Routes.INBOX) },
-            onOpenAccounts = { navController.navigate(Routes.ACCOUNTS) },
+            onOpenAccounts = { navController.navigateToTab(Routes.ACCOUNTS) },
             onOpenRecurring = { navController.navigate(Routes.RECURRING) },
-            onOpenSavings = { navController.navigateToTab(Routes.SAVINGS) },
+            onOpenSavings = { navController.navigate(Routes.SAVINGS) },
             onOpenSettings = { navController.navigate(Routes.SETTINGS) },
             onOpenDashboardSettings = { navController.navigate(Routes.SETTINGS_DASHBOARD) },
             onOpenExternalData = { navController.navigate(Routes.SETTINGS_EXTERNAL_DATA) },
@@ -292,6 +292,7 @@ private fun NavGraphBuilder.topLevelDestinations(
             onEditGoal = { navController.navigate(Routes.savingsEdit(it)) },
             onAddGoal = { navController.navigate(Routes.savingsEdit()) },
             onOpenAccount = { navController.navigate(Routes.accountView(it)) },
+            onBack = { navController.popBackStack() },
         )
     }
 
@@ -299,13 +300,14 @@ private fun NavGraphBuilder.topLevelDestinations(
         ReportsScreen(
             onShareFile = onShareFile,
             onOpenLedger = { navController.navigate(Routes.LEDGER) },
+            onBack = { navController.popBackStack() },
         )
     }
 
     composable(Routes.MORE) {
         MoreScreen(
             onOpenInsights = { navController.navigate(Routes.INSIGHTS) },
-            onOpenAccounts = { navController.navigate(Routes.ACCOUNTS) },
+            onOpenAccounts = { navController.navigateToTab(Routes.ACCOUNTS) },
             onOpenPeople = { navController.navigate(Routes.PEOPLE) },
             onOpenRecurring = { navController.navigate(Routes.RECURRING) },
             onOpenCategories = { navController.navigate(Routes.CATEGORIES) },
@@ -318,6 +320,7 @@ private fun NavGraphBuilder.topLevelDestinations(
             onOpenCards = { navController.navigate(Routes.CARDS) },
             onScanReceipt = { navController.navigate(Routes.receiptScan()) },
             onOpenInbox = { navController.navigate(Routes.INBOX) },
+            onOpenReports = { navController.navigate(Routes.REPORTS) },
         )
     }
 
@@ -440,12 +443,15 @@ private fun NavGraphBuilder.editorDestinations(
 
     composable(Routes.ACCOUNTS) {
         AccountsScreen(
-            onBack = { navController.popBackStack() },
+            // A tab now: nothing to go back to.
+            onBack = null,
             onEditAccount = { navController.navigate(Routes.accountEdit(it)) },
             onAddAccount = { navController.navigate(Routes.accountEdit()) },
             onOpenPeople = { navController.navigate(Routes.PEOPLE) },
             onImportStatement = { navController.navigate(Routes.importForAccount(it)) },
             onOpenAccount = { navController.navigate(Routes.accountView(it)) },
+            onOpenSavingsGoals = { navController.navigate(Routes.SAVINGS) },
+            onOpenCards = { navController.navigate(Routes.CARDS) },
         )
     }
 

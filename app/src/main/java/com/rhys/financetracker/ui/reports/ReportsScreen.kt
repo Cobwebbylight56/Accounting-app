@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material3.DropdownMenu
@@ -79,6 +80,7 @@ import kotlinx.coroutines.flow.first
 fun ReportsScreen(
     onShareFile: (com.rhys.financetracker.data.export.ExportedFile) -> Unit,
     onOpenLedger: () -> Unit = {},
+    onBack: (() -> Unit)? = null,
     viewModel: ReportsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -110,7 +112,14 @@ fun ReportsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Reports") },
+                title = { Text("Reports & exports") },
+                navigationIcon = {
+                    if (onBack != null) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    }
+                },
                 actions = {
                     IconButton(onClick = viewModel::print) {
                         Icon(Icons.Default.Print, contentDescription = "Print")

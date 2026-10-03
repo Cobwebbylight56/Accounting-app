@@ -1,12 +1,11 @@
 package com.rhys.financetracker.ui.navigation
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Assessment
+import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.PieChart
 import androidx.compose.material.icons.outlined.ReceiptLong
-import androidx.compose.material.icons.outlined.Savings
 import androidx.compose.ui.graphics.vector.ImageVector
 
 /**
@@ -130,7 +129,10 @@ object Routes {
         "$IMPORT?$ARG_ACCOUNT_ID={$ARG_ACCOUNT_ID}&$ARG_PERSON_ID={$ARG_PERSON_ID}"
 }
 
-/** The tabs along the bottom. Spending has its own: where the money goes matters most. */
+/**
+ * The tabs along the bottom: how the month is going, where the money went,
+ * every payment, where the money is kept, and everything else.
+ */
 enum class TopLevelDestination(
     val route: String,
     val label: String,
@@ -139,8 +141,7 @@ enum class TopLevelDestination(
     DASHBOARD(Routes.DASHBOARD, "Home", Icons.Outlined.Home),
     SPENDING(Routes.SPENDING, "Spending", Icons.Outlined.PieChart),
     TRANSACTIONS(Routes.TRANSACTIONS, "Payments", Icons.Outlined.ReceiptLong),
-    SAVINGS(Routes.SAVINGS, "Savings", Icons.Outlined.Savings),
-    REPORTS(Routes.REPORTS, "Reports", Icons.Outlined.Assessment),
+    ACCOUNTS(Routes.ACCOUNTS, "Accounts", Icons.Outlined.AccountBalanceWallet),
     MORE(Routes.MORE, "More", Icons.Outlined.MoreHoriz),
     ;
 

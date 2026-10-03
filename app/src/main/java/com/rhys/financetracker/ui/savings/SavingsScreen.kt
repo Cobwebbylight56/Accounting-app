@@ -81,6 +81,7 @@ fun SavingsScreen(
     onEditGoal: (Long) -> Unit,
     onAddGoal: () -> Unit,
     onOpenAccount: (Long) -> Unit = {},
+    onBack: (() -> Unit)? = null,
     viewModel: SavingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -97,7 +98,18 @@ fun SavingsScreen(
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Savings") }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("Savings goals") },
+                navigationIcon = {
+                    if (onBack != null) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    }
+                },
+            )
+        },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             FloatingActionButton(onClick = onAddGoal) {

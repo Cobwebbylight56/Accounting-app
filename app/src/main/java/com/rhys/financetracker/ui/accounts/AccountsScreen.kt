@@ -81,13 +81,16 @@ import com.rhys.financetracker.ui.theme.FinanceTheme
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AccountsScreen(
-    onBack: () -> Unit,
+    /** Null when Accounts is a tab, with nothing to go back to. */
+    onBack: (() -> Unit)?,
     onEditAccount: (Long) -> Unit,
     onAddAccount: () -> Unit,
     onOpenPeople: () -> Unit,
     onImportStatement: (Long) -> Unit,
     /** The account's own page; tapping a row opens it, Edit is in the menu. */
     onOpenAccount: (Long) -> Unit = onEditAccount,
+    onOpenSavingsGoals: (() -> Unit)? = null,
+    onOpenCards: (() -> Unit)? = null,
     viewModel: AccountsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -106,8 +109,10 @@ fun AccountsScreen(
             TopAppBar(
                 title = { Text("Accounts") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    if (onBack != null) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
                     }
                 },
                 actions = {
@@ -142,6 +147,20 @@ fun AccountsScreen(
             contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 96.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
+            // Everything about where money is kept, from one tab: savings
+            // goals and the cards page sit beside the accounts themselves.
+            if (onOpenSavingsGoals != null || onOpenCards != null) {
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        onOpenSavingsGoals?.let {
+                            androidx.compose.material3.AssistChip(onClick = it, label = { Text("Savings goals") })
+                        }
+                        onOpenCards?.let {
+                            androidx.compose.material3.AssistChip(onClick = it, label = { Text("Credit cards") })
+                        }
+                    }
+                }
+            }
             item {
                 // Named as on Home — Available, Saved, Owed — rather than a
                 // second set of words for the same money.
