@@ -71,6 +71,11 @@ class SettingsRepository @Inject constructor(
         val LAST_RESORT_SUMMARY = stringPreferencesKey("last_resort_summary")
         val LAST_RESORT_UNDO = stringPreferencesKey("last_resort_undo")
         val BACKUP_NUDGE_SNOOZED_UNTIL = longPreferencesKey("backup_nudge_snoozed_until")
+        val LIVE_ALERTS = booleanPreferencesKey("live_alerts")
+        val LIVE_ALERT_ACCOUNTS = stringPreferencesKey("live_alert_accounts")
+        val LIVE_ALERT_APPS = stringSetPreferencesKey("live_alert_apps")
+        val LIVE_ALERT_SEEN = stringSetPreferencesKey("live_alert_seen")
+        val LIVE_ALERT_LAST = stringPreferencesKey("live_alert_last")
     }
 
     /** Defaults chosen so a fresh install is immediately usable and private. */
@@ -145,6 +150,17 @@ class SettingsRepository @Inject constructor(
                 .mapNotNull { pair -> pair.split('=').takeIf { it.size == 2 }?.let { it[0] to it[1] } }
                 .toMap(),
             backupNudgeSnoozedUntil = prefs[Keys.BACKUP_NUDGE_SNOOZED_UNTIL],
+            liveAlerts = prefs[Keys.LIVE_ALERTS] ?: false,
+            liveAlertAccounts = prefs[Keys.LIVE_ALERT_ACCOUNTS].orEmpty().split(';')
+                .mapNotNull { pair ->
+                    val parts = pair.split('=')
+                    if (parts.size != 2) return@mapNotNull null
+                    parts[1].toLongOrNull()?.let { parts[0] to it }
+                }
+                .toMap(),
+            liveAlertApps = prefs[Keys.LIVE_ALERT_APPS].orEmpty(),
+            liveAlertSeen = prefs[Keys.LIVE_ALERT_SEEN].orEmpty(),
+            liveAlertLast = prefs[Keys.LIVE_ALERT_LAST].orEmpty(),
         )
     }
 
@@ -229,6 +245,45 @@ class SettingsRepository @Inject constructor(
     /** Hides the backup reminder on Home until [until] (epoch millis). */
     suspend fun snoozeBackupNudge(until: Long) = put(Keys.BACKUP_NUDGE_SNOOZED_UNTIL, until)
 
+    /** Adding payments from banking apps' alerts, on or off. */
+    suspend fun setLiveAlerts(enabled: Boolean) = put(Keys.LIVE_ALERTS, enabled)
+
+    /** Which account [app]'s alerts go to; null goes back to choosing automatically. */
+    suspend fun setLiveAlertAccount(app: String, accountId: Long?) {
+        context.dataStore.edit { prefs ->
+            val current = prefs[Keys.LIVE_ALERT_ACCOUNTS].orEmpty().split(';')
+                .mapNotNull { pair -> pair.split('=').takeIf { it.size == 2 }?.let { it[0] to it[1] } }
+                .toMap()
+            val updated = if (accountId == null) current - app else current + (app to accountId.toString())
+            prefs[Keys.LIVE_ALERT_ACCOUNTS] = updated.entries.joinToString(";") { "${it.key}=${it.value}" }
+        }
+    }
+
+    /** Lets alerts from [app], which is not a known bank, be read — or stops it. */
+    suspend fun setLiveAlertAppAllowed(app: String, allowed: Boolean) {
+        context.dataStore.edit { prefs ->
+            val current = prefs[Keys.LIVE_ALERT_APPS].orEmpty()
+            prefs[Keys.LIVE_ALERT_APPS] = if (allowed) current + app else current - app
+        }
+    }
+
+    /**
+     * Remembers that [app] (shown as [label]) sent something that read like
+     * a payment, so Live payments can offer it. Only the app's name is kept,
+     * never what the alert said.
+     */
+    suspend fun noteLiveAlertApp(app: String, label: String) {
+        context.dataStore.edit { prefs ->
+            val current = prefs[Keys.LIVE_ALERT_SEEN].orEmpty()
+            if (current.none { it.substringBefore('|') == app }) {
+                prefs[Keys.LIVE_ALERT_SEEN] = current + "$app|${label.replace('|', ' ')}"
+            }
+        }
+    }
+
+    /** What was added last, for the Live payments page. */
+    suspend fun setLiveAlertLast(summary: String) = put(Keys.LIVE_ALERT_LAST, summary)
+
     /** Records that Android has been asked once for permission to show reminders. */
     suspend fun setNotificationsAsked() = put(Keys.NOTIFICATIONS_ASKED, true)
 
@@ -311,6 +366,16 @@ data class AppSettings(
     val cardViews: Map<String, String> = emptyMap(),
     /** The backup reminder stays hidden until then (epoch millis). */
     val backupNudgeSnoozedUntil: Long? = null,
+    /** Payments are added the moment a banking app's alert says money moved. */
+    val liveAlerts: Boolean = false,
+    /** The account each app's alerts go to, by package name; the rest are chosen automatically. */
+    val liveAlertAccounts: Map<String, Long> = emptyMap(),
+    /** Apps, by package name, the user allowed besides the known banks. */
+    val liveAlertApps: Set<String> = emptySet(),
+    /** "package|label" for other apps whose alerts read like payments. */
+    val liveAlertSeen: Set<String> = emptySet(),
+    /** What was last added from an alert. */
+    val liveAlertLast: String = "",
 ) {
     val isLockEnabled: Boolean get() = lockMethod != LockMethod.NONE
     val requiresPin: Boolean

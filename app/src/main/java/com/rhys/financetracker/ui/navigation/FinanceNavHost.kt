@@ -520,7 +520,11 @@ private fun NavGraphBuilder.settingsDestinations(navController: NavHostControlle
             onOpenCategories = { navController.navigate(Routes.CATEGORIES) },
             onOpenImport = { navController.navigate(Routes.importForAccount()) },
             onOpenSortEverything = { navController.navigate(Routes.SORT_EVERYTHING) },
+            onOpenLivePayments = { navController.navigate(Routes.SETTINGS_LIVE_PAYMENTS) },
         )
+    }
+    composable(Routes.SETTINGS_LIVE_PAYMENTS) {
+        com.rhys.financetracker.ui.settings.LivePaymentsScreen(onBack = { navController.popBackStack() })
     }
     composable(Routes.SETTINGS_APPEARANCE) {
         AppearanceSettingsScreen(onBack = { navController.popBackStack() })

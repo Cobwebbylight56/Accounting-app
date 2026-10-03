@@ -1,0 +1,115 @@
+package com.rhys.financetracker.data
+
+import com.rhys.financetracker.data.live.BankAlertParser
+import com.rhys.financetracker.domain.model.TransactionType
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Test
+
+/**
+ * Banking app alerts in the shapes banks send them. The exact wording varies
+ * by bank and changes over time, so these cover the shapes rather than one
+ * bank's sentence.
+ */
+class BankAlertParserTest {
+
+    private fun read(title: String?, text: String?) = BankAlertParser.parse(title, text)
+
+    @Test
+    fun `card spending at a shop`() {
+        val alert = read("Nationwide", "You've spent £12.50 at TESCO STORES 3012 on your card ending 1234.")!!
+        assertEquals(1_250L, alert.amountMinor)
+        assertEquals(TransactionType.EXPENSE, alert.type)
+        assertEquals("TESCO STORES 3012", alert.payee)
+        assertEquals("1234", alert.ending)
+    }
+
+    @Test
+    fun `amount first`() {
+        val alert = read("Card payment", "£4.20 at Costa Coffee")!!
+        assertEquals(420L, alert.amountMinor)
+        assertEquals("Costa Coffee", alert.payee)
+    }
+
+    @Test
+    fun `the balance after is not the payment`() {
+        val alert = read("Lloyds", "£12.50 has gone out of your account ending 5678 to SHELL WAKEFIELD. Your balance is now £840.10")!!
+        assertEquals(1_250L, alert.amountMinor)
+        assertEquals(TransactionType.EXPENSE, alert.type)
+        assertEquals("SHELL WAKEFIELD", alert.payee)
+    }
+
+    @Test
+    fun `thousands and pence`() {
+        assertEquals(125_000L, read(null, "You paid £1,250.00 to Halifax Mortgage")!!.amountMinor)
+        assertEquals(125_000L, read(null, "You paid £1250 to Halifax Mortgage")!!.amountMinor)
+        assertEquals(1_250L, read(null, "You paid £12.5 to Ann")!!.amountMinor)
+    }
+
+    @Test
+    fun `money in from a person`() {
+        val alert = read("Money in", "You've received £250.00 from H PAYNE.")!!
+        assertEquals(TransactionType.INCOME, alert.type)
+        assertEquals(25_000L, alert.amountMinor)
+        assertEquals("H PAYNE", alert.payee)
+    }
+
+    @Test
+    fun `someone paid you`() {
+        val alert = read("Monzo", "Hannah Payne paid you £20.00")!!
+        assertEquals(TransactionType.INCOME, alert.type)
+        assertEquals("Hannah Payne", alert.payee)
+    }
+
+    @Test
+    fun `payment received is money in, not out`() {
+        val alert = read(null, "Payment received: £45.00 from EMPLOYER LTD")!!
+        assertEquals(TransactionType.INCOME, alert.type)
+        assertEquals("EMPLOYER LTD", alert.payee)
+    }
+
+    @Test
+    fun `a refund is money in`() {
+        assertEquals(TransactionType.INCOME, read(null, "Refund of £9.99 from Amazon")!!.type)
+    }
+
+    @Test
+    fun `sending money to a person`() {
+        val alert = read(null, "You sent £30.00 to Ross Evans from your account")!!
+        assertEquals(TransactionType.EXPENSE, alert.type)
+        assertEquals("Ross Evans", alert.payee)
+    }
+
+    @Test
+    fun `a time is not the shop`() {
+        val alert = read(null, "You spent £3.10 at 10:23 at Greggs")!!
+        assertEquals("Greggs", alert.payee)
+    }
+
+    @Test
+    fun `wallet style puts the shop in the title`() {
+        val alert = read("Tesco Express", "£8.40 with Visa •••• 4321")
+        // No direction word: read nothing rather than guess.
+        assertNull(alert)
+        val paid = read("Tesco Express", "Paid £8.40 with Visa •••• 4321")!!
+        assertEquals("Tesco Express", paid.payee)
+        assertEquals("4321", paid.ending)
+    }
+
+    @Test
+    fun `no name falls back to a plain description`() {
+        assertEquals("Card payment", read("Nationwide", "Card payment of £5.00")!!.payee)
+    }
+
+    @Test
+    fun `things that are not payments are ignored`() {
+        assertNull(read("Nationwide", "Your one-time passcode is 123456. Never share it."))
+        assertNull(read(null, "Your card payment of £50.00 at ASOS was declined"))
+        assertNull(read(null, "A Direct Debit of £45.00 to British Gas will be taken tomorrow"))
+        assertNull(read(null, "Your balance is £840.10"))
+        assertNull(read(null, "Hannah requested £10.00 from you"))
+        assertNull(read(null, "Your statement is ready to view"))
+        assertNull(read(null, "Approve your payment of £20.00 to Amazon in the app"))
+        assertNull(read("Lloyds", "Log in to see your latest offers"))
+    }
+}

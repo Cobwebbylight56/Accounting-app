@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.AutoFixHigh
 import androidx.compose.material.icons.outlined.Backup
+import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.Dashboard
@@ -67,6 +68,7 @@ fun SettingsScreen(
     onOpenCategories: () -> Unit,
     onOpenImport: () -> Unit,
     onOpenSortEverything: () -> Unit = {},
+    onOpenLivePayments: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -137,6 +139,16 @@ fun SettingsScreen(
             )
 
             SettingsGroupHeader("Your data")
+            SettingsItem(
+                title = "Live payments",
+                subtitle = if (state.settings.liveAlerts) {
+                    "On: payments added from your bank's alerts as they happen"
+                } else {
+                    "Off: add payments the moment your bank alerts you"
+                },
+                icon = Icons.Outlined.Bolt,
+                onClick = onOpenLivePayments,
+            )
             SettingsItem(
                 title = "Sort everything",
                 subtitle = "Go through all your entries and put each in the right place",

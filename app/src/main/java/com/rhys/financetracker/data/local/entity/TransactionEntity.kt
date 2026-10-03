@@ -120,7 +120,7 @@ data class TransactionEntity(
             categoryId != null && when (source) {
                 RecordSource.MANUAL, RecordSource.SPREADSHEET -> true
                 RecordSource.UNKNOWN -> importHash == null
-                RecordSource.STATEMENT -> false
+                RecordSource.STATEMENT, RecordSource.LIVE -> false
             }
     }
 

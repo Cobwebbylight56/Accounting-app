@@ -58,7 +58,7 @@ import kotlinx.coroutines.launch
 /** Shared scaffold for the settings sub-screens. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SettingsSubScreen(
+internal fun SettingsSubScreen(
     title: String,
     onBack: () -> Unit,
     snackbarHostState: SnackbarHostState,

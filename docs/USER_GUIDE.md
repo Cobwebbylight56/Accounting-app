@@ -497,6 +497,46 @@ as money coming back.
 held are recognised — ones now read with their shop's name are updated in
 place, not added twice — and the payments that were missed are added.
 
+### Live payments from your bank's alerts
+
+Rather than waiting for the statement, the app can add a payment the moment
+your banking app's alert says money moved — "You spent £12.50 at Tesco",
+"£250 received from H Payne". Turn it on in **Settings → Live payments**:
+
+1. Switch on **Add payments from bank alerts**.
+2. Tap **Allow notification access**, find Finance Tracker in Android's list,
+   turn it on and come back. (Payment alerts also have to be switched on in
+   your banking app.)
+
+Each payment is filed into a category just like a statement line, goes into
+the right account, and shows on Home and Spending straight away. The page
+shows the last one added.
+
+**Which account.** By default a payment goes to an account with the card's
+last four digits in its name, then one named after the bank ("Nationwide"),
+then your main account. To choose, pick an account next to each banking app
+on the Live payments page.
+
+**When the statement comes.** Import it as usual. Each live payment is matched
+to the bank's line for it and replaced by that line — the bank's date and
+wording win — so nothing is counted twice.
+
+**Good to know.**
+* Nationwide, Lloyds, Halifax, Bank of Scotland, Barclays, HSBC, first direct,
+  NatWest, RBS, Santander, Monzo, Starling, Revolut, Chase, American Express
+  and Google Wallet are read. Another app whose alert looks like a payment is
+  listed under **Other apps that sent payment alerts**, and is only read if
+  you switch it on. Text messages, WhatsApp and email are never read.
+* Direct Debits and standing orders often send no alert; they still come in
+  with the statement.
+* Security codes, declined payments, reminders about payments still to come
+  and balance alerts are ignored.
+* Two alerts for the same amount within a few minutes (your bank and Google
+  Wallet telling you about one payment) are added once.
+* Everything happens on the phone. Nothing is sent anywhere, and an alert
+  that isn't a payment is never kept. Switch it off, or take the access away
+  in Android's settings, to stop.
+
 ### Bills found in statements
 
 After a statement is imported, the finished screen lists **regular payments

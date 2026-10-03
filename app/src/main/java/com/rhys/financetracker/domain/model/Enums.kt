@@ -95,6 +95,12 @@ enum class RecordSource(val displayName: String) {
     MANUAL("Typed in"),
     SPREADSHEET("From a spreadsheet"),
     STATEMENT("From a bank statement"),
+
+    /**
+     * Added the moment a banking app's alert said money moved. Stands in
+     * until the statement arrives, which then replaces it.
+     */
+    LIVE("From a bank alert"),
     ;
 
     /** True when [other] should be allowed to overwrite a record from here. */

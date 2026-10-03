@@ -989,6 +989,24 @@ interface TransactionDao {
     )
     suspend fun fileAsSavings(accountId: Long, savingsCategoryId: Long, updatedAt: Long): Int
 
+    /** How many entries carry [hash]; used to tell a re-posted bank alert from a new one. */
+    @Query("SELECT COUNT(*) FROM transactions WHERE import_hash = :hash")
+    suspend fun countWithHash(hash: String): Int
+
+    /**
+     * Payments of this amount and direction added from bank alerts since
+     * [since] (epoch millis): the same payment told twice, by the bank and
+     * by Google Wallet, arrives within moments. [type] is the TransactionType name.
+     */
+    @Query(
+        """
+        SELECT COUNT(*) FROM transactions
+        WHERE source = 'LIVE' AND is_archived = 0
+          AND amount_minor = :amountMinor AND type = :type AND created_at >= :since
+        """,
+    )
+    suspend fun countRecentLive(amountMinor: Long, type: String, since: Long): Int
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(transaction: TransactionEntity): Long
 

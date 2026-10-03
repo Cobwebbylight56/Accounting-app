@@ -13,6 +13,14 @@
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- Lets Live payments show which banking apps are on the phone. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
     <application
         android:name=".FinanceApp"
         android:allowBackup="false"
@@ -101,6 +109,20 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
+
+        <!--
+            Live payments: reads banking apps' alerts once the user gives the app
+            notification access and turns Live payments on in Settings.
+        -->
+        <service
+            android:name=".data.live.BankAlertListener"
+            android:exported="true"
+            android:label="Finance Tracker live payments"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
 
         <!-- Shares generated PDF/CSV/XLSX files with other apps. -->
         <provider
