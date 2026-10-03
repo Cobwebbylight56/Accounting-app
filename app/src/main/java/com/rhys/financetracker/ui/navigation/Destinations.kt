@@ -73,7 +73,8 @@ object Routes {
     /** `0` means "create a new one". */
     const val NEW_ID = 0L
 
-    fun transactionEdit(id: Long = NEW_ID): String = "$TRANSACTION_EDIT/$id"
+    fun transactionEdit(id: Long = NEW_ID, startType: com.rhys.financetracker.domain.model.TransactionType? = null): String =
+        "$TRANSACTION_EDIT/$id" + (startType?.let { "?$ARG_START_TYPE=${it.name}" } ?: "")
     fun transactionSplit(id: Long): String = "$TRANSACTION_SPLIT/$id"
     fun accountEdit(id: Long = NEW_ID): String = "$ACCOUNT_EDIT/$id"
     fun accountView(id: Long): String = "$ACCOUNT_VIEW/$id"
@@ -104,7 +105,9 @@ object Routes {
     fun importForPerson(personId: Long): String = "$IMPORT?$ARG_PERSON_ID=$personId"
 
     /** Route patterns, with the argument placeholder Navigation expects. */
-    const val TRANSACTION_EDIT_PATTERN = "$TRANSACTION_EDIT/{$ARG_ID}"
+    /** A new payment can start as a particular type: "Move money" starts as a transfer. */
+    const val ARG_START_TYPE = "startType"
+    const val TRANSACTION_EDIT_PATTERN = "$TRANSACTION_EDIT/{$ARG_ID}?$ARG_START_TYPE={$ARG_START_TYPE}"
     const val TRANSACTION_SPLIT_PATTERN = "$TRANSACTION_SPLIT/{$ARG_ID}"
     const val ACCOUNT_EDIT_PATTERN = "$ACCOUNT_EDIT/{$ARG_ID}"
     const val ACCOUNT_VIEW_PATTERN = "$ACCOUNT_VIEW/{$ARG_ID}"

@@ -98,22 +98,10 @@ fun MoreScreen(
                 onClick = onOpenSortSpending,
             )
             SettingsItem(
-                title = "Scan a receipt",
-                subtitle = "Photo, picture or screenshot — read and kept with its payment",
-                icon = Icons.Outlined.ReceiptLong,
-                onClick = onScanReceipt,
-            )
-            SettingsItem(
                 title = "Credit cards",
                 subtitle = "What's owed on each card, what goes on it, its statements",
                 icon = Icons.Outlined.CreditCard,
                 onClick = onOpenCards,
-            )
-            SettingsItem(
-                title = "Import statements & spreadsheets",
-                subtitle = "Add a bank statement, or an Excel or CSV budget",
-                icon = Icons.Outlined.UploadFile,
-                onClick = onOpenImport,
             )
             SettingsItem(
                 title = "Settings",

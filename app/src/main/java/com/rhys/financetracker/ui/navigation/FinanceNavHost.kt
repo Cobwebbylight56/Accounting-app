@@ -229,6 +229,7 @@ private fun NavGraphBuilder.topLevelDestinations(
         DashboardScreen(
             onOpenTransaction = { navController.navigate(Routes.transactionEdit(it)) },
             onAddTransaction = { navController.navigate(Routes.transactionEdit()) },
+            addActions = addActions(navController),
             onOpenAccounts = { navController.navigate(Routes.ACCOUNTS) },
             onOpenRecurring = { navController.navigate(Routes.RECURRING) },
             onOpenSavings = { navController.navigateToTab(Routes.SAVINGS) },
@@ -248,6 +249,7 @@ private fun NavGraphBuilder.topLevelDestinations(
 
     composable(Routes.SPENDING) {
         com.rhys.financetracker.ui.spending.SpendingScreen(
+            addActions = addActions(navController),
             onOpenLedger = { navController.navigate(Routes.LEDGER) },
             onOpenSubscriptions = { navController.navigate(Routes.SUBSCRIPTIONS) },
             onOpenPeopleMoney = { navController.navigate(Routes.SENT_TO_PEOPLE) },
@@ -279,6 +281,7 @@ private fun NavGraphBuilder.topLevelDestinations(
             onAddTransaction = { navController.navigate(Routes.transactionEdit()) },
             onOpenImport = { navController.navigate(Routes.importForAccount()) },
             onShareFile = onShareFile,
+            addActions = addActions(navController),
         )
     }
 
@@ -368,7 +371,14 @@ private fun NavGraphBuilder.editorDestinations(
 ) {
     composable(
         route = Routes.TRANSACTION_EDIT_PATTERN,
-        arguments = listOf(navArgument(Routes.ARG_ID) { type = NavType.StringType }),
+        arguments = listOf(
+            navArgument(Routes.ARG_ID) { type = NavType.StringType },
+            navArgument(Routes.ARG_START_TYPE) {
+                type = NavType.StringType
+                nullable = true
+                defaultValue = null
+            },
+        ),
     ) {
         TransactionEditScreen(
             onBack = { navController.popBackStack() },
@@ -615,3 +625,15 @@ private fun NavHostController.navigateToTab(route: String) {
         restoreState = true
     }
 }
+
+/** The + sheet's choices, the same wherever it is opened. */
+private fun addActions(navController: NavHostController) = com.rhys.financetracker.ui.components.AddActions(
+    payment = { navController.navigate(Routes.transactionEdit()) },
+    scan = { navController.navigate(Routes.receiptScan()) },
+    import = { navController.navigate(Routes.importForAccount()) },
+    move = {
+        navController.navigate(
+            Routes.transactionEdit(startType = com.rhys.financetracker.domain.model.TransactionType.TRANSFER),
+        )
+    },
+)

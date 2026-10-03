@@ -289,6 +289,7 @@ class SpendingViewModel @Inject constructor(
 @Composable
 fun SpendingScreen(
     onOpenLedger: () -> Unit,
+    addActions: com.rhys.financetracker.ui.components.AddActions? = null,
     onOpenSubscriptions: () -> Unit = {},
     onOpenPeopleMoney: () -> Unit = {},
     onOpenAdvice: () -> Unit = {},
@@ -302,6 +303,7 @@ fun SpendingScreen(
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Spending") }) },
+        floatingActionButton = { addActions?.let { com.rhys.financetracker.ui.components.AddButton(it) } },
         // The month sits at the bottom, under the thumb, wherever the page is
         // scrolled to; a swipe across the page steps it too.
         bottomBar = {

@@ -54,6 +54,10 @@ class TransactionEditViewModel @Inject constructor(
     val transactionId: Long = savedStateHandle.get<String>(Routes.ARG_ID)?.toLongOrNull()
         ?: Routes.NEW_ID
 
+    /** What a new entry starts as: a transfer when it came from "Move money". */
+    private val startType: TransactionType? = savedStateHandle.get<String>(Routes.ARG_START_TYPE)
+        ?.let { name -> TransactionType.entries.firstOrNull { it.name == name } }
+
     private val form = MutableStateFlow(TransactionForm())
 
     /** The parts this payment is split into, if it is split. */
@@ -119,6 +123,7 @@ class TransactionEditViewModel @Inject constructor(
         val defaults = accountRepository.observeActiveOptions().first()
         if (transactionId == Routes.NEW_ID) {
             form.value = TransactionForm(
+                type = startType ?: TransactionType.EXPENSE,
                 date = DateUtils.today(),
                 accountId = defaults.firstOrNull()?.id,
             )

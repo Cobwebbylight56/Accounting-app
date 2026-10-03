@@ -65,6 +65,7 @@ import com.rhys.financetracker.ui.components.StatTile
 fun DashboardScreen(
     onOpenTransaction: (Long) -> Unit,
     onAddTransaction: () -> Unit,
+    addActions: com.rhys.financetracker.ui.components.AddActions? = null,
     onOpenAccounts: () -> Unit,
     onOpenRecurring: () -> Unit,
     onOpenSavings: () -> Unit,
@@ -128,8 +129,12 @@ fun DashboardScreen(
         // had no way to do it in one tap.
         floatingActionButton = {
             if (showsHome) {
-                androidx.compose.material3.FloatingActionButton(onClick = onAddTransaction) {
-                    Icon(Icons.Default.Add, contentDescription = "Add a payment")
+                if (addActions != null) {
+                    com.rhys.financetracker.ui.components.AddButton(addActions)
+                } else {
+                    androidx.compose.material3.FloatingActionButton(onClick = onAddTransaction) {
+                        Icon(Icons.Default.Add, contentDescription = "Add a payment")
+                    }
                 }
             }
         },

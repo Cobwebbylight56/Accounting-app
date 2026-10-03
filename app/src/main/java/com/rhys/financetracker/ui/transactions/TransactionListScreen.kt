@@ -85,6 +85,7 @@ fun TransactionListScreen(
     onShareFile: (com.rhys.financetracker.data.export.ExportedFile) -> Unit,
     /** Set when opened from another page: shows a back arrow, and back returns there. */
     onBack: (() -> Unit)? = null,
+    addActions: com.rhys.financetracker.ui.components.AddActions? = null,
     viewModel: TransactionListViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -163,17 +164,6 @@ fun TransactionListScreen(
                             expanded = showMenu,
                             onDismissRequest = { showMenu = false },
                         ) {
-                            // Sits with the exports because this is the screen
-                            // you are on when you think about transactions
-                            // arriving, not Settings.
-                            DropdownMenuItem(
-                                text = { Text("Import a bank statement") },
-                                onClick = {
-                                    onOpenImport()
-                                    showMenu = false
-                                },
-                            )
-                            HorizontalDivider()
                             DropdownMenuItem(
                                 text = { Text("Export as CSV") },
                                 onClick = {
@@ -214,11 +204,15 @@ fun TransactionListScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = onAddTransaction,
-                text = { Text("Add") },
-                icon = { Icon(Icons.Default.Add, contentDescription = null) },
-            )
+            if (addActions != null) {
+                com.rhys.financetracker.ui.components.AddButton(addActions)
+            } else {
+                ExtendedFloatingActionButton(
+                    onClick = onAddTransaction,
+                    text = { Text("Add") },
+                    icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                )
+            }
         },
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
