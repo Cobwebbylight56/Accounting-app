@@ -125,7 +125,7 @@ class TransactionEditViewModel @Inject constructor(
             return
         }
         val existing = transactionRepository.get(transactionId) ?: run {
-            message.value = "That transaction no longer exists"
+            message.value = "That payment no longer exists"
             return
         }
         loaded = existing

@@ -135,7 +135,7 @@ fun TransactionListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (onBack != null) "Payments" else "Money") },
+                title = { Text("Payments") },
                 navigationIcon = {
                     if (onBack != null) {
                         IconButton(onClick = onBack) {
@@ -245,10 +245,10 @@ fun TransactionListScreen(
 
                 state.transactions.isEmpty() -> EmptyState(
                     icon = Icons.Outlined.ReceiptLong,
-                    title = "No transactions yet",
+                    title = "No payments yet",
                     message = "Everything you spend and receive will appear here. Regular " +
                         "bills are added for you once you set them up.",
-                    actionLabel = "Add a transaction",
+                    actionLabel = "Add a payment",
                     onAction = onAddTransaction,
                 )
 

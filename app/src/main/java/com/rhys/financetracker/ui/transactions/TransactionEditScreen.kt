@@ -70,7 +70,7 @@ fun TransactionEditScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (state.isNew) "New transaction" else "Edit transaction") },
+                title = { Text(if (state.isNew) "New payment" else "Edit payment") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -286,14 +286,14 @@ fun TransactionEditScreen(
                 onClick = viewModel::save,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
             ) {
-                Text(if (state.isNew) "Add transaction" else "Save changes")
+                Text(if (state.isNew) "Add payment" else "Save changes")
             }
         }
     }
 
     if (showDeleteConfirm) {
         ConfirmDialog(
-            title = "Delete this transaction?",
+            title = "Delete this payment?",
             message = "It will be removed permanently and your totals will change. " +
                 "Archiving keeps it in your history but hides it from lists.",
             confirmLabel = "Delete",

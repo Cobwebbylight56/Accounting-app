@@ -192,7 +192,7 @@ fun PeopleScreen(
     if (pendingDelete != 0L) {
         ConfirmDialog(
             title = "Delete this person?",
-            message = "Their accounts and transactions are kept but will no longer be " +
+            message = "Their accounts and payments are kept but will no longer be " +
                 "assigned to anyone.",
             confirmLabel = "Delete",
             isDestructive = true,

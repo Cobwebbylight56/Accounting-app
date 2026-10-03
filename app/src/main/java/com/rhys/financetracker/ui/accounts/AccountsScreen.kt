@@ -275,7 +275,7 @@ fun AccountsScreen(
     if (pendingDelete != 0L) {
         ConfirmDialog(
             title = "Delete this account?",
-            message = "Every transaction on this account will be deleted too, and your " +
+            message = "Every payment on this account will be deleted too, and your " +
                 "history will change. Archiving hides it while keeping all of that intact.",
             confirmLabel = "Delete everything",
             isDestructive = true,

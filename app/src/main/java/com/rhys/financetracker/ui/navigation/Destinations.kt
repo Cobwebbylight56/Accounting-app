@@ -134,7 +134,7 @@ enum class TopLevelDestination(
 ) {
     DASHBOARD(Routes.DASHBOARD, "Home", Icons.Outlined.Home),
     SPENDING(Routes.SPENDING, "Spending", Icons.Outlined.PieChart),
-    TRANSACTIONS(Routes.TRANSACTIONS, "Money", Icons.Outlined.ReceiptLong),
+    TRANSACTIONS(Routes.TRANSACTIONS, "Payments", Icons.Outlined.ReceiptLong),
     SAVINGS(Routes.SAVINGS, "Savings", Icons.Outlined.Savings),
     REPORTS(Routes.REPORTS, "Reports", Icons.Outlined.Assessment),
     MORE(Routes.MORE, "More", Icons.Outlined.MoreHoriz),

@@ -290,6 +290,8 @@ class SpendingViewModel @Inject constructor(
 fun SpendingScreen(
     onOpenLedger: () -> Unit,
     onOpenSubscriptions: () -> Unit = {},
+    onOpenPeopleMoney: () -> Unit = {},
+    onOpenAdvice: () -> Unit = {},
     viewModel: SpendingViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -382,9 +384,16 @@ fun SpendingScreen(
                 }
             }
 
+            // The deeper looks at spending, in one place rather than spread
+            // across More and Home.
             item {
-                androidx.compose.material3.OutlinedButton(onClick = onOpenSubscriptions, modifier = Modifier.fillMaxWidth()) {
-                    Text("Subscriptions — what's still being paid")
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    androidx.compose.material3.AssistChip(onClick = onOpenSubscriptions, label = { Text("Bills & subscriptions") })
+                    androidx.compose.material3.AssistChip(onClick = onOpenPeopleMoney, label = { Text("Money with people") })
+                    androidx.compose.material3.AssistChip(onClick = onOpenAdvice, label = { Text("Ideas to save") })
                 }
             }
 

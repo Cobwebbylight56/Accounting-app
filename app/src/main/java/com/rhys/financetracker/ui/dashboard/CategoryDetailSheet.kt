@@ -111,7 +111,7 @@ fun CategoryDetailSheet(
 
             Text(
                 text = "${detail.transactions.size} " +
-                    if (detail.transactions.size == 1) "entry" else "entries",
+                    if (detail.transactions.size == 1) "payment" else "payments",
                 style = MaterialTheme.typography.titleSmall,
             )
 

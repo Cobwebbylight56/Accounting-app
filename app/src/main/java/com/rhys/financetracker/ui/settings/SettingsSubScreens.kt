@@ -480,7 +480,7 @@ fun BackupSettingsScreen(
         }
 
         SettingsNote(
-            "A backup is a plain, readable JSON file containing every account, transaction, " +
+            "A backup is a plain, readable JSON file containing every account, payment, " +
                 "regular payment and goal. Anyone who can open the file can read your " +
                 "finances, so keep it somewhere private.",
         )

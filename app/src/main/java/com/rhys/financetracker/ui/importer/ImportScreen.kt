@@ -436,7 +436,7 @@ private fun DetectedStatementCard(state: ImportState, viewModel: ImportViewModel
 
     SectionCard(
         title = "This looks like a bank statement",
-        subtitle = "Import it as transactions",
+        subtitle = "Import it as payments",
     ) {
         Text(
             text = "Dates, descriptions and amounts were found. Rows already in " +
@@ -1500,7 +1500,7 @@ private fun DoneStep(
                     Text("${it.recurringCreated} regular payments added")
                 }
                 if (it.transactionsCreated > 0) {
-                    Text("${it.transactionsCreated} transactions added")
+                    Text("${it.transactionsCreated} payments added")
                 }
                 if (it.transactionsUpdated > 0) {
                     Text("${it.transactionsUpdated} entries updated from the statement")

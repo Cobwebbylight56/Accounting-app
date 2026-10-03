@@ -151,7 +151,7 @@ fun CategoriesScreen(
     if (pendingDelete != 0L) {
         ConfirmDialog(
             title = "Delete this category?",
-            message = "Transactions that used it stay exactly as they are — they simply " +
+            message = "Payments that used it stay exactly as they are — they simply " +
                 "become uncategorised, so no money disappears from your reports.",
             confirmLabel = "Delete",
             isDestructive = true,

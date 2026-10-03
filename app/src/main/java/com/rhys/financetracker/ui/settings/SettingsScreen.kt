@@ -150,12 +150,6 @@ fun SettingsScreen(
                 onClick = onOpenLivePayments,
             )
             SettingsItem(
-                title = "Sort everything",
-                subtitle = "Go through all your entries and put each in the right place",
-                icon = Icons.Outlined.AutoFixHigh,
-                onClick = onOpenSortEverything,
-            )
-            SettingsItem(
                 title = "Backup and restore",
                 subtitle = state.settings.lastBackupAt?.let {
                     "Last backup " + DateUtils.format(
@@ -187,7 +181,7 @@ fun SettingsScreen(
             )
             SettingsItem(
                 title = "Rebuild the monthly archive",
-                subtitle = "Recalculates every archived month from your transactions",
+                subtitle = "Recalculates every archived month from your payments",
                 icon = Icons.Outlined.Refresh,
                 onClick = viewModel::rebuildArchive,
             )
@@ -203,7 +197,7 @@ fun SettingsScreen(
             }
             SettingsItem(
                 title = "Delete everything",
-                subtitle = "Clears all accounts, transactions and goals",
+                subtitle = "Clears all accounts, payments and goals",
                 icon = Icons.Outlined.DeleteForever,
                 onClick = { showClearConfirm = true },
             )
@@ -246,7 +240,7 @@ fun SettingsScreen(
     if (showClearConfirm) {
         ConfirmDialog(
             title = "Delete everything?",
-            message = "Every account, transaction, regular payment and savings goal will be " +
+            message = "Every account, payment, regular payment and savings goal will be " +
                 "removed. This cannot be undone. Take a backup first if you are not sure.",
             confirmLabel = "Delete everything",
             isDestructive = true,

@@ -104,28 +104,10 @@ fun MoreScreen(
                 onClick = onScanReceipt,
             )
             SettingsItem(
-                title = "Subscriptions",
-                subtitle = "What you pay every month, and which have stopped",
-                icon = Icons.Outlined.EventRepeat,
-                onClick = onOpenSubscriptions,
-            )
-            SettingsItem(
                 title = "Credit cards",
                 subtitle = "What's owed on each card, what goes on it, its statements",
                 icon = Icons.Outlined.CreditCard,
                 onClick = onOpenCards,
-            )
-            SettingsItem(
-                title = "Money with people",
-                subtitle = "What you sent each person and what they sent you, month by month",
-                icon = Icons.Outlined.People,
-                onClick = onOpenSentToPeople,
-            )
-            SettingsItem(
-                title = "Advice",
-                subtitle = "Where you could spend less, and what is coming",
-                icon = Icons.Outlined.Lightbulb,
-                onClick = onOpenInsights,
             )
             SettingsItem(
                 title = "Import statements & spreadsheets",

@@ -247,7 +247,7 @@ class TransactionListViewModel @Inject constructor(
             when (val result = exportManager.exportTransactionsToCache(items, format)) {
                 is com.rhys.financetracker.core.result.AppResult.Success -> {
                     exported.value = result.data
-                    message.value = "${items.size} transactions exported"
+                    message.value = "${items.size} payments exported"
                 }
                 is com.rhys.financetracker.core.result.AppResult.Failure ->
                     message.value = result.message

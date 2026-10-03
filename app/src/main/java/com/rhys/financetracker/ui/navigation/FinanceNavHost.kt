@@ -250,6 +250,8 @@ private fun NavGraphBuilder.topLevelDestinations(
         com.rhys.financetracker.ui.spending.SpendingScreen(
             onOpenLedger = { navController.navigate(Routes.LEDGER) },
             onOpenSubscriptions = { navController.navigate(Routes.SUBSCRIPTIONS) },
+            onOpenPeopleMoney = { navController.navigate(Routes.SENT_TO_PEOPLE) },
+            onOpenAdvice = { navController.navigate(Routes.INSIGHTS) },
         )
     }
 
