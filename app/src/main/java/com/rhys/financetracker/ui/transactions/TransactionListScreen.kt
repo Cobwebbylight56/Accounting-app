@@ -389,14 +389,31 @@ private fun TransactionRow(
                     }
                     // The same small marks everywhere: from a bank alert
                     // (the statement will replace it), and has a receipt.
+                    // "Live": added the moment a bank or Google Wallet alert
+                    // said so; the statement replaces it when it comes in.
                     if (entry.source == com.rhys.financetracker.domain.model.RecordSource.LIVE) {
                         Spacer(Modifier.width(6.dp))
-                        Icon(
-                            androidx.compose.material.icons.Icons.Outlined.Bolt,
-                            contentDescription = "From a bank alert",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(16.dp),
-                        )
+                        Surface(
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            shape = MaterialTheme.shapes.small,
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(start = 3.dp, end = 6.dp, top = 1.dp, bottom = 1.dp),
+                            ) {
+                                Icon(
+                                    androidx.compose.material.icons.Icons.Outlined.Bolt,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.size(12.dp),
+                                )
+                                Text(
+                                    text = "Live",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                )
+                            }
+                        }
                     }
                     if (item.receiptCount > 0) {
                         Spacer(Modifier.width(4.dp))

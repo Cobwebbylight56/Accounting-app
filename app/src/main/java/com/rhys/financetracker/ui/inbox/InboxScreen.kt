@@ -38,6 +38,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -212,7 +213,7 @@ class InboxViewModel @Inject constructor(
                 add(
                     InboxItem(
                         InboxItem.Kind.SUBSCRIPTION_MISSED,
-                        title = "${missed.size} ${if (missed.size == 1) "subscription" else "subscriptions"} may have stopped",
+                        title = "${missed.size} ${if (missed.size == 1) "regular payment" else "regular payments"} may have stopped",
                         detail = missed.take(MONTHS_NAMED).joinToString(", ") { it.name } + " missed a payment.",
                         action = "See",
                     ),
@@ -251,6 +252,16 @@ class InboxViewModel @Inject constructor(
         }
     }
 
+    /** Whether the pop-up may open with the app: not hidden for the week. */
+    val popupAllowed: StateFlow<Boolean> = settingsRepository.settings
+        .map { s -> s.needsLookSnoozedUntil == null || System.currentTimeMillis() > s.needsLookSnoozedUntil }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    /** Keeps the pop-up away for a week; Home's line still shows. */
+    fun hideForAWeek() {
+        viewModelScope.launch { settingsRepository.snoozeNeedsALook(System.currentTimeMillis() + WEEK_MS) }
+    }
+
     fun second(item: InboxItem) {
         when (item.kind) {
             InboxItem.Kind.RESORTED -> viewModelScope.launch { tidyUp.undoLastResort() }
@@ -268,6 +279,7 @@ class InboxViewModel @Inject constructor(
         const val MONTHS_NAMED = 3
         const val BACKUP_AFTER_MS = 14L * 24 * 60 * 60 * 1000
         const val SNOOZE_MS = 7L * 24 * 60 * 60 * 1000
+        const val WEEK_MS = 7L * 24 * 60 * 60 * 1000
     }
 }
 
@@ -279,6 +291,108 @@ private fun iconFor(kind: InboxItem.Kind): ImageVector = when (kind) {
     InboxItem.Kind.MISSING_STATEMENT -> Icons.Outlined.CalendarMonth
     InboxItem.Kind.SUBSCRIPTION_MISSED -> Icons.Outlined.Subscriptions
     InboxItem.Kind.BACKUP -> Icons.Outlined.Backup
+}
+
+/** Once per time the app runs: the pop-up does not come back on every visit to Home. */
+private object PopupShown {
+    var thisRun = false
+}
+
+/**
+ * Needs a look, as a pop-up when the app opens — after the opening animation
+ * and the lock — unless hidden for the week. Each thing is a tap away.
+ */
+@Composable
+fun NeedsALookPopup(
+    routes: InboxRoutes,
+    onOpenInbox: () -> Unit,
+    viewModel: InboxViewModel = hiltViewModel(),
+) {
+    val items by viewModel.items.collectAsStateWithLifecycle()
+    val allowed by viewModel.popupAllowed.collectAsStateWithLifecycle()
+    val introShowing = com.rhys.financetracker.ui.components.LocalIntroShowing.current
+    var open by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(items.isNotEmpty(), allowed, introShowing) {
+        if (!PopupShown.thisRun && items.isNotEmpty() && allowed && !introShowing) {
+            // A moment for Home to settle before anything pops over it.
+            kotlinx.coroutines.delay(POPUP_DELAY_MS)
+            PopupShown.thisRun = true
+            open = true
+        }
+    }
+    if (!open) return
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = { open = false },
+        title = { Text(if (items.size == 1) "1 thing needs a look" else "${items.size} things need a look") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                items.take(POPUP_SHOWN).forEach { item ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                open = false
+                                viewModel.act(item, routes)
+                            }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        InboxIcon(item.kind)
+                        Spacer(Modifier.width(10.dp))
+                        Text(item.title, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                        Text(item.action, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+                if (items.size > POPUP_SHOWN) {
+                    TextButton(onClick = {
+                        open = false
+                        onOpenInbox()
+                    }) { Text("See all ${items.size}") }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { open = false }) { Text("Not now") }
+        },
+        dismissButton = {
+            TextButton(onClick = {
+                viewModel.hideForAWeek()
+                open = false
+            }) { Text("Hide for a week") }
+        },
+    )
+}
+
+private const val POPUP_SHOWN = 5
+private const val POPUP_DELAY_MS = 600L
+
+/** One slim line on Home: how many things need a look, a tap from the list. Nothing when all is well. */
+@Composable
+fun NeedsALookLine(onOpenInbox: () -> Unit, viewModel: InboxViewModel = hiltViewModel()) {
+    val items by viewModel.items.collectAsStateWithLifecycle()
+    if (items.isEmpty()) return
+    androidx.compose.material3.Surface(
+        onClick = onOpenInbox,
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            InboxIcon(items.first().kind)
+            Spacer(Modifier.width(12.dp))
+            Text(
+                if (items.size == 1) "1 thing needs a look" else "${items.size} things need a look",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = "See them",
+                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+        }
+    }
 }
 
 /** The "Needs a look" card on Home: the first few things, and the way to all of them. Nothing when all is well. */

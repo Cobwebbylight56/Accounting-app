@@ -46,6 +46,9 @@ object SubscriptionTracker {
 
         /** And per month, for adding up. */
         val monthlyMinor: Long get() = yearlyMinor / 12
+
+        /** Netflix, Audible, Claude: a subscription, rather than a bill for a service like insurance. */
+        val isSubscription: Boolean get() = SubscriptionKinds.isSubscription(name, categoryName)
     }
 
     /**

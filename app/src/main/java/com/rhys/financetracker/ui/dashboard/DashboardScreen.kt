@@ -118,6 +118,29 @@ fun DashboardScreen(
 
     // The cash buttons change a number further up the card, which is easy to
     // miss on a screen this busy — so what happened is said outright.
+    // Needs a look, popping up when the app opens (unless hidden for the week).
+    if (inboxRoutes != null) {
+        com.rhys.financetracker.ui.inbox.NeedsALookPopup(routes = inboxRoutes, onOpenInbox = onOpenInbox)
+    }
+
+    // When the app learned new shops and re-sorted what it had filed itself:
+    // a brief note of how many moved, with Undo.
+    val introShowing = com.rhys.financetracker.ui.components.LocalIntroShowing.current
+    LaunchedEffect(resortNote, introShowing) {
+        val note = resortNote ?: return@LaunchedEffect
+        if (introShowing) return@LaunchedEffect
+        val result = snackbar.showSnackbar(
+            message = "Re-sorted ${note.moved} ${if (note.moved == 1) "payment" else "payments"} into better categories",
+            actionLabel = "Undo",
+            duration = androidx.compose.material3.SnackbarDuration.Long,
+        )
+        if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+            viewModel.undoResort()
+        } else {
+            viewModel.dismissResortNote()
+        }
+    }
+
     LaunchedEffect(message) {
         message?.let {
             snackbar.showSnackbar(it)
@@ -200,8 +223,9 @@ fun DashboardScreen(
 
                 // Everything that needs a look, in one card: re-sorts, payments
                 // to check or sort, missing statements, the backup reminder.
+                // One slim line here; the full list pops up when the app opens.
                 if (inboxRoutes != null) {
-                    item { com.rhys.financetracker.ui.inbox.NeedsALookCard(routes = inboxRoutes, onOpenInbox = onOpenInbox) }
+                    item { com.rhys.financetracker.ui.inbox.NeedsALookLine(onOpenInbox = onOpenInbox) }
                 }
 
                 item {

@@ -22,12 +22,21 @@ every way to add money: **A payment**, **Scan a receipt or screenshot**,
 **Import a statement**, and **Move money** (between your own accounts, or to or
 from a person).
 
-**Needs a look** on Home gathers everything that wants your attention in one
-card — payments to sort or check, payments from bank alerts still waiting for a
-statement, a missing statement month, a subscription that seems to have
-stopped, the backup reminder, the app's own re-sorting — each with one tap to
-deal with it. Tap **See all** (or **More → Needs a look**) for the full list and
-the tidying-up tools.
+**Needs a look** gathers everything that wants your attention — payments to
+sort or check, payments from bank alerts still waiting for a statement, a
+missing statement month, a regular payment that seems to have stopped, the
+backup reminder — each with one tap to deal with it. It pops up when the app
+opens; **Not now** closes it until next time, **Hide for a week** keeps it away
+for seven days. Home keeps a slim **N things need a look** line; tap it (or
+**More → Needs a look**) for the full list and the tidying-up tools.
+
+**Live** on a payment means it was added from a bank or Google Wallet alert,
+the moment it happened. When that month's statement is imported, the bank's
+line replaces it and the mark goes.
+
+**Re-sorting.** When an update teaches the app more shops, it re-files the
+payments it sorted itself (never ones you chose) and says so briefly — "Re-sorted
+12 payments into better categories" — with **Undo** to put them all back.
 
 **Get set up** on Home is a short checklist — people, accounts, a statement,
 live payments, a backup — ticked off as you do each. It goes once they are all
@@ -750,6 +759,13 @@ street chains, online shops (Amazon, eBay, Shein, Temu, ASOS…), cinemas,
 bowling, theme parks, ticket sites, pubs and takeaways.
 
 ### Bills & subscriptions
+
+**In your statements** has two filters: **Subscriptions** — things signed up
+to and easily cancelled, like Netflix, Audible, Claude or Uber One — and
+**Bills & services** — what the household needs, like insurance, the phone,
+broadband, TV, the car, council tax and energy. Each shows its own monthly
+total. A payment to a person (a window cleaner, say) counts as a service.
+
 
 **Bills & subscriptions → In your statements** (from the Spending tab or More) lists everything
 your statements show being paid at a steady rhythm — every week, month or year,

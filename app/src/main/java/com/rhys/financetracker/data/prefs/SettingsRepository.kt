@@ -79,6 +79,7 @@ class SettingsRepository @Inject constructor(
         val LIVE_STATEMENT_NUDGE = booleanPreferencesKey("live_statement_nudge")
         val LIVE_CARD_ACCOUNTS = stringPreferencesKey("live_card_accounts")
         val SETUP_HIDDEN = booleanPreferencesKey("setup_checklist_hidden")
+        val NEEDS_LOOK_SNOOZED_UNTIL = longPreferencesKey("needs_look_snoozed_until")
     }
 
     /** Defaults chosen so a fresh install is immediately usable and private. */
@@ -167,6 +168,7 @@ class SettingsRepository @Inject constructor(
             liveStatementNudge = prefs[Keys.LIVE_STATEMENT_NUDGE] ?: true,
             liveCardAccounts = cardAccountsOf(prefs[Keys.LIVE_CARD_ACCOUNTS]),
             setupChecklistHidden = prefs[Keys.SETUP_HIDDEN] ?: false,
+            needsLookSnoozedUntil = prefs[Keys.NEEDS_LOOK_SNOOZED_UNTIL],
         )
     }
 
@@ -314,6 +316,9 @@ class SettingsRepository @Inject constructor(
             parts[1].toLongOrNull()?.let { parts[0] to it }
         }.toMap()
 
+    /** Keeps the Needs a look pop-up from opening with the app until [until] (epoch millis). */
+    suspend fun snoozeNeedsALook(until: Long) = put(Keys.NEEDS_LOOK_SNOOZED_UNTIL, until)
+
     /** Hides the Get set up checklist on Home for good. */
     suspend fun hideSetupChecklist() = put(Keys.SETUP_HIDDEN, true)
 
@@ -421,6 +426,8 @@ data class AppSettings(
     val liveCardAccounts: Map<String, Long> = emptyMap(),
     /** The Get set up checklist was put away. */
     val setupChecklistHidden: Boolean = false,
+    /** The Needs a look pop-up stays away until then (epoch millis). */
+    val needsLookSnoozedUntil: Long? = null,
 ) {
     val isLockEnabled: Boolean get() = lockMethod != LockMethod.NONE
     val requiresPin: Boolean

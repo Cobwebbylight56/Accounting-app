@@ -30,6 +30,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -108,6 +110,7 @@ fun SubscriptionsScreen(
     viewModel: SubscriptionsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    var showSubscriptions by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(true) }
     Scaffold(
         contentWindowInsets = if (embedded) {
             androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0)
@@ -144,10 +147,27 @@ fun SubscriptionsScreen(
                 }
                 return@LazyColumn
             }
-            item { Summary(state) }
-            item { MonthlyGraph(state.subscriptions) }
+            // Subscriptions (Netflix, Audible, Claude) apart from bills for
+            // services the household needs (insurance, phone, car, council tax).
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    androidx.compose.material3.FilterChip(
+                        selected = showSubscriptions,
+                        onClick = { showSubscriptions = true },
+                        label = { Text("Subscriptions · ${state.subscriptions.count { it.isSubscription }}") },
+                    )
+                    androidx.compose.material3.FilterChip(
+                        selected = !showSubscriptions,
+                        onClick = { showSubscriptions = false },
+                        label = { Text("Bills & services · ${state.subscriptions.count { !it.isSubscription }}") },
+                    )
+                }
+            }
+            val shown = state.copy(subscriptions = state.subscriptions.filter { it.isSubscription == showSubscriptions })
+            item { Summary(shown, if (showSubscriptions) "subscription" else "bill") }
+            item { MonthlyGraph(shown.subscriptions) }
             Status.entries.forEach { status ->
-                val group = state.subscriptions.filter { it.status == status }
+                val group = shown.subscriptions.filter { it.status == status }
                 if (group.isEmpty()) return@forEach
                 item(key = "head-$status") {
                     Text(
@@ -183,7 +203,7 @@ fun SubscriptionsScreen(
 }
 
 @Composable
-private fun Summary(state: SubscriptionsState) {
+private fun Summary(state: SubscriptionsState, noun: String = "subscription") {
     SectionCard(title = "Still being paid") {
         Text(
             text = animatedMoney(state.monthlyMinor) + " a month",
@@ -192,7 +212,7 @@ private fun Summary(state: SubscriptionsState) {
         )
         Text(
             text = "${Money.format(state.monthlyMinor * 12)} a year across ${state.active.size} " +
-                (if (state.active.size == 1) "subscription" else "subscriptions") + ".",
+                (if (state.active.size == 1) noun else "${noun}s") + ".",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

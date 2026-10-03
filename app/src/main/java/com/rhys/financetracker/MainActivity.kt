@@ -124,13 +124,17 @@ class MainActivity : FragmentActivity() {
                                 )
                             } else {
                                 val pendingFile by incomingFile.collectAsStateWithLifecycle()
-                                FinanceNavHost(
-                                    onShareFile = ::shareFile,
-                                    // Consumed once, so returning to the app later
-                                    // does not re-open the same statement.
-                                    importFile = pendingFile,
-                                    onImportFileHandled = { incomingFile.value = null },
-                                )
+                                CompositionLocalProvider(
+                                    com.rhys.financetracker.ui.components.LocalIntroShowing provides introPlaying,
+                                ) {
+                                    FinanceNavHost(
+                                        onShareFile = ::shareFile,
+                                        // Consumed once, so returning to the app later
+                                        // does not re-open the same statement.
+                                        importFile = pendingFile,
+                                        onImportFileHandled = { incomingFile.value = null },
+                                    )
+                                }
                             }
                         }
                         // Drawn over everything, the lock screen included, and
