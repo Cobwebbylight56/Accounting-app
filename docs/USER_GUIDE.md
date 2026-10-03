@@ -5,18 +5,40 @@ knowledge.
 
 ---
 
-## The five tabs
+## Finding your way around
 
-Along the bottom of the screen:
+Along the bottom of the screen are five tabs:
 
 | Tab | What it is for |
 |---|---|
-| **Home** | The dashboard: what you have, what came in, what went out, what is still to pay |
-| **Money** | Every transaction, searchable and filterable |
-| **Spending** | Where the money went this month — by category, month by month, and who it went to |
-| **Savings** | Your savings accounts and cash pot (tap one to open it), then your goals |
-| **Reports** | Printable summaries and charts |
-| **More** | Accounts, people, regular payments, categories, import, settings |
+| **Home** | This month at a glance: what you have, what came in and went out, what needs a look, who you sent money to, what is coming up |
+| **Spending** | Where the money went — by category (split payments counted part by part), month by month, who it went to — with shortcuts to **Bills & subscriptions**, **Money with people** and **Ideas to save** |
+| **Payments** | Every payment, searchable and filterable |
+| **Accounts** | Where the money is kept: current accounts, savings, cards, loans and the mortgage, with shortcuts to **Savings goals** and **Credit cards** |
+| **More** | People, Bills & subscriptions, Needs a look, Reports & exports, Settings |
+
+**The + button** on Home, Spending and Payments opens one **Add** sheet with
+every way to add money: **A payment**, **Scan a receipt or screenshot**,
+**Import a statement**, and **Move money** (between your own accounts, or to or
+from a person).
+
+**Needs a look** on Home gathers everything that wants your attention in one
+card — payments to sort or check, payments from bank alerts still waiting for a
+statement, a missing statement month, a subscription that seems to have
+stopped, the backup reminder, the app's own re-sorting — each with one tap to
+deal with it. Tap **See all** (or **More → Needs a look**) for the full list and
+the tidying-up tools.
+
+**Get set up** on Home is a short checklist — people, accounts, a statement,
+live payments, a backup — ticked off as you do each. It goes once they are all
+done, or when you hide it.
+
+**Tapping a payment** opens its own page: the amount, date, category, account,
+where it came from, its receipts and photos, and any split. **Edit** and
+**Split across categories** are on that page.
+
+The month sits in a bar at the bottom of month-by-month pages — swipe left or
+right anywhere to change it.
 
 ---
 
@@ -59,7 +81,7 @@ history shows each change as before → after with the percentage.
 
 ### 2. Add the accounts
 
-**More → Accounts → +**
+**Accounts → +**
 
 Add every place your money sits: current accounts, savings, cash, the coin jar,
 credit cards, loans, the mortgage.
@@ -78,9 +100,9 @@ Credit cards, loans and mortgages are money you owe. Enter their balance as a
 **negative** number, and the app will show it as a debt and subtract it from
 your net worth.
 
-### 3. Add the regular payments
+### 3. Add the regular bills and salary
 
-**More → Regular payments → +**
+**More → Bills & subscriptions → Set up by you → +**
 
 This is the step that removes most of the work. Set up each thing that repeats:
 
@@ -125,7 +147,7 @@ putting by will actually get you there in time.
 
 ### Recording something
 
-**Money → Add**, or the **Add** button on the Home screen's "Recent" card.
+Tap **+** (on Home, Spending or Payments) and choose **A payment**, or **Move money** for a transfer.
 
 - **Expense** — money leaving.
 - **Income** — money arriving.
@@ -144,7 +166,7 @@ month's amount, which is why the tag is there.
 
 ### Finding something
 
-The search box at the top of **Money** looks at names, notes, tags, categories,
+The search box at the top of **Payments** looks at names, notes, tags, categories,
 accounts and people — so "hannah fuel" or "birthday" will find it, whichever
 field you typed it in.
 
@@ -193,7 +215,7 @@ The three-dot menu on any row offers:
 while a filter or search is narrowing the list, so it can never mean everything.
 
 Archived goals and regular payments are not lost: **Show archived** at the
-bottom of the Savings tab and of Regular payments lists them, with **Restore**.
+bottom of Savings goals and of Bills & subscriptions → Set up by you lists them, with **Restore**.
 
 ---
 
@@ -224,7 +246,7 @@ Spending by category, Income against spending, Accounts this month — start
 switched off; switch any back on here.
 
 Home also has a **+** button for adding a payment, a **People** card only when
-there's money with people that month, **Sort spending · N payments to file**
+there's money with people that month, **Needs a look** offers the payments to file
 only while there are some, and the cash pot only on tabs that count it (the
 Shared tab, or everybody).
 Each card is listed under the name it has on Home ("Coming up", "This month's
@@ -469,7 +491,7 @@ Tap an account (in Accounts, or on a person's page) to open its page:
 * **Statements** — the last year of months, each ✓ or *missing*, so a gap is
   obvious, and every statement imported with what it added and an **Undo**;
 * the balance at each of the last six month ends;
-* its latest payments, with **All payments** opening the Money tab on just
+* its latest payments, with **All payments** opening Payments on just
   this account.
 
 The pencil at the top edits the account; **Import statements** adds to it.
@@ -499,7 +521,7 @@ place, not added twice — and the payments that were missed are added.
 
 ### Receipts, photos and screenshots
 
-**Scan a receipt** (More → Scan a receipt, or **Scan a receipt instead** when
+**Scan a receipt** (**+ → Scan a receipt or screenshot**, or **Scan a receipt instead** when
 adding a payment): take a photo of a paper receipt, or choose a picture or a
 screenshot — an online order, a bank app, a till receipt. The shop, the total
 and the date are read off it on your phone (nothing is sent anywhere) and
@@ -647,7 +669,7 @@ asks to be confirmed each time; a fixed one is added on its day. Either way,
 when that month's statement is imported it updates the entry rather than adding
 a second one.
 
-**More → Regular payments → Find bills** looks through every statement imported so far.
+**More → Bills & subscriptions → Set up by you → Find bills** looks through every statement imported so far.
 
 A payment that was **returned, refunded or unpaid** ("RETURNED DD") is never
 offered as a bill. Bills seen only once are listed but left unticked — check
@@ -715,9 +737,9 @@ advice or Reports — opens a **Payments** page with a back arrow. Back (the
 arrow or the phone's own) returns to the page you came from, not to Home.
 Finishing an import goes back to where you started it, too.
 
-### Sort spending
+### Sorting payments
 
-**More → Sort spending** (or the button on Home) lists everything with no
+**Needs a look → Sort** (or **Sort payments by who they went to** at the foot of Needs a look) lists everything with no
 category, or only "Card spending", grouped by who it went to, biggest first.
 Tap a payee to see its payments, then **File all under a category** — shops,
 websites, outings, bills. Every payment to them is sorted at once, and new
@@ -727,9 +749,9 @@ The app also now knows many more shops, websites and outings by name — high
 street chains, online shops (Amazon, eBay, Shein, Temu, ASOS…), cinemas,
 bowling, theme parks, ticket sites, pubs and takeaways.
 
-### Subscriptions
+### Bills & subscriptions
 
-**More → Subscriptions** (or the button on the Spending tab) lists everything
+**Bills & subscriptions → In your statements** (from the Spending tab or More) lists everything
 your statements show being paid at a steady rhythm — every week, month or year,
 at much the same amount. Each row has a dot for each of the last twelve months
 it was paid in, so a gap stands out, and says which account or card pays it.
@@ -746,7 +768,7 @@ the graph shows what they came to each month. Tap one to see every payment.
 
 ### Credit cards
 
-**More → Credit cards** shows each credit card and pay-later account: what's
+**Accounts → Credit cards** shows each credit card and pay-later account: what's
 owed, how much of the limit that is (amber past three-quarters), what went on
 it this month and last, a graph of what was owed at each month end, and the
 subscriptions it pays. **Import statement** imports that card's statement
@@ -761,7 +783,7 @@ side by side, with the totals. It follows the tab you're on — a person's tab
 shows their accounts, the Shared tab the shared ones — and the month you're
 looking at. A person's own page has the same card for their accounts.
 
-**See all** (or **More → Money with people**) opens every person for the
+**See all** (or **Spending → Money with people**) opens every person for the
 month, with the month in the bar at the bottom (or swipe to change it), and the year's graph under the totals with
 that month picked out. Switch to **Whole year** to see the year at once: the totals say who sent more over the year, and **Through the year** draws
 it month by month — for everyone, or tap a name to see just them. The button in
@@ -796,9 +818,9 @@ Your choice is remembered for every month. Names are matched however the bank
 writes them — "J Smith", "John Smith", "Smith J" — so both sides land on one
 card.
 
-### Sort everything
+### Sorting everything again
 
-**Settings → Sort everything** (also under **More → Tools**) goes through every
+**Sort everything again**, at the foot of **Needs a look**, goes through every
 entry already in the app and puts it in the right place by today's rules, so
 you don't have to move things by hand:
 
@@ -822,7 +844,7 @@ payee. Run it again any time — after importing old statements, or after
 teaching it a few payees.
 
 **It happens by itself, too.** The app quietly remembers every payment whose
-category **you** set — by editing it, filing a payee in Sort spending or on the
+category **you** set — by editing it, filing a payee when sorting payments or on the
 People page, typing it in, or in your own spreadsheet. You never see this
 mark, but the app never moves those payments. Everything else it filed by
 itself is re-sorted automatically: when an update teaches it more shops, the
@@ -973,10 +995,10 @@ follows.
 
 ## Advice and what is coming
 
-**More → Advice**, or the Advice card on the home screen.
+**Spending → Ideas to save**, or the Advice card on Home.
 
 This is the part a spreadsheet cannot do. It looks at what you have recorded and
-says, in plain words (tap one about a category to open the Money tab on just
+says, in plain words (tap one about a category to open Payments on just
 those payments, for that month):
 
 - **Where spending has moved** — "You have spent £90 on takeaways this month —
@@ -1031,7 +1053,7 @@ carries the title and the period.
 
 See [IMPORT.md](IMPORT.md) for a step-by-step walkthrough.
 
-In short: **More → Import a spreadsheet**, then choose the file.
+In short: **+ → Import a statement**, then choose the spreadsheet.
 
 If your sheet has a column of figures for each person — the way the original
 "Book r and h" workbook is built — the app recognises that and offers to import
@@ -1116,7 +1138,7 @@ and the charts then appear straight away instead of drawing themselves in.
 - **Settings → What Home shows** — turn cards on and off and change their
   order.
 - **Settings → Appearance** — light or dark, wallpaper colours, larger text.
-- **More → Categories** — add, rename, recolour and group your own categories,
+- **More → Settings → Categories** — add, rename, recolour and group your own categories,
   with an optional monthly budget for each.
 
 Built-in categories can be renamed and recoloured but not deleted, because the

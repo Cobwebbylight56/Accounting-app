@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -371,7 +372,10 @@ fun SplitDropDown(
     var open by rememberSaveable(transactionId) { mutableStateOf(false) }
     Column {
         Row(
-            modifier = Modifier.clickable { open = !open }.padding(vertical = 2.dp),
+            modifier = Modifier
+                .clickable { open = !open }
+                .heightIn(min = 40.dp)
+                .padding(vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
