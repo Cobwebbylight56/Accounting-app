@@ -6,6 +6,7 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.rhys.financetracker.domain.model.Frequency
+import com.rhys.financetracker.domain.model.PaymentKind
 import com.rhys.financetracker.domain.model.RecurrenceMode
 import com.rhys.financetracker.domain.model.TransactionType
 import java.time.Instant
@@ -84,6 +85,8 @@ data class RecurringRuleEntity(
     @ColumnInfo(name = "reminder_days_before") val reminderDaysBefore: Int? = null,
     /** True for bills whose amount changes each time (energy, fuel). */
     @ColumnInfo(name = "is_variable_amount") val isVariableAmount: Boolean = false,
+    /** Direct debit, standing order, moving to savings…; null when not said. */
+    @ColumnInfo(name = "payment_kind") val paymentKind: PaymentKind? = null,
     val notes: String? = null,
     @ColumnInfo(name = "is_paused") val isPaused: Boolean = false,
     @ColumnInfo(name = "is_archived") val isArchived: Boolean = false,

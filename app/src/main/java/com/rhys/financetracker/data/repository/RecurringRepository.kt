@@ -5,11 +5,16 @@ import com.rhys.financetracker.core.result.runCatchingApp
 import com.rhys.financetracker.core.time.DateUtils
 import com.rhys.financetracker.core.validation.Validators
 import com.rhys.financetracker.data.local.dao.RecurringRuleDao
+import com.rhys.financetracker.data.local.dao.TransactionDao
 import com.rhys.financetracker.data.local.entity.RecurringRuleEntity
+import com.rhys.financetracker.data.local.entity.TransactionEntity
 import com.rhys.financetracker.data.local.projection.RecurringRuleWithDetails
 import com.rhys.financetracker.domain.model.Frequency
+import com.rhys.financetracker.domain.model.PaymentKind
+import com.rhys.financetracker.domain.model.RecurrenceMode
 import com.rhys.financetracker.domain.model.TransactionType
 import com.rhys.financetracker.domain.recurrence.RecurrenceCalculator
+import com.rhys.financetracker.domain.recurrence.RegularSchedule
 import java.time.Instant
 import java.time.LocalDate
 import javax.inject.Inject
@@ -19,6 +24,7 @@ import kotlinx.coroutines.flow.Flow
 @Singleton
 class RecurringRepository @Inject constructor(
     private val ruleDao: RecurringRuleDao,
+    private val transactionDao: TransactionDao,
 ) {
 
     fun observeAll(): Flow<List<RecurringRuleWithDetails>> = ruleDao.observeActiveWithDetails()
@@ -61,6 +67,71 @@ class RecurringRepository @Inject constructor(
                 prepared.id
             }
         }
+
+    /**
+     * Makes [payment] a regular one — a direct debit, a standing order, money
+     * moved to savings — so the app adds it by itself on its day from now on,
+     * with no statement needed. Changing one already regular keeps its place:
+     * nothing it has added is added again.
+     *
+     * @param day the day of the month it goes out on.
+     * @param addByItself false only reminds, the day before.
+     * @param amountChanges adds it marked "to check", for the real amount.
+     */
+    suspend fun makeRegular(
+        payment: TransactionEntity,
+        kind: PaymentKind,
+        frequency: Frequency,
+        day: Int,
+        addByItself: Boolean,
+        amountChanges: Boolean,
+        today: LocalDate = DateUtils.today(),
+    ): AppResult<Long> = runCatchingApp("Could not make this a regular payment") {
+        val existing = payment.recurringRuleId?.let { ruleDao.getById(it) }
+        val now = Instant.now().toEpochMilli()
+        val base = existing ?: RecurringRuleEntity(
+            name = payment.description.trim(),
+            amountMinor = payment.amountMinor,
+            type = payment.type,
+            frequency = frequency,
+            startDate = payment.date,
+            nextDueDate = payment.date,
+            accountId = payment.accountId,
+            transferAccountId = payment.transferAccountId,
+            categoryId = payment.categoryId,
+            personId = payment.personId,
+            savingsGoalId = payment.savingsGoalId,
+        )
+        val planned = RegularSchedule.plan(
+            rule = base.copy(
+                amountMinor = payment.amountMinor,
+                frequency = frequency,
+                interval = 1,
+                paymentKind = kind,
+                mode = if (addByItself) RecurrenceMode.AUTO_POST else RecurrenceMode.REMIND_ONLY,
+                reminderDaysBefore = base.reminderDaysBefore ?: (if (addByItself) null else 1),
+                isVariableAmount = amountChanges,
+                isPaused = false,
+                isArchived = false,
+                updatedAt = now,
+            ),
+            paid = payment.date,
+            day = day,
+            today = today,
+            doneUpTo = existing?.lastGeneratedDate,
+        )
+        validate(planned)
+        // Written as planned: save() would restart a new one from its first
+        // date and fill in every month since, which the statements already hold.
+        val id = if (existing == null) {
+            ruleDao.insert(planned)
+        } else {
+            ruleDao.update(planned)
+            existing.id
+        }
+        transactionDao.linkToRule(payment.id, id, now)
+        id
+    }
 
     suspend fun duplicate(id: Long): AppResult<Long> =
         runCatchingApp("Could not duplicate this recurring payment") {

@@ -19,6 +19,7 @@ import com.rhys.financetracker.data.repository.BillFinderRepository
 import com.rhys.financetracker.data.repository.RecurringRepository
 import com.rhys.financetracker.domain.model.CategoryKind
 import com.rhys.financetracker.domain.model.Frequency
+import com.rhys.financetracker.domain.model.PaymentKind
 import com.rhys.financetracker.domain.model.RecurrenceMode
 import com.rhys.financetracker.domain.model.TransactionType
 import com.rhys.financetracker.domain.recurrence.RecurrenceCalculator
@@ -247,6 +248,7 @@ class RecurringEditViewModel @Inject constructor(
                     mode = rule.mode,
                     reminderDaysText = rule.reminderDaysBefore?.toString().orEmpty(),
                     isVariableAmount = rule.isVariableAmount,
+                    paymentKind = rule.paymentKind,
                     isPaused = rule.isPaused,
                     notes = rule.notes.orEmpty(),
                     nextDueDate = rule.nextDueDate,
@@ -299,6 +301,8 @@ class RecurringEditViewModel @Inject constructor(
     fun save() {
         viewModelScope.launch {
             val current = form.value
+            // What the form doesn't show is kept as it was.
+            val original = if (ruleId == Routes.NEW_ID) null else recurringRepository.get(ruleId)
             val entity = RecurringRuleEntity(
                 id = if (ruleId == Routes.NEW_ID) 0L else ruleId,
                 name = current.name.trim(),
@@ -317,8 +321,13 @@ class RecurringEditViewModel @Inject constructor(
                 mode = current.mode,
                 reminderDaysBefore = current.reminderDaysText.toIntOrNull(),
                 isVariableAmount = current.isVariableAmount,
+                paymentKind = current.paymentKind,
                 isPaused = current.isPaused,
                 notes = current.notes.trim().takeIf { it.isNotEmpty() },
+                savingsGoalId = original?.savingsGoalId,
+                lastGeneratedDate = original?.lastGeneratedDate,
+                isArchived = original?.isArchived ?: false,
+                createdAt = original?.createdAt ?: java.time.Instant.now().toEpochMilli(),
             )
 
             if (entity.accountId == 0L) {
@@ -353,6 +362,7 @@ data class RecurringForm(
     val mode: RecurrenceMode = RecurrenceMode.AUTO_POST,
     val reminderDaysText: String = "3",
     val isVariableAmount: Boolean = false,
+    val paymentKind: PaymentKind? = null,
     val isPaused: Boolean = false,
     val notes: String = "",
     val nextDueDate: LocalDate? = null,

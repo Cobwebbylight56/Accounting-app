@@ -14,6 +14,7 @@ import com.rhys.financetracker.data.local.entity.TransactionEntity
 import com.rhys.financetracker.domain.model.AccountType
 import com.rhys.financetracker.domain.model.CategoryKind
 import com.rhys.financetracker.domain.model.Frequency
+import com.rhys.financetracker.domain.model.PaymentKind
 import com.rhys.financetracker.domain.model.Holding
 import com.rhys.financetracker.domain.model.RecurrenceMode
 import com.rhys.financetracker.domain.model.RecordSource
@@ -349,6 +350,7 @@ class BackupSerializer @Inject constructor() {
         put("mode", rule.mode.name)
         putOpt("reminderDaysBefore", rule.reminderDaysBefore)
         put("isVariableAmount", rule.isVariableAmount)
+        putOpt("paymentKind", rule.paymentKind?.name)
         putOpt("notes", rule.notes)
         put("isPaused", rule.isPaused)
         put("isArchived", rule.isArchived)
@@ -379,6 +381,7 @@ class BackupSerializer @Inject constructor() {
             mode = json.optEnum("mode", RecurrenceMode.AUTO_POST) { RecurrenceMode.valueOf(it) },
             reminderDaysBefore = json.optIntOrNull("reminderDaysBefore"),
             isVariableAmount = json.optBoolean("isVariableAmount", false),
+            paymentKind = PaymentKind.fromName(json.optStringOrNull("paymentKind")),
             notes = json.optStringOrNull("notes"),
             isPaused = json.optBoolean("isPaused", false),
             isArchived = json.optBoolean("isArchived", false),

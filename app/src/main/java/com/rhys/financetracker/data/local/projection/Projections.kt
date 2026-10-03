@@ -35,6 +35,8 @@ data class TransactionWithDetails(
     @ColumnInfo(name = "split_count") val splitCount: Int = 0,
     /** How many receipts, photos or screenshots are kept with it. */
     @ColumnInfo(name = "receipt_count") val receiptCount: Int = 0,
+    /** Direct debit, standing order…, when it is one of a regular payment's. */
+    @ColumnInfo(name = "regular_kind") val regularKind: com.rhys.financetracker.domain.model.PaymentKind? = null,
 ) {
     /** Money moved to or from a person rather than spent or earned. */
     val isPersonTransfer: Boolean

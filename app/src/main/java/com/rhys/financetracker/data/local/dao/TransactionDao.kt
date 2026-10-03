@@ -54,7 +54,19 @@ interface TransactionDao {
             p.name AS person_name,
             p.color_hex AS person_color,
             (SELECT COUNT(*) FROM transaction_splits sp WHERE sp.transaction_id = t.id) AS split_count,
-            (SELECT COUNT(*) FROM receipts rc WHERE rc.transaction_id = t.id) AS receipt_count
+            (SELECT COUNT(*) FROM receipts rc WHERE rc.transaction_id = t.id) AS receipt_count,
+            (SELECT rr.payment_kind FROM recurring_rules rr WHERE rr.id = t.recurring_rule_id) AS regular_kind
+        """
+
+        /**
+         * The same payment on the same account, whichever way it was filed:
+         * money out as spending or a move, money in as income or a move in.
+         */
+        const val SAME_MONEY = """
+            is_archived = 0 AND amount_minor = :amountMinor AND date BETWEEN :from AND :until
+            AND ((:incoming = 0 AND account_id = :accountId AND type IN ('EXPENSE', 'TRANSFER'))
+              OR (:incoming = 1 AND ((account_id = :accountId AND type = 'INCOME')
+                                  OR (transfer_account_id = :accountId AND type = 'TRANSFER'))))
         """
 
         /**
@@ -661,6 +673,42 @@ interface TransactionDao {
         """,
     )
     suspend fun existsForRuleOnDate(ruleId: Long, date: LocalDate): Boolean
+
+    /**
+     * A payment already in for this amount on this account near [around],
+     * not yet tied to a schedule — the statement or bank alert for a
+     * payment the schedule was about to add.
+     */
+    @Query(
+        "SELECT id FROM transactions WHERE recurring_rule_id IS NULL AND $SAME_MONEY " +
+            "ORDER BY ABS(julianday(date) - julianday(:around)) LIMIT 1",
+    )
+    suspend fun findUnscheduledNear(
+        accountId: Long,
+        amountMinor: Long,
+        incoming: Boolean,
+        from: LocalDate,
+        until: LocalDate,
+        around: LocalDate,
+    ): Long?
+
+    /** A payment the schedule has already added near this date. */
+    @Query(
+        "SELECT id FROM transactions WHERE recurring_rule_id IS NOT NULL AND $SAME_MONEY " +
+            "ORDER BY ABS(julianday(date) - julianday(:around)) LIMIT 1",
+    )
+    suspend fun findScheduledNear(
+        accountId: Long,
+        amountMinor: Long,
+        incoming: Boolean,
+        from: LocalDate,
+        until: LocalDate,
+        around: LocalDate,
+    ): Long?
+
+    /** Ties a payment to the regular payment it is one of. */
+    @Query("UPDATE transactions SET recurring_rule_id = :ruleId, updated_at = :updatedAt WHERE id = :id")
+    suspend fun linkToRule(id: Long, ruleId: Long, updatedAt: Long)
 
     /**
      * Money out since [from] that no regular payment already accounts for,

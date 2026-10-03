@@ -1,5 +1,6 @@
 package com.rhys.financetracker.data.repository
 
+import com.rhys.financetracker.domain.model.PaymentKind
 import com.rhys.financetracker.core.result.AppResult
 import com.rhys.financetracker.core.result.runCatchingApp
 import com.rhys.financetracker.core.time.DateUtils
@@ -88,6 +89,7 @@ class IncomeRepository @Inject constructor(
             categoryId = salary.id,
             personId = personId,
             mode = RecurrenceMode.AUTO_POST,
+            paymentKind = PaymentKind.MONEY_IN,
             notes = SpreadsheetImporter.WAGE_MARKER,
         )
         if (existing == null) {

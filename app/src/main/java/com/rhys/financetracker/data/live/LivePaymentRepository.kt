@@ -129,13 +129,27 @@ class LivePaymentRepository @Inject constructor(
             return Outcome.ALREADY_ADDED
         }
 
+        // A regular payment the app has already added on its day — the car
+        // loan on the 1st — and this is the bank saying it went.
+        val date = Instant.ofEpochMilli(postedAt).atZone(ZoneId.systemDefault()).toLocalDate()
+        if (transactionDao.findScheduledNear(
+                accountId = accountId,
+                amountMinor = alert.amountMinor,
+                incoming = alert.type == TransactionType.INCOME,
+                from = date.minusDays(SCHEDULED_DAYS),
+                until = date.plusDays(SCHEDULED_DAYS),
+                around = date,
+            ) != null
+        ) {
+            return Outcome.ALREADY_ADDED
+        }
+
         val learned = transactionDao.getUserFiledDescriptions(SpreadsheetImporter.LEARNED_PAYEE_LIMIT)
             .filterNot { it.categoryName in Refiling.VAGUE }
             .associate { TransactionFingerprint.normaliseDescription(it.description) to it.categoryName }
         val categoryName = if (paidOff == null) MerchantCategoriser.categoryFor(alert.payee, alert.type, learned) else null
         val categoryId = categoryName?.let { categoryIdFor(it, alert.type) }
 
-        val date = Instant.ofEpochMilli(postedAt).atZone(ZoneId.systemDefault()).toLocalDate()
         transactionDao.insert(
             TransactionEntity(
                 amountMinor = alert.amountMinor,
@@ -229,6 +243,9 @@ class LivePaymentRepository @Inject constructor(
 
         /** How far apart a bank and a payment app may tell of one payment. */
         const val TOLD_TWICE_MILLIS = 24 * 60 * 60 * 1000L
+
+        /** How far from its day a regular payment may actually go out. */
+        const val SCHEDULED_DAYS = 4L
         val TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM, HH:mm")
     }
 }

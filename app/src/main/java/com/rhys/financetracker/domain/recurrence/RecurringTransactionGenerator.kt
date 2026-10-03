@@ -9,6 +9,7 @@ import com.rhys.financetracker.data.local.entity.RecurringRuleEntity
 import com.rhys.financetracker.data.local.entity.TransactionEntity
 import com.rhys.financetracker.domain.model.Frequency
 import com.rhys.financetracker.domain.model.RecurrenceMode
+import com.rhys.financetracker.domain.model.TransactionType
 import java.time.Instant
 import java.time.LocalDate
 import javax.inject.Inject
@@ -58,8 +59,17 @@ class RecurringTransactionGenerator @Inject constructor(
                     } else if (transactionDao.existsForRuleOnDate(rule.id, date)) {
                         skipped++
                     } else {
-                        transactionDao.insert(rule.toTransaction(date))
-                        created++
+                        // The statement or a bank alert may have got there
+                        // first: that is this payment, so it is tied to the
+                        // schedule rather than written in a second time.
+                        val existing = alreadyIn(rule, date)
+                        if (existing != null) {
+                            transactionDao.linkToRule(existing, rule.id, Instant.now().toEpochMilli())
+                            skipped++
+                        } else {
+                            transactionDao.insert(rule.toTransaction(date))
+                            created++
+                        }
                     }
                     generatedCount++
                     lastGenerated = date
@@ -82,6 +92,17 @@ class RecurringTransactionGenerator @Inject constructor(
                 generatedThrough = through,
             )
         }
+
+    /** A payment already in for this occurrence, from a statement or a bank alert. */
+    private suspend fun alreadyIn(rule: RecurringRuleEntity, date: LocalDate): Long? =
+        transactionDao.findUnscheduledNear(
+            accountId = rule.accountId,
+            amountMinor = rule.amountMinor,
+            incoming = rule.type == TransactionType.INCOME,
+            from = date.minusDays(SAME_PAYMENT_DAYS),
+            until = date.plusDays(SAME_PAYMENT_DAYS),
+            around = date,
+        )
 
     /**
      * Where the cursor should sit once [lastGenerated] has been posted.
@@ -110,6 +131,9 @@ class RecurringTransactionGenerator @Inject constructor(
         return RecurrenceCalculator.nextOccurrenceAfter(rule, from.minusDays(1)) ?: rule.startDate
     }
 }
+
+/** How far either side of its day a payment can land: weekends, bank holidays. */
+private const val SAME_PAYMENT_DAYS = 4L
 
 /** What one generation run did, shown in the "what's new" banner and the logs. */
 data class GenerationSummary(

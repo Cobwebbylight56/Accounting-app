@@ -4,6 +4,7 @@ import androidx.room.TypeConverter
 import com.rhys.financetracker.domain.model.AccountType
 import com.rhys.financetracker.domain.model.CategoryKind
 import com.rhys.financetracker.domain.model.Frequency
+import com.rhys.financetracker.domain.model.PaymentKind
 import com.rhys.financetracker.domain.model.Holding
 import com.rhys.financetracker.domain.model.RecurrenceMode
 import com.rhys.financetracker.domain.model.RecordSource
@@ -73,6 +74,12 @@ class Converters {
     @TypeConverter
     fun stringToFrequency(value: String): Frequency =
         runCatching { Frequency.valueOf(value) }.getOrDefault(Frequency.MONTHLY)
+
+    @TypeConverter
+    fun paymentKindToString(value: PaymentKind?): String? = value?.name
+
+    @TypeConverter
+    fun stringToPaymentKind(value: String?): PaymentKind? = PaymentKind.fromName(value)
 
     @TypeConverter
     fun recurrenceModeToString(value: RecurrenceMode): String = value.name

@@ -758,6 +758,43 @@ The app also now knows many more shops, websites and outings by name — high
 street chains, online shops (Amazon, eBay, Shein, Temu, ASOS…), cinemas,
 bowling, theme parks, ticket sites, pubs and takeaways.
 
+### Making a payment regular (direct debit, standing order, savings)
+
+Open any payment, such as the car loan, the transfer into savings or a
+subscription, and tap **Set up** on **Happens regularly?**. Moves between
+accounts (the blue ones) show this card highlighted. Then choose:
+
+* **What is it?** — Direct debit, Standing order, Moving to savings, Regular
+  card payment, or Money in. The app guesses from what it knows: money into a
+  saver is moving to savings, a payment to a loan is usually a direct debit,
+  and "DD" or "SO" on the statement settles it.
+* **How often?** — weekly, every 4 weeks, monthly or yearly.
+* **Which day?** — use − and + to pick the day of the month. In shorter months
+  a day after the 28th falls on the last day.
+* **Add it by itself on the day** — on (the usual) and the app adds it on its
+  day, without a statement or bank alert. Off and you get a reminder the day
+  before instead.
+* **The amount can change** — it is still added, but marked to check so you
+  can put in the real amount.
+
+The sheet shows the date of the next one before you save. The payment you
+started from counts as this month's, so it is never added twice.
+
+You never get two of the same payment:
+
+* When the statement comes in, its line is matched to the one the app added
+  and puts its details right.
+* If the statement or a bank alert got there first, the app uses that line
+  instead of adding its own.
+* A bank alert for a payment the app has already added is not added again.
+
+Regular payments show their type in the payment lists ("1 Oct · Direct
+debit · …") and on the payment's page. The page also shows the next date,
+**Change** and **Stop**. Stopping keeps every payment already in; it only
+stops new ones being added. The upcoming ones are listed under **Coming up**
+on Home, and all of them under **Bills & subscriptions → Set up by you**, where the
+editor has the same **What is it?** choice.
+
 ### Bills & subscriptions
 
 **In your statements** has two filters: **Subscriptions** — things signed up

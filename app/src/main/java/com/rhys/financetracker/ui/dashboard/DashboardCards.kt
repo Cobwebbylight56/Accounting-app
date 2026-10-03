@@ -801,6 +801,7 @@ private fun TransactionRowCompact(item: TransactionWithDetails, onClick: () -> U
             Text(
                 text = listOfNotNull(
                     DateUtils.formatShort(entry.date),
+                    item.regularKind?.shortName,
                     item.categoryName,
                     item.accountName,
                 ).joinToString(" · "),

@@ -23,6 +23,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -39,13 +41,22 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.rhys.financetracker.core.money.Money
+import com.rhys.financetracker.core.result.AppResult
 import com.rhys.financetracker.core.time.DateUtils
+import com.rhys.financetracker.data.importer.SubscriptionKinds
 import com.rhys.financetracker.data.local.dao.SplitPart
 import com.rhys.financetracker.data.local.dao.TransactionDao
+import com.rhys.financetracker.data.local.entity.RecurringRuleEntity
 import com.rhys.financetracker.data.local.projection.TransactionWithDetails
 import com.rhys.financetracker.data.receipts.SplitRepository
+import com.rhys.financetracker.data.repository.AccountRepository
+import com.rhys.financetracker.data.repository.RecurringRepository
+import com.rhys.financetracker.domain.model.Frequency
+import com.rhys.financetracker.domain.model.PaymentKind
 import com.rhys.financetracker.domain.model.RecordSource
 import com.rhys.financetracker.domain.model.TransactionType
+import com.rhys.financetracker.domain.recurrence.RecurringTransactionGenerator
+import com.rhys.financetracker.domain.recurrence.RegularSchedule
 import com.rhys.financetracker.ui.components.ColorDot
 import com.rhys.financetracker.ui.components.colorFromHex
 import com.rhys.financetracker.ui.navigation.Routes
@@ -53,14 +64,25 @@ import com.rhys.financetracker.ui.receipts.PaymentReceipts
 import com.rhys.financetracker.ui.theme.FinanceTheme
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 @HiltViewModel
 class TransactionViewViewModel @Inject constructor(
     transactionDao: TransactionDao,
     splits: SplitRepository,
+    private val recurring: RecurringRepository,
+    private val accounts: AccountRepository,
+    private val generator: RecurringTransactionGenerator,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -71,6 +93,60 @@ class TransactionViewViewModel @Inject constructor(
 
     val parts: StateFlow<List<SplitPart>> = splits.observeParts(transactionId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** The regular payment this is one of, if it is. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val regular: StateFlow<RecurringRuleEntity?> = payment
+        .map { it?.transaction?.recurringRuleId }
+        .distinctUntilChanged()
+        .flatMapLatest { id -> if (id == null) flowOf(null) else recurring.observe(id).map { it?.rule } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** What kind of regular payment it most likely is, to start the choice on. */
+    val kindGuess: StateFlow<PaymentKind> = payment
+        .map { details ->
+            val entry = details?.transaction ?: return@map PaymentKind.DIRECT_DEBIT
+            RegularSchedule.guessKind(
+                type = entry.type,
+                description = entry.description,
+                toHolding = entry.transferAccountId?.let { accounts.get(it)?.holding },
+                isSubscription = SubscriptionKinds.isSubscription(entry.description, details.categoryName),
+            )
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PaymentKind.DIRECT_DEBIT)
+
+    private val _message = MutableStateFlow<String?>(null)
+    val message: StateFlow<String?> = _message.asStateFlow()
+
+    fun messageShown() {
+        _message.value = null
+    }
+
+    fun makeRegular(kind: PaymentKind, frequency: Frequency, day: Int, addByItself: Boolean, amountChanges: Boolean) {
+        val entry = payment.value?.transaction ?: return
+        viewModelScope.launch {
+            when (val result = recurring.makeRegular(entry, kind, frequency, day, addByItself, amountChanges)) {
+                is AppResult.Success -> {
+                    // Anything due since — a month missed — goes in now.
+                    generator.generateDue()
+                    _message.value = if (addByItself) {
+                        "Saved — it'll be added by itself each time"
+                    } else {
+                        "Saved — you'll get a reminder each time"
+                    }
+                }
+                is AppResult.Failure -> _message.value = result.message
+            }
+        }
+    }
+
+    fun stopRegular() {
+        val rule = regular.value ?: return
+        viewModelScope.launch {
+            recurring.setArchived(rule.id, archived = true)
+            _message.value = "Stopped — it won't be added any more"
+        }
+    }
 }
 
 /**
@@ -87,7 +163,18 @@ fun TransactionViewScreen(
 ) {
     val item by viewModel.payment.collectAsStateWithLifecycle()
     val parts by viewModel.parts.collectAsStateWithLifecycle()
+    val regular by viewModel.regular.collectAsStateWithLifecycle()
+    val kindGuess by viewModel.kindGuess.collectAsStateWithLifecycle()
+    val message by viewModel.message.collectAsStateWithLifecycle()
     val colors = FinanceTheme.colors
+    var settingUp by remember { androidx.compose.runtime.mutableStateOf(false) }
+    val snackbar = remember { SnackbarHostState() }
+    androidx.compose.runtime.LaunchedEffect(message) {
+        message?.let {
+            snackbar.showSnackbar(it)
+            viewModel.messageShown()
+        }
+    }
     // Deleted from the editor: nothing left to show, so close.
     var seen by remember { androidx.compose.runtime.mutableStateOf(false) }
     androidx.compose.runtime.LaunchedEffect(item) {
@@ -95,6 +182,7 @@ fun TransactionViewScreen(
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
                 title = { Text("Payment") },
@@ -154,12 +242,32 @@ fun TransactionViewScreen(
                     }
                     Fact("Account", listOfNotNull(details.accountName, details.transferAccountName).joinToString(" → "))
                     details.personName?.let { Fact("For", it) }
-                    Fact("From", sourceOf(entry.source))
+                    details.regularKind?.let { Fact("Type", it.displayName) }
+                    Fact("From", sourceOf(entry.source, scheduled = entry.recurringRuleId != null))
                     if (!entry.isCleared) Fact("Status", "Not gone through yet")
                     if (!entry.isConfirmed) Fact("Status", "To check — the amount may differ")
                     entry.notes?.let { Fact("Notes", it) }
                     entry.tags?.let { Fact("Tags", it) }
                 }
+            }
+
+            RegularPaymentCard(
+                rule = regular,
+                isTransfer = entry.type == TransactionType.TRANSFER,
+                onSetUp = { settingUp = true },
+                onStop = viewModel::stopRegular,
+            )
+            if (settingUp) {
+                RegularPaymentSheet(
+                    payment = entry,
+                    rule = regular,
+                    guess = kindGuess,
+                    onDismiss = { settingUp = false },
+                    onSave = { kind, frequency, day, addByItself, amountChanges ->
+                        settingUp = false
+                        viewModel.makeRegular(kind, frequency, day, addByItself, amountChanges)
+                    },
+                )
             }
 
             if (entry.type == TransactionType.EXPENSE) {
@@ -213,10 +321,10 @@ private fun Fact(label: String, value: @Composable () -> Unit) {
     HorizontalDivider()
 }
 
-private fun sourceOf(source: RecordSource): String = when (source) {
+private fun sourceOf(source: RecordSource, scheduled: Boolean): String = when (source) {
     RecordSource.STATEMENT -> "A bank statement"
     RecordSource.LIVE -> "A bank alert — the statement will replace it when it comes in"
     RecordSource.SPREADSHEET -> "Your spreadsheet"
-    RecordSource.MANUAL -> "Typed in"
+    RecordSource.MANUAL -> if (scheduled) "Added by itself on its day — the statement will confirm it" else "Typed in"
     RecordSource.UNKNOWN -> "Added before the app kept track"
 }

@@ -182,6 +182,24 @@ enum class RecurrenceMode(val displayName: String) {
     REMIND_ONLY("Remind me only"),
 }
 
+/**
+ * How a regular payment leaves or reaches the account, as the bank names it.
+ * Only a label: a direct debit and a standing order are scheduled the same
+ * way, but people know their payments by these names.
+ */
+enum class PaymentKind(val displayName: String, val shortName: String) {
+    DIRECT_DEBIT("Direct debit", "Direct debit"),
+    STANDING_ORDER("Standing order", "Standing order"),
+    TO_SAVINGS("Moving to savings", "To savings"),
+    CARD("Regular card payment", "Card payment"),
+    MONEY_IN("Money in", "Regular in"),
+    ;
+
+    companion object {
+        fun fromName(name: String?): PaymentKind? = entries.firstOrNull { it.name == name }
+    }
+}
+
 /** Which slice of the household the user is currently looking at. */
 enum class ScopeType(val displayName: String) {
     HOUSEHOLD("Whole household"),

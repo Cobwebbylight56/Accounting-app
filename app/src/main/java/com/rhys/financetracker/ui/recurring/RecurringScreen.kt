@@ -58,6 +58,7 @@ import com.rhys.financetracker.core.time.DateUtils
 import com.rhys.financetracker.data.local.projection.RecurringRuleWithDetails
 import com.rhys.financetracker.data.local.projection.labelFor
 import com.rhys.financetracker.domain.model.Frequency
+import com.rhys.financetracker.domain.model.PaymentKind
 import com.rhys.financetracker.domain.model.RecurrenceMode
 import com.rhys.financetracker.domain.model.TransactionType
 import com.rhys.financetracker.ui.components.AmountField
@@ -301,6 +302,7 @@ private fun RecurringRow(
                     )
                     Text(
                         text = buildString {
+                            rule.paymentKind?.let { append(it.shortName).append(" · ") }
                             append(frequencyLabel(rule.frequency, rule.interval))
                             append(" · ")
                             append(
@@ -536,6 +538,15 @@ fun RecurringEditScreen(
                 optionLabel = { it.name },
                 optionColor = { colorFromHex(it.colorHex) },
                 placeholder = "The account's owner",
+            )
+
+            DropdownField(
+                label = "What is it?",
+                options = PaymentKind.entries,
+                selected = state.form.paymentKind,
+                onSelect = { kind -> viewModel.update { it.copy(paymentKind = kind) } },
+                optionLabel = { it.displayName },
+                placeholder = "Direct debit, standing order…",
             )
 
             DropdownField(

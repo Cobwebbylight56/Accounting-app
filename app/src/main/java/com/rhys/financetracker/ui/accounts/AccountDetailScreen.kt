@@ -531,7 +531,7 @@ private fun PaymentRow(item: TransactionWithDetails, accountId: Long, onClick: (
         Column(modifier = Modifier.weight(1f)) {
             Text(entry.description, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                text = listOfNotNull(DateUtils.formatShort(entry.date), item.categoryName).joinToString(" · "),
+                text = listOfNotNull(DateUtils.formatShort(entry.date), item.regularKind?.shortName, item.categoryName).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

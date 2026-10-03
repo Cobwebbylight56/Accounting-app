@@ -1,5 +1,6 @@
 package com.rhys.financetracker.data.repository
 
+import com.rhys.financetracker.domain.model.PaymentKind
 import com.rhys.financetracker.core.result.AppResult
 import com.rhys.financetracker.core.result.runCatchingApp
 import com.rhys.financetracker.core.time.DateUtils
@@ -145,6 +146,7 @@ class HouseholdSetupRepository @Inject constructor(
                     accountId = payFromAccountId,
                     transferAccountId = loanId,
                     personId = personId,
+                    paymentKind = PaymentKind.DIRECT_DEBIT,
                 ),
             )
         }

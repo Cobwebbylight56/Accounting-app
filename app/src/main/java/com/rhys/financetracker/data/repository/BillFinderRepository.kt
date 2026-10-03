@@ -1,5 +1,7 @@
 package com.rhys.financetracker.data.repository
 
+import com.rhys.financetracker.data.importer.SubscriptionKinds
+import com.rhys.financetracker.domain.recurrence.RegularSchedule
 import com.rhys.financetracker.core.result.AppResult
 import com.rhys.financetracker.core.result.runCatchingApp
 import com.rhys.financetracker.core.time.DateUtils
@@ -94,6 +96,12 @@ class BillFinderRepository @Inject constructor(
                         personId = accountDao.getById(bill.accountId)?.personId,
                         mode = if (bill.isVariable) RecurrenceMode.CONFIRM else RecurrenceMode.AUTO_POST,
                         isVariableAmount = bill.isVariable,
+                        paymentKind = RegularSchedule.guessKind(
+                            type = TransactionType.EXPENSE,
+                            description = bill.name,
+                            toHolding = null,
+                            isSubscription = SubscriptionKinds.isSubscription(bill.name, bill.categoryName),
+                        ),
                         notes = "Found in a statement: ${bill.reason.lowercase()}.",
                     ),
                 )
