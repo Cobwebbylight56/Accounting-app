@@ -511,7 +511,13 @@ object Migrations {
 
     /** Version 14 names how a regular payment goes: direct debit, standing order… */
     val MIGRATION_13_14 = Migration(13, 14) { db ->
-        db.execSQL("ALTER TABLE recurring_rules ADD COLUMN payment_kind TEXT")
+        // Only when missing: a database wound back by hand still has it.
+        val has = db.query("PRAGMA table_info(recurring_rules)").use { cursor ->
+            val name = cursor.getColumnIndex("name")
+            generateSequence { if (cursor.moveToNext()) cursor.getString(name) else null }
+                .any { it == "payment_kind" }
+        }
+        if (!has) db.execSQL("ALTER TABLE recurring_rules ADD COLUMN payment_kind TEXT")
     }
 
     val ALL: Array<Migration> = arrayOf(
