@@ -216,4 +216,24 @@ class StatementPriorityTest {
         )
         assertNull(StatementPriority.corrections(emptyList(), listOf(recorded(1, "x", 500, 3)))["1:0"])
     }
+
+    @Test
+    fun `a payment added from a bank alert is replaced by the statement's line`() {
+        val corrections = StatementPriority.corrections(
+            candidates = listOf(statementRow(1, "CARD PAYMENT TO TESCO STORES 3012", 1250, 4)),
+            existing = listOf(recorded(10, "TESCO STORES 3012", 1250, 3, source = RecordSource.LIVE)),
+        )
+        assertEquals(10L, corrections.values.single().existing.id)
+    }
+
+    @Test
+    fun `an overpayment added from an alert matches the statement's money out`() {
+        val corrections = StatementPriority.corrections(
+            candidates = listOf(statementRow(1, "NATIONWIDE MORTGAGE OVERPAYMENT", 10_000, 5)),
+            existing = listOf(
+                recorded(10, "Overpayment to mortgage", 10_000, 5, type = TransactionType.TRANSFER, source = RecordSource.LIVE),
+            ),
+        )
+        assertEquals(10L, corrections.values.single().existing.id)
+    }
 }

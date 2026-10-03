@@ -27,6 +27,20 @@ object BankApps {
         "com.chase.intl" to "Chase",
         "com.americanexpress.android.acctsvcs.uk" to "American Express",
         "com.google.android.apps.walletnfcrel" to "Google Wallet",
+        // Payment apps: their confirmations are payments too.
+        "com.paypal.android.p2pmobile" to "PayPal",
+        "com.myklarnamobile" to "Klarna",
+        "com.imaginecurve.curve.prd" to "Curve",
+    )
+
+    /**
+     * Apps that tell of a payment the bank may tell of too: a PayPal or
+     * Klarna purchase, a Google Wallet tap. Within a day, the same amount
+     * from one of these and from another app is taken as one payment.
+     */
+    val ALSO_TOLD_BY_BANK: Set<String> = setOf(
+        "com.google.android.apps.walletnfcrel", "com.paypal.android.p2pmobile", "com.myklarnamobile",
+        "com.imaginecurve.curve.prd",
     )
 
     /**
@@ -38,6 +52,47 @@ object BankApps {
         "org.thoughtcrime.securesms", "com.google.android.apps.messaging", "com.samsung.android.messaging",
         "com.google.android.gm", "com.microsoft.office.outlook", "com.snapchat.android",
         "com.instagram.android", "com.discord", "com.facebook.katana",
+    )
+
+    /** A loan, mortgage, card or pay-later account, for paying off. */
+    data class BorrowingOption(
+        val id: Long,
+        val name: String,
+        /** "mortgage", "loan", "credit card" or "pay later". */
+        val kind: String,
+    )
+
+    /**
+     * The borrowing a payment pays off, or null when it is ordinary spending:
+     * the one of [kind] the alert named ("overpayment to your mortgage"), or
+     * one named after the lender the payee names ("KLARNA", "AMERICAN
+     * EXPRESS"). Only lenders count: spending at Tesco is not paying off a
+     * Tesco credit card. Never [fromAccountId] itself.
+     */
+    fun pickBorrowing(
+        kind: String?,
+        payee: String,
+        borrowing: List<BorrowingOption>,
+        fromAccountId: Long?,
+    ): Long? {
+        val options = borrowing.filter { it.id != fromAccountId }
+        if (kind != null) {
+            options.firstOrNull { it.kind == kind && kind in it.name.lowercase() }?.let { return it.id }
+            options.firstOrNull { it.kind == kind }?.let { return it.id }
+        }
+        val lenders = wordsOf(payee).filter { it in LENDERS }
+        if (lenders.isEmpty()) return null
+        return options.firstOrNull { option -> wordsOf(option.name).any { it in lenders } }?.id
+    }
+
+    private fun wordsOf(text: String): Set<String> =
+        text.lowercase().split(Regex("""[^a-z0-9]+""")).filter { it.isNotBlank() }.toSet()
+
+    /** Card, pay-later and loan companies, as they appear in a payee or account name. */
+    private val LENDERS = setOf(
+        "klarna", "clearpay", "laybuy", "zilch", "barclaycard", "amex", "american", "capital", "vanquis",
+        "aqua", "mbna", "tymit", "newday", "marbles", "fluid", "jaja", "zopa", "novuna", "creation",
+        "moneybarn", "blackhorse", "santanderconsumer",
     )
 
     /** The bank behind [app], when it is one of the known ones. */

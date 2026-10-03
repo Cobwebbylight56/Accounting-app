@@ -76,6 +76,7 @@ class SettingsRepository @Inject constructor(
         val LIVE_ALERT_APPS = stringSetPreferencesKey("live_alert_apps")
         val LIVE_ALERT_SEEN = stringSetPreferencesKey("live_alert_seen")
         val LIVE_ALERT_LAST = stringPreferencesKey("live_alert_last")
+        val LIVE_STATEMENT_NUDGE = booleanPreferencesKey("live_statement_nudge")
     }
 
     /** Defaults chosen so a fresh install is immediately usable and private. */
@@ -161,6 +162,7 @@ class SettingsRepository @Inject constructor(
             liveAlertApps = prefs[Keys.LIVE_ALERT_APPS].orEmpty(),
             liveAlertSeen = prefs[Keys.LIVE_ALERT_SEEN].orEmpty(),
             liveAlertLast = prefs[Keys.LIVE_ALERT_LAST].orEmpty(),
+            liveStatementNudge = prefs[Keys.LIVE_STATEMENT_NUDGE] ?: true,
         )
     }
 
@@ -281,6 +283,9 @@ class SettingsRepository @Inject constructor(
         }
     }
 
+    /** Whether a bank's "statement ready" alert brings a reminder to import it. */
+    suspend fun setLiveStatementNudge(enabled: Boolean) = put(Keys.LIVE_STATEMENT_NUDGE, enabled)
+
     /** What was added last, for the Live payments page. */
     suspend fun setLiveAlertLast(summary: String) = put(Keys.LIVE_ALERT_LAST, summary)
 
@@ -376,6 +381,8 @@ data class AppSettings(
     val liveAlertSeen: Set<String> = emptySet(),
     /** What was last added from an alert. */
     val liveAlertLast: String = "",
+    /** A bank's "statement ready" alert brings a reminder to import it. */
+    val liveStatementNudge: Boolean = true,
 ) {
     val isLockEnabled: Boolean get() = lockMethod != LockMethod.NONE
     val requiresPin: Boolean

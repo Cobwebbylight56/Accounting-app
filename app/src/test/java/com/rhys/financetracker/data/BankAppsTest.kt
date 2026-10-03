@@ -34,3 +34,31 @@ class BankAppsTest {
         assertNull(BankApps.pickAccount("Monzo", null, emptyList(), defaultAccountId = null))
     }
 }
+
+class BankAppsBorrowingTest {
+
+    private val mortgage = BankApps.BorrowingOption(10, "Nationwide Mortgage", "mortgage")
+    private val carLoan = BankApps.BorrowingOption(11, "Car finance", "loan")
+    private val klarna = BankApps.BorrowingOption(12, "Klarna", "pay later")
+    private val tescoCard = BankApps.BorrowingOption(13, "Tesco Credit Card", "credit card")
+    private val all = listOf(mortgage, carLoan, klarna, tescoCard)
+
+    @Test
+    fun `an overpayment goes to the kind it names`() {
+        assertEquals(10L, BankApps.pickBorrowing("mortgage", "Overpayment to mortgage", all, fromAccountId = 1))
+        assertEquals(11L, BankApps.pickBorrowing("loan", "Overpayment to loan", all, fromAccountId = 1))
+        assertEquals(13L, BankApps.pickBorrowing("credit card", "Payment to credit card", all, fromAccountId = 1))
+    }
+
+    @Test
+    fun `a lender named as the payee is paying it off`() {
+        assertEquals(12L, BankApps.pickBorrowing(null, "KLARNA*ASOS", all, fromAccountId = 1))
+    }
+
+    @Test
+    fun `shopping is not paying off a shop's card`() {
+        assertNull(BankApps.pickBorrowing(null, "TESCO STORES 3012", all, fromAccountId = 1))
+        // Klarna's own alert, already in the Klarna account, is a purchase.
+        assertNull(BankApps.pickBorrowing(null, "Klarna", listOf(klarna), fromAccountId = 12))
+    }
+}

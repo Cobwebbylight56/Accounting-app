@@ -1007,6 +1007,35 @@ interface TransactionDao {
     )
     suspend fun countRecentLive(amountMinor: Long, type: String, since: Long): Int
 
+    /**
+     * The import hashes ("live:<app>:…") of payments of this amount and
+     * direction added from alerts since [since], to spot one payment told by
+     * two apps. [type] is the TransactionType name.
+     */
+    @Query(
+        """
+        SELECT import_hash FROM transactions
+        WHERE source = 'LIVE' AND is_archived = 0 AND import_hash IS NOT NULL
+          AND amount_minor = :amountMinor AND type = :type AND created_at >= :since
+        """,
+    )
+    suspend fun recentLiveHashes(amountMinor: Long, type: String, since: Long): List<String>
+
+    /**
+     * Payments of [amountMinor] added from alerts since [since] that paid
+     * into borrowing account [accountId]: money in on it, or a move into it.
+     * A card payment is told by the bank (money out) and the card (money in).
+     */
+    @Query(
+        """
+        SELECT COUNT(*) FROM transactions
+        WHERE source = 'LIVE' AND is_archived = 0 AND amount_minor = :amountMinor AND created_at >= :since
+          AND ((account_id = :accountId AND type = 'INCOME')
+            OR (transfer_account_id = :accountId AND type = 'TRANSFER'))
+        """,
+    )
+    suspend fun countLivePaidInto(accountId: Long, amountMinor: Long, since: Long): Int
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(transaction: TransactionEntity): Long
 

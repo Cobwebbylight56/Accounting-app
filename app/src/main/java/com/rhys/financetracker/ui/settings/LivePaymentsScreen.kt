@@ -74,6 +74,10 @@ class LivePaymentsViewModel @Inject constructor(
         viewModelScope.launch { settingsRepository.setLiveAlertAccount(app, accountId) }
     }
 
+    fun setStatementNudge(enabled: Boolean) {
+        viewModelScope.launch { settingsRepository.setLiveStatementNudge(enabled) }
+    }
+
     fun setAllowed(app: String, allowed: Boolean) {
         viewModelScope.launch { settingsRepository.setLiveAlertAppAllowed(app, allowed) }
     }
@@ -144,6 +148,14 @@ fun LivePaymentsScreen(
             SettingsNote("Working: alerts from the banking apps below are read as they arrive.")
         }
 
+        SettingsSwitch(
+            title = "Tell me when a statement is ready",
+            subtitle = "When your bank says a new statement is out, a reminder to bring it in",
+            checked = settings.liveStatementNudge,
+            onCheckedChange = viewModel::setStatementNudge,
+            enabled = settings.liveAlerts,
+        )
+
         if (settings.liveAlertLast.isNotBlank()) {
             SettingsGroupHeader("Last added")
             SettingsNote(settings.liveAlertLast)
@@ -153,7 +165,8 @@ fun LivePaymentsScreen(
         if (bankApps.isEmpty()) {
             SettingsNote(
                 "No banking apps found on this phone yet. Nationwide, Lloyds, Halifax, Barclays, HSBC, " +
-                    "NatWest, Santander, Monzo, Starling, Revolut, Chase, Amex and Google Wallet are read.",
+                    "NatWest, Santander, Monzo, Starling, Revolut, Chase, Amex, Google Wallet, PayPal, " +
+                    "Klarna and Curve are read.",
             )
         }
         bankApps.forEach { (app, label) ->
@@ -197,6 +210,9 @@ fun LivePaymentsScreen(
         SettingsGroupHeader("How it works")
         SettingsNote(
             "Payments from alerts are filed like statement lines and show on Home and Spending at once. " +
+                "An overpayment, or a payment to a card, Klarna or loan, comes off what you owe on it " +
+                "rather than counting as spending. A payment PayPal, Klarna or Google Wallet tells you " +
+                "about that your bank tells you about too is only added once. " +
                 "When you import that month's statement, each one is matched to the bank's line and " +
                 "replaced by it, so nothing is counted twice. Direct Debits and standing orders often " +
                 "don't send an alert, so those still come in with the statement.",

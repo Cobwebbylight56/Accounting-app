@@ -24,6 +24,12 @@ object BankAlertParser {
         val payee: String,
         /** The last four digits of the card or account, when the alert gives them. */
         val ending: String?,
+        /**
+         * What sort of borrowing the money went to, when the alert says it
+         * went to one — "mortgage", "loan" or "credit card" — as with an
+         * overpayment. Null for an ordinary payment.
+         */
+        val toBorrowing: String? = null,
     )
 
     /** The payment in an alert with this [title] and [text], or null when it is not one. */
@@ -38,9 +44,37 @@ object BankAlertParser {
         val amount = amountIn(all) ?: return null
         val type = directionOf(lower) ?: return null
         val payee = payeeIn(body, type) ?: payeeIn(all, type) ?: titleAsPayee(heading)
-            ?: if (type == TransactionType.INCOME) "Money in" else "Card payment"
+            ?: if (type == TransactionType.INCOME) MONEY_IN_NAME else CARD_PAYMENT_NAME
         val ending = ENDING.find(all)?.groupValues?.get(1)
-        return Alert(amount, type, payee, ending)
+        val borrowing = if (type == TransactionType.EXPENSE) borrowingIn(lower) else null
+        val named = if (borrowing != null && payee in FALLBACK_NAMES) {
+            (if (OVERPAY.containsMatchIn(lower)) "Overpayment to " else "Payment to ") + borrowing
+        } else {
+            payee
+        }
+        return Alert(amount, type, named, ending, borrowing)
+    }
+
+    /**
+     * True for an alert saying a statement is ready to look at — no money
+     * moved, but it is the moment to import it.
+     */
+    fun isStatementReady(title: String?, text: String?): Boolean {
+        val lower = listOfNotNull(title, text).joinToString(". ").lowercase()
+        return STATEMENT_READY.containsMatchIn(lower)
+    }
+
+    /** "mortgage", "loan" or "credit card" when the money went to paying one off. */
+    internal fun borrowingIn(lower: String): String? {
+        val overpaid = OVERPAY.containsMatchIn(lower)
+        val toIt = Regex("""\b(to|towards|into|off) (your|the) (\w+ )?(mortgage|loan|credit card|card balance)\b""").containsMatchIn(lower)
+        if (!overpaid && !toIt) return null
+        return when {
+            "mortgage" in lower -> "mortgage"
+            "credit card" in lower || "card balance" in lower -> "credit card"
+            "loan" in lower -> "loan"
+            else -> if (overpaid) "loan" else null
+        }
     }
 
     /**
@@ -74,7 +108,7 @@ object BankAlertParser {
             // "H PAYNE paid you £20.00"
             PAID_YOU.find(text)?.let { match -> cleanPayee(match.groupValues[1].substringAfterLast(". "))?.let { return it } }
         }
-        val words = if (type == TransactionType.INCOME) listOf("from", "by") else listOf("at", "to")
+        val words = if (type == TransactionType.INCOME) listOf("from", "by") else listOf("at", "to", "with", "from")
         for (word in words) {
             for (match in Regex("""\b$word\s+""", RegexOption.IGNORE_CASE).findAll(text)) {
                 cleanPayee(text.substring(match.range.last + 1))?.let { return it }
@@ -91,6 +125,8 @@ object BankAlertParser {
         if (name.isEmpty() || name.length > MAX_PAYEE) return null
         val lower = name.lowercase()
         if (lower.startsWith("your ") || lower == "you" || lower == "your" || !lower.first().isLetter()) return null
+        // "with Visa •••• 1234", "with Apple Pay": how it was paid, not who to.
+        if (lower.split(' ').first() in HOW_PAID) return null
         return name
     }
 
@@ -134,12 +170,30 @@ object BankAlertParser {
 
     private val MONEY_OUT = listOf(
         Regex("""\b(spent|spend|paid|payment|purchase|went out|gone out|left your account|debited|sent|taken|withdraw(al|n)?|cash machine|charged|transaction)\b"""),
+        // Confirmations from shops and payment apps, and overpayments.
+        Regex("""\b(order|ordered|bought|booked|booking|receipt|overpa(y|id|yment|yments))\b"""),
+    )
+
+    private val OVERPAY = Regex("""\bover-?pa(y|id|ying|yment|yments)\b""")
+
+    private val STATEMENT_READY = Regex(
+        """\b(statement|e-?statement)s? (is |are )?(now )?(ready|available)|\bnew (e-?)?statement\b|\bstatement has arrived\b""",
+    )
+
+    private const val MONEY_IN_NAME = "Money in"
+    private const val CARD_PAYMENT_NAME = "Card payment"
+    private val FALLBACK_NAMES = setOf(MONEY_IN_NAME, CARD_PAYMENT_NAME)
+
+    /** First words of "with …" that say how something was paid. */
+    private val HOW_PAID = setOf(
+        "visa", "mastercard", "debit", "credit", "card", "apple", "google", "samsung", "contactless",
+        "your", "klarna", "clearpay", "paypal", "amex", "maestro",
     )
 
     /** Where a payee's name ends. */
     private val STOPS = listOf(
         Regex("""[.,;!](\s|$)"""),
-        Regex("""\s(on|using|with your|from your|to your|via|by card|by contactless|for £|was|has|have|is)\b.*""", RegexOption.IGNORE_CASE),
+        Regex("""\s(on|using|with|from your|to your|via|by card|by contactless|for £|was|has|have|is)\b.*""", RegexOption.IGNORE_CASE),
         Regex("""\s(card|account)\s+ending\b.*""", RegexOption.IGNORE_CASE),
         Regex("""\s£.*"""),
         Regex("""\sat\s+\d.*"""),
@@ -152,6 +206,7 @@ object BankAlertParser {
         "spent", "spending", "purchase", "alert", "alerts", "notification", "new", "your", "account", "you",
         "nationwide", "lloyds", "halifax", "barclays", "hsbc", "natwest", "santander", "monzo", "starling",
         "revolut", "chase", "bank", "banking", "received", "sent", "contactless", "online",
+        "order", "orders", "confirmed", "placed", "thanks", "thank", "receipt", "booking", "update",
     )
 
     private const val MAX_PAYEE = 60

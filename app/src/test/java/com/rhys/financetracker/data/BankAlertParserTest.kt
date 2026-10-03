@@ -112,4 +112,36 @@ class BankAlertParserTest {
         assertNull(read(null, "Approve your payment of £20.00 to Amazon in the app"))
         assertNull(read("Lloyds", "Log in to see your latest offers"))
     }
+
+    @Test
+    fun `an overpayment goes to the borrowing`() {
+        val alert = read("Nationwide", "You've made a £100.00 overpayment to your mortgage.")!!
+        assertEquals(10_000L, alert.amountMinor)
+        assertEquals(TransactionType.EXPENSE, alert.type)
+        assertEquals("mortgage", alert.toBorrowing)
+        assertEquals("Overpayment to mortgage", alert.payee)
+        assertEquals("loan", read(null, "Overpayment of £50.00 made towards your car loan")!!.toBorrowing)
+        assertEquals("credit card", read(null, "You paid £200.00 to your credit card")!!.toBorrowing)
+        assertNull(read(null, "You spent £4.20 at Costa")!!.toBorrowing)
+    }
+
+    @Test
+    fun `confirmations from payment apps and shops`() {
+        val klarna = read("Klarna", "You've paid £25.00 to ASOS with Klarna")!!
+        assertEquals("ASOS", klarna.payee)
+        assertEquals(TransactionType.EXPENSE, klarna.type)
+        val paypal = read("PayPal", "You sent £10.00 to Ross Evans")!!
+        assertEquals("Ross Evans", paypal.payee)
+        val order = read("Order confirmed", "Your order of £18.40 from Deliveroo is confirmed")!!
+        assertEquals(1_840L, order.amountMinor)
+        assertEquals("Deliveroo", order.payee)
+    }
+
+    @Test
+    fun `statement ready alerts`() {
+        assertEquals(true, BankAlertParser.isStatementReady("Nationwide", "Your statement is ready to view"))
+        assertEquals(true, BankAlertParser.isStatementReady("Lloyds", "A new statement is available in the app"))
+        assertEquals(false, BankAlertParser.isStatementReady("Lloyds", "You spent £4.20 at Costa"))
+        assertNull(read("Nationwide", "Your statement is ready to view"))
+    }
 }

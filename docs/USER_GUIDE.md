@@ -517,14 +517,29 @@ last four digits in its name, then one named after the bank ("Nationwide"),
 then your main account. To choose, pick an account next to each banking app
 on the Live payments page.
 
+**Overpayments and paying things off.** "You've made a £100 overpayment to
+your mortgage", or a payment to Klarna, American Express or another lender
+you have an account for, is a move into that account rather than spending: it
+comes off what you owe straight away, and the loan's **Paying it off** card
+moves with it.
+
+**PayPal, Klarna and other payment apps.** Their "you paid" and order
+confirmations are read too, into an account named after them if you have one
+(a Klarna pay-later account, say). If your bank also tells you about the same
+amount within a day, it is added once, not twice.
+
+**Statement ready.** When your bank's app says a new statement is out, the
+app reminds you to bring it in. Switch **Tell me when a statement is ready**
+off if you'd rather not.
+
 **When the statement comes.** Import it as usual. Each live payment is matched
 to the bank's line for it and replaced by that line — the bank's date and
 wording win — so nothing is counted twice.
 
 **Good to know.**
 * Nationwide, Lloyds, Halifax, Bank of Scotland, Barclays, HSBC, first direct,
-  NatWest, RBS, Santander, Monzo, Starling, Revolut, Chase, American Express
-  and Google Wallet are read. Another app whose alert looks like a payment is
+  NatWest, RBS, Santander, Monzo, Starling, Revolut, Chase, American Express,
+  Google Wallet, PayPal, Klarna and Curve are read. Another app whose alert looks like a payment is
   listed under **Other apps that sent payment alerts**, and is only read if
   you switch it on. Text messages, WhatsApp and email are never read.
 * Direct Debits and standing orders often send no alert; they still come in

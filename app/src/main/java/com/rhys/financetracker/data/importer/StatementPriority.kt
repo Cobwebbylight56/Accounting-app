@@ -94,7 +94,7 @@ object StatementPriority {
         for ((candidate, date) in rows) {
             val type = candidate.transactionType ?: TransactionType.EXPENSE
             for (entry in correctable) {
-                if (entry.amountMinor != candidate.amountMinor || entry.type != type) continue
+                if (entry.amountMinor != candidate.amountMinor || !sameDirection(entry, type)) continue
                 val agreed = payeesAgree(candidate.name, entry.description)
                 val gap = kotlin.math.abs(ChronoUnit.DAYS.between(entry.date, date))
                 if (gap <= if (agreed) AGREED_DAYS else NEARBY_DAYS) {
@@ -133,6 +133,16 @@ object StatementPriority {
         }
         return corrections
     }
+
+    /**
+     * Whether [entry] moved money the way a statement row of [type] did. A
+     * move added from a bank alert — an overpayment into the mortgage — left
+     * this account, so the statement's money-out line for it is the same
+     * payment, whichever way the statement reader filed that line.
+     */
+    private fun sameDirection(entry: ExistingEntry, type: TransactionType): Boolean =
+        entry.type == type ||
+            (entry.source == RecordSource.LIVE && entry.type == TransactionType.TRANSFER && type == TransactionType.EXPENSE)
 
     /** A pairing the amounts and dates allow, with the evidence for it. */
     private data class Possible(

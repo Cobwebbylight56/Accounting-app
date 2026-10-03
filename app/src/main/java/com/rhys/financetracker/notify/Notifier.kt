@@ -36,6 +36,7 @@ class Notifier @Inject constructor(
         const val GOAL_PROGRESS = 1004
         const val ROLLOVER = 1005
         const val BACKUP = 1006
+        const val STATEMENT_READY = 1100
     }
 
     val hasPermission: Boolean
@@ -105,6 +106,17 @@ class Notifier @Inject constructor(
                     append(" archived")
                 }
             },
+        )
+    }
+
+    /** A bank says a statement is ready: the moment to bring it in. One per bank, replaced by the next. */
+    fun notifyStatementReady(bank: String) {
+        post(
+            id = Ids.STATEMENT_READY + (bank.hashCode() and 0xFF),
+            channel = NotificationChannels.BILLS,
+            title = "Your $bank statement is ready",
+            text = "Download it in the $bank app and share it to Finance Tracker to bring it in. " +
+                "Any payments added from alerts will be matched to it, not added twice.",
         )
     }
 
