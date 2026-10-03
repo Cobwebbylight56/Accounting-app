@@ -103,12 +103,19 @@ class SubscriptionsViewModel @Inject constructor(
 fun SubscriptionsScreen(
     onBack: () -> Unit,
     onOpenLedger: () -> Unit,
+    /** Shown as a tab of Bills & subscriptions, which has the title and back arrow. */
+    embedded: Boolean = false,
     viewModel: SubscriptionsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     Scaffold(
+        contentWindowInsets = if (embedded) {
+            androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0)
+        } else {
+            androidx.compose.material3.ScaffoldDefaults.contentWindowInsets
+        },
         topBar = {
-            TopAppBar(
+            if (!embedded) TopAppBar(
                 title = { Text("Subscriptions") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {

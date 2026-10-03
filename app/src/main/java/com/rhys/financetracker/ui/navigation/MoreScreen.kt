@@ -69,8 +69,8 @@ fun MoreScreen(
                 onClick = onOpenPeople,
             )
             SettingsItem(
-                title = "Regular payments",
-                subtitle = "Salary, bills and standing orders that repeat",
+                title = "Bills & subscriptions",
+                subtitle = "What your statements show you pay, and the salary and bills you set up",
                 icon = Icons.Outlined.EventRepeat,
                 onClick = onOpenRecurring,
             )

@@ -325,9 +325,12 @@ private fun NavGraphBuilder.topLevelDestinations(
     }
 
     composable(Routes.SUBSCRIPTIONS) {
-        com.rhys.financetracker.ui.subscriptions.SubscriptionsScreen(
+        com.rhys.financetracker.ui.subscriptions.BillsScreen(
             onBack = { navController.popBackStack() },
             onOpenLedger = { navController.navigate(Routes.LEDGER) },
+            onEditRule = { navController.navigate(Routes.recurringEdit(it)) },
+            onAddRule = { navController.navigate(Routes.recurringEdit()) },
+            startTab = 0,
         )
     }
 
@@ -525,10 +528,12 @@ private fun NavGraphBuilder.editorDestinations(
     }
 
     composable(Routes.RECURRING) {
-        RecurringScreen(
+        com.rhys.financetracker.ui.subscriptions.BillsScreen(
             onBack = { navController.popBackStack() },
+            onOpenLedger = { navController.navigate(Routes.LEDGER) },
             onEditRule = { navController.navigate(Routes.recurringEdit(it)) },
             onAddRule = { navController.navigate(Routes.recurringEdit()) },
+            startTab = 1,
         )
     }
 

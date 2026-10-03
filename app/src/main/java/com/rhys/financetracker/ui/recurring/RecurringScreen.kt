@@ -83,6 +83,8 @@ fun RecurringScreen(
     onBack: () -> Unit,
     onEditRule: (Long) -> Unit,
     onAddRule: () -> Unit,
+    /** Shown as a tab of Bills & subscriptions, which has the title and back arrow. */
+    embedded: Boolean = false,
     viewModel: RecurringViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -107,8 +109,21 @@ fun RecurringScreen(
     }
 
     Scaffold(
+        contentWindowInsets = if (embedded) {
+            androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0)
+        } else {
+            androidx.compose.material3.ScaffoldDefaults.contentWindowInsets
+        },
         topBar = {
-            TopAppBar(
+            if (embedded) {
+                androidx.compose.foundation.layout.Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End,
+                ) {
+                    TextButton(onClick = viewModel::findBills) { Text("Find bills") }
+                    TextButton(onClick = viewModel::catchUpNow) { Text("Update now") }
+                }
+            } else TopAppBar(
                 title = { Text("Regular payments") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
