@@ -1049,6 +1049,22 @@ interface TransactionDao {
     )
     suspend fun countLivePaidInto(accountId: Long, amountMinor: Long, since: Long): Int
 
+    /** Spending and income since [since] with no category: what "Needs a look" asks to sort. */
+    @Query(
+        """
+        SELECT COUNT(*) FROM transactions
+        WHERE is_archived = 0 AND category_id IS NULL AND type IN ('EXPENSE', 'INCOME') AND date >= :since
+        """,
+    )
+    fun observeUncategorisedCount(since: LocalDate): Flow<Int>
+
+    /**
+     * Payments added from bank alerts before [before] that no statement has
+     * replaced yet: the statement for them is probably waiting to be imported.
+     */
+    @Query("SELECT COUNT(*) FROM transactions WHERE is_archived = 0 AND source = 'LIVE' AND date < :before")
+    fun observeOldLiveCount(before: LocalDate): Flow<Int>
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(transaction: TransactionEntity): Long
 

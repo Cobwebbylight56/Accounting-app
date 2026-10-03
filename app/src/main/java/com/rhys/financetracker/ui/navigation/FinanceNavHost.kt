@@ -230,6 +230,8 @@ private fun NavGraphBuilder.topLevelDestinations(
             onOpenTransaction = { navController.navigate(Routes.transactionEdit(it)) },
             onAddTransaction = { navController.navigate(Routes.transactionEdit()) },
             addActions = addActions(navController),
+            inboxRoutes = inboxRoutes(navController),
+            onOpenInbox = { navController.navigate(Routes.INBOX) },
             onOpenAccounts = { navController.navigate(Routes.ACCOUNTS) },
             onOpenRecurring = { navController.navigate(Routes.RECURRING) },
             onOpenSavings = { navController.navigateToTab(Routes.SAVINGS) },
@@ -315,6 +317,7 @@ private fun NavGraphBuilder.topLevelDestinations(
             onOpenSubscriptions = { navController.navigate(Routes.SUBSCRIPTIONS) },
             onOpenCards = { navController.navigate(Routes.CARDS) },
             onScanReceipt = { navController.navigate(Routes.receiptScan()) },
+            onOpenInbox = { navController.navigate(Routes.INBOX) },
         )
     }
 
@@ -338,6 +341,13 @@ private fun NavGraphBuilder.topLevelDestinations(
         SortEverythingScreen(
             onBack = { navController.popBackStack() },
             onOpenSortSpending = { navController.navigate(Routes.SORT_SPENDING) },
+        )
+    }
+
+    composable(Routes.INBOX) {
+        com.rhys.financetracker.ui.inbox.InboxScreen(
+            onBack = { navController.popBackStack() },
+            routes = inboxRoutes(navController),
         )
     }
 
@@ -636,4 +646,15 @@ private fun addActions(navController: NavHostController) = com.rhys.financetrack
             Routes.transactionEdit(startType = com.rhys.financetracker.domain.model.TransactionType.TRANSFER),
         )
     },
+)
+
+/** Where "Needs a look" sends each thing. */
+private fun inboxRoutes(navController: NavHostController) = com.rhys.financetracker.ui.inbox.InboxRoutes(
+    sortPayments = { navController.navigate(Routes.SORT_SPENDING) },
+    openToCheck = { navController.navigate(Routes.LEDGER) },
+    importStatement = { navController.navigate(Routes.importForAccount()) },
+    openAccount = { navController.navigate(Routes.accountView(it)) },
+    openBills = { navController.navigate(Routes.SUBSCRIPTIONS) },
+    openBackup = { navController.navigate(Routes.SETTINGS_BACKUP) },
+    sortEverything = { navController.navigate(Routes.SORT_EVERYTHING) },
 )

@@ -48,6 +48,7 @@ fun MoreScreen(
     onOpenSubscriptions: () -> Unit = {},
     onOpenCards: () -> Unit = {},
     onScanReceipt: () -> Unit = {},
+    onOpenInbox: () -> Unit = {},
 ) {
     Scaffold(
         topBar = { TopAppBar(title = { Text("More") }) },
@@ -86,16 +87,10 @@ fun MoreScreen(
 
             SettingsGroupHeader("Tools")
             SettingsItem(
-                title = "Sort everything",
-                subtitle = "Go through all your entries and put each in the right place",
+                title = "Needs a look",
+                subtitle = "Payments to sort or check, missing statements, tidying up",
                 icon = Icons.Outlined.AutoFixHigh,
-                onClick = onOpenSortEverything,
-            )
-            SettingsItem(
-                title = "Sort spending",
-                subtitle = "Unsorted payments by who they went to — file each in one tap",
-                icon = Icons.Outlined.Category,
-                onClick = onOpenSortSpending,
+                onClick = onOpenInbox,
             )
             SettingsItem(
                 title = "Credit cards",

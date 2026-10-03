@@ -66,6 +66,8 @@ fun DashboardScreen(
     onOpenTransaction: (Long) -> Unit,
     onAddTransaction: () -> Unit,
     addActions: com.rhys.financetracker.ui.components.AddActions? = null,
+    inboxRoutes: com.rhys.financetracker.ui.inbox.InboxRoutes? = null,
+    onOpenInbox: () -> Unit = {},
     onOpenAccounts: () -> Unit,
     onOpenRecurring: () -> Unit,
     onOpenSavings: () -> Unit,
@@ -195,47 +197,10 @@ fun DashboardScreen(
                     )
                 }
 
-                resortNote?.let { note ->
-                    item {
-                        SectionCard(title = "Payments re-sorted") {
-                            Text(
-                                text = "The app now knows more shops, so it moved ${note.moved} " +
-                                    (if (note.moved == 1) "payment" else "payments") +
-                                    " it had filed itself into the right category" +
-                                    (if (note.examples.isEmpty()) "." else ": " + note.examples.joinToString(", ")) +
-                                    (if (note.examples.isNotEmpty() && note.moved > note.examples.size) " and others." else ".") +
-                                    " Anything you filed yourself was left alone.",
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                            Spacer(Modifier.height(10.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Button(onClick = viewModel::dismissResortNote, modifier = Modifier.weight(1f)) {
-                                    Text("OK")
-                                }
-                                TextButton(onClick = viewModel::undoResort) { Text("Put them back") }
-                            }
-                        }
-                    }
-                }
-
-                if (showBackupNudge) {
-                    item {
-                        SectionCard(title = "Back up your money") {
-                            Text(
-                                text = "Everything here is only on this phone. A backup keeps it " +
-                                    "safe if the phone is lost or the app is put on again — and " +
-                                    "you can save it to Drive or OneDrive.",
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                            Spacer(Modifier.height(10.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Button(onClick = onOpenBackup, modifier = Modifier.weight(1f)) {
-                                    Text("Back up now")
-                                }
-                                TextButton(onClick = viewModel::snoozeBackupNudge) { Text("Later") }
-                            }
-                        }
-                    }
+                // Everything that needs a look, in one card: re-sorts, payments
+                // to check or sort, missing statements, the backup reminder.
+                if (inboxRoutes != null) {
+                    item { com.rhys.financetracker.ui.inbox.NeedsALookCard(routes = inboxRoutes, onOpenInbox = onOpenInbox) }
                 }
 
                 item {

@@ -52,6 +52,7 @@ object Routes {
     const val SETTINGS_DASHBOARD = "settings/dashboard"
     const val SETTINGS_LIVE_PAYMENTS = "settings/live"
     const val RECEIPT_SCAN = "receipts/scan"
+    const val INBOX = "inbox"
     const val IMPORT = "import"
 
     /** Subscriptions and regular payments, and whether each is still being paid. */

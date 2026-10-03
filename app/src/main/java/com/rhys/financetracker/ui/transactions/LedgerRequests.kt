@@ -55,6 +55,11 @@ class LedgerRequests @Inject constructor() {
         pending.value = TransactionFilter(accountIds = setOf(accountId))
     }
 
+    /** Payments marked to check. */
+    fun openToCheck() {
+        pending.value = TransactionFilter(onlyUnconfirmed = true)
+    }
+
     fun consumed() {
         pending.value = null
     }
