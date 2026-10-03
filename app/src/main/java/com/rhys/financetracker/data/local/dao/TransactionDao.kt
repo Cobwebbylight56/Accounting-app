@@ -53,7 +53,8 @@ interface TransactionDao {
             c.kind AS category_kind,
             p.name AS person_name,
             p.color_hex AS person_color,
-            (SELECT COUNT(*) FROM transaction_splits sp WHERE sp.transaction_id = t.id) AS split_count
+            (SELECT COUNT(*) FROM transaction_splits sp WHERE sp.transaction_id = t.id) AS split_count,
+            (SELECT COUNT(*) FROM receipts rc WHERE rc.transaction_id = t.id) AS receipt_count
         """
 
         /**
@@ -250,6 +251,7 @@ interface TransactionDao {
         observedEntities = [
             TransactionEntity::class,
             com.rhys.financetracker.data.local.entity.TransactionSplitEntity::class,
+            com.rhys.financetracker.data.local.entity.ReceiptEntity::class,
             AccountEntity::class,
             CategoryEntity::class,
             PersonEntity::class,

@@ -33,6 +33,8 @@ data class TransactionWithDetails(
     @ColumnInfo(name = "category_kind") val categoryKind: com.rhys.financetracker.domain.model.CategoryKind? = null,
     /** How many parts it is split into across categories; 0 when it is not split. */
     @ColumnInfo(name = "split_count") val splitCount: Int = 0,
+    /** How many receipts, photos or screenshots are kept with it. */
+    @ColumnInfo(name = "receipt_count") val receiptCount: Int = 0,
 ) {
     /** Money moved to or from a person rather than spent or earned. */
     val isPersonTransfer: Boolean

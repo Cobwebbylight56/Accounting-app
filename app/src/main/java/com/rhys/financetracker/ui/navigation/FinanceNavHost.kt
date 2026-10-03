@@ -227,7 +227,7 @@ private fun NavGraphBuilder.topLevelDestinations(
 ) {
     composable(Routes.DASHBOARD) {
         DashboardScreen(
-            onOpenTransaction = { navController.navigate(Routes.transactionEdit(it)) },
+            onOpenTransaction = { navController.navigate(Routes.transactionView(it)) },
             onAddTransaction = { navController.navigate(Routes.transactionEdit()) },
             addActions = addActions(navController),
             inboxRoutes = inboxRoutes(navController),
@@ -269,7 +269,7 @@ private fun NavGraphBuilder.topLevelDestinations(
         ),
     ) {
         TransactionListScreen(
-            onOpenTransaction = { navController.navigate(Routes.transactionEdit(it)) },
+            onOpenTransaction = { navController.navigate(Routes.transactionView(it)) },
             onAddTransaction = { navController.navigate(Routes.transactionEdit()) },
             onOpenImport = { navController.navigate(Routes.importForAccount()) },
             onShareFile = onShareFile,
@@ -279,7 +279,7 @@ private fun NavGraphBuilder.topLevelDestinations(
 
     composable(Routes.TRANSACTIONS) {
         TransactionListScreen(
-            onOpenTransaction = { navController.navigate(Routes.transactionEdit(it)) },
+            onOpenTransaction = { navController.navigate(Routes.transactionView(it)) },
             onAddTransaction = { navController.navigate(Routes.transactionEdit()) },
             onOpenImport = { navController.navigate(Routes.importForAccount()) },
             onShareFile = onShareFile,
@@ -373,7 +373,7 @@ private fun NavGraphBuilder.topLevelDestinations(
         val personId = entry.arguments?.getLong(Routes.ARG_PERSON_ID) ?: Routes.NEW_ID
         SentToPeopleScreen(
             onBack = { navController.popBackStack() },
-            onOpenTransaction = { navController.navigate(Routes.transactionEdit(it)) },
+            onOpenTransaction = { navController.navigate(Routes.transactionView(it)) },
             personId = personId.takeIf { it != Routes.NEW_ID },
         )
     }
@@ -408,6 +408,17 @@ private fun NavGraphBuilder.editorDestinations(
     }
 
     composable(
+        route = Routes.TRANSACTION_VIEW_PATTERN,
+        arguments = listOf(navArgument(Routes.ARG_ID) { type = NavType.StringType }),
+    ) {
+        com.rhys.financetracker.ui.transactions.TransactionViewScreen(
+            onBack = { navController.popBackStack() },
+            onEdit = { navController.navigate(Routes.transactionEdit(it)) },
+            onSplit = { navController.navigate(Routes.transactionSplit(it)) },
+        )
+    }
+
+    composable(
         route = Routes.TRANSACTION_SPLIT_PATTERN,
         arguments = listOf(navArgument(Routes.ARG_ID) { type = NavType.StringType }),
     ) {
@@ -437,7 +448,7 @@ private fun NavGraphBuilder.editorDestinations(
                 }
             },
             onAddedPayment = { id ->
-                navController.navigate(Routes.transactionEdit(id)) {
+                navController.navigate(Routes.transactionView(id)) {
                     popUpTo(Routes.RECEIPT_SCAN_PATTERN) { inclusive = true }
                 }
             },
@@ -466,7 +477,7 @@ private fun NavGraphBuilder.editorDestinations(
             onBack = { navController.popBackStack() },
             onEdit = { navController.navigate(Routes.accountEdit(it)) },
             onImportStatement = { navController.navigate(Routes.importForAccount(it)) },
-            onOpenTransaction = { navController.navigate(Routes.transactionEdit(it)) },
+            onOpenTransaction = { navController.navigate(Routes.transactionView(it)) },
             onOpenLedger = { navController.navigate(Routes.LEDGER) },
         )
     }

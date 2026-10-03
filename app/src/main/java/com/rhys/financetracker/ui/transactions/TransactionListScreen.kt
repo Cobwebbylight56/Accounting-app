@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -385,6 +386,26 @@ private fun TransactionRow(
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                             )
                         }
+                    }
+                    // The same small marks everywhere: from a bank alert
+                    // (the statement will replace it), and has a receipt.
+                    if (entry.source == com.rhys.financetracker.domain.model.RecordSource.LIVE) {
+                        Spacer(Modifier.width(6.dp))
+                        Icon(
+                            androidx.compose.material.icons.Icons.Outlined.Bolt,
+                            contentDescription = "From a bank alert",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                    if (item.receiptCount > 0) {
+                        Spacer(Modifier.width(4.dp))
+                        Icon(
+                            androidx.compose.material.icons.Icons.Outlined.ReceiptLong,
+                            contentDescription = "Has a receipt",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp),
+                        )
                     }
                     if (entry.isArchived) {
                         Spacer(Modifier.width(8.dp))

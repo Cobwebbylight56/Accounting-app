@@ -210,75 +210,86 @@ fun TransactionEditScreen(
                 )
             }
 
-            DropdownField(
-                label = "Who is this for?",
-                options = state.people,
-                selected = state.people.firstOrNull { it.id == state.form.personId },
-                onSelect = { person -> viewModel.update { it.copy(personId = person.id) } },
-                optionLabel = { it.name },
-                optionColor = { colorFromHex(it.colorHex) },
-                placeholder = "The account's owner",
-            )
-
-            if (state.savingsGoals.isNotEmpty()) {
+            // The essentials above; who it was for, a goal, notes, tags and
+            // whether it has gone through yet are tucked under More details,
+            // open when any of them has something in it.
+            val hasDetails = state.form.personId != null || state.form.savingsGoalId != null ||
+                state.form.notes.isNotBlank() || state.form.tags.isNotBlank() || !state.form.isCleared
+            var moreDetails by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+            val showDetails = moreDetails || hasDetails
+            if (!hasDetails) {
+                androidx.compose.material3.TextButton(onClick = { moreDetails = !moreDetails }) {
+                    Text(if (moreDetails) "Fewer details" else "More details — person, goal, notes, tags")
+                }
+            }
+            if (showDetails) {
                 DropdownField(
-                    label = "Put towards a goal",
-                    options = state.savingsGoals,
-                    selected = state.savingsGoals.firstOrNull { it.id == state.form.savingsGoalId },
-                    onSelect = { goal -> viewModel.update { it.copy(savingsGoalId = goal.id) } },
+                    label = "Who is this for?",
+                    options = state.people,
+                    selected = state.people.firstOrNull { it.id == state.form.personId },
+                    onSelect = { person -> viewModel.update { it.copy(personId = person.id) } },
                     optionLabel = { it.name },
                     optionColor = { colorFromHex(it.colorHex) },
-                    placeholder = "Not linked to a goal",
+                    placeholder = "The account's owner",
                 )
-            }
 
-            LabelledTextField(
-                label = "Notes",
-                value = state.form.notes,
-                onValueChange = { text -> viewModel.update { it.copy(notes = text) } },
-                singleLine = false,
-                supportingText = "Anything you might want to search for later",
-            )
-
-            LabelledTextField(
-                label = "Tags",
-                value = state.form.tags,
-                onValueChange = { text -> viewModel.update { it.copy(tags = text) } },
-                placeholder = "holiday, birthday",
-                supportingText = "Separate tags with commas",
-                keyboardType = KeyboardType.Text,
-            )
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Money has left the account", style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        text = "Turn this off for a payment you have arranged but that has " +
-                            "not gone through yet",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                if (state.savingsGoals.isNotEmpty()) {
+                    DropdownField(
+                        label = "Put towards a goal",
+                        options = state.savingsGoals,
+                        selected = state.savingsGoals.firstOrNull { it.id == state.form.savingsGoalId },
+                        onSelect = { goal -> viewModel.update { it.copy(savingsGoalId = goal.id) } },
+                        optionLabel = { it.name },
+                        optionColor = { colorFromHex(it.colorHex) },
+                        placeholder = "Not linked to a goal",
                     )
                 }
-                Switch(
-                    checked = state.form.isCleared,
-                    onCheckedChange = { checked ->
-                        viewModel.update { it.copy(isCleared = checked) }
-                    },
+
+                LabelledTextField(
+                    label = "Notes",
+                    value = state.form.notes,
+                    onValueChange = { text -> viewModel.update { it.copy(notes = text) } },
+                    singleLine = false,
+                    supportingText = "Anything you might want to search for later",
                 )
+
+                LabelledTextField(
+                    label = "Tags",
+                    value = state.form.tags,
+                    onValueChange = { text -> viewModel.update { it.copy(tags = text) } },
+                    placeholder = "holiday, birthday",
+                    supportingText = "Separate tags with commas",
+                    keyboardType = KeyboardType.Text,
+                )
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Money has left the account", style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            text = "Turn this off for a payment you have arranged but that has " +
+                                "not gone through yet",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = state.form.isCleared,
+                        onCheckedChange = { checked ->
+                            viewModel.update { it.copy(isCleared = checked) }
+                        },
+                    )
+                }
             }
 
             // A receipt, photo or screenshot kept with the payment; a new one
             // can be started from a receipt instead of typed in.
+            // Receipts and splitting live on the payment's own page, opened
+            // before editing; a new one can start from a receipt instead.
             if (state.isNew) {
                 androidx.compose.material3.OutlinedButton(
                     onClick = onScanReceipt,
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("Scan a receipt instead") }
-            } else {
-                com.rhys.financetracker.ui.receipts.PaymentReceipts(transactionId = viewModel.transactionId)
-                if (state.form.type == TransactionType.EXPENSE) {
-                    SplitButton(viewModel = viewModel, onSplit = { onSplit(viewModel.transactionId) })
-                }
             }
 
             Spacer(Modifier.height(8.dp))
