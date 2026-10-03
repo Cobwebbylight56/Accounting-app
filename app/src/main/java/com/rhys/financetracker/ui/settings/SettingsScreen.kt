@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.AutoFixHigh
 import androidx.compose.material.icons.outlined.Backup
@@ -106,7 +107,49 @@ fun SettingsScreen(
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
 
-            SettingsGroupHeader("How the app looks and behaves")
+            // Three groups by what they are for, and the rarely needed jobs
+            // folded away under Advanced.
+            SettingsGroupHeader("Automatic")
+            SettingsItem(
+                title = "Live payments",
+                subtitle = if (state.settings.liveAlerts) {
+                    "On: payments added from your bank's alerts as they happen"
+                } else {
+                    "Off: add payments the moment your bank alerts you"
+                },
+                icon = Icons.Outlined.Bolt,
+                onClick = onOpenLivePayments,
+            )
+            SettingsItem(
+                title = "Rates and figures",
+                subtitle = if (state.settings.externalDataEnabled) {
+                    "Updating automatically"
+                } else {
+                    "Turned off"
+                },
+                icon = Icons.Outlined.CloudDownload,
+                onClick = onOpenExternalData,
+            )
+
+            SettingsGroupHeader("Your data")
+            SettingsItem(
+                title = "Backup and restore",
+                subtitle = state.settings.lastBackupAt?.let {
+                    "Last backup " + DateUtils.format(
+                        Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate(),
+                    )
+                } ?: "No backup taken yet",
+                icon = Icons.Outlined.Backup,
+                onClick = onOpenBackup,
+            )
+            SettingsItem(
+                title = "Categories",
+                subtitle = "How your spending is grouped",
+                icon = Icons.Outlined.Category,
+                onClick = onOpenCategories,
+            )
+
+            SettingsGroupHeader("App")
             SettingsItem(
                 title = "Appearance",
                 subtitle = "Light or dark, colours, text size",
@@ -119,8 +162,6 @@ fun SettingsScreen(
                 icon = Icons.Outlined.Dashboard,
                 onClick = onOpenDashboardLayout,
             )
-
-            SettingsGroupHeader("Privacy and reminders")
             SettingsItem(
                 title = "Lock and security",
                 subtitle = if (state.settings.isLockEnabled) {
@@ -138,69 +179,43 @@ fun SettingsScreen(
                 onClick = onOpenNotifications,
             )
 
-            SettingsGroupHeader("Your data")
+            var showAdvanced by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
             SettingsItem(
-                title = "Live payments",
-                subtitle = if (state.settings.liveAlerts) {
-                    "On: payments added from your bank's alerts as they happen"
-                } else {
-                    "Off: add payments the moment your bank alerts you"
-                },
-                icon = Icons.Outlined.Bolt,
-                onClick = onOpenLivePayments,
+                title = if (showAdvanced) "Hide advanced" else "Advanced",
+                subtitle = "Monthly update, rebuilding the archive, starting again",
+                icon = Icons.Outlined.Tune,
+                onClick = { showAdvanced = !showAdvanced },
             )
-            SettingsItem(
-                title = "Backup and restore",
-                subtitle = state.settings.lastBackupAt?.let {
-                    "Last backup " + DateUtils.format(
-                        Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate(),
-                    )
-                } ?: "No backup taken yet",
-                icon = Icons.Outlined.Backup,
-                onClick = onOpenBackup,
-            )
-            SettingsItem(
-                title = "Rates and figures",
-                subtitle = if (state.settings.externalDataEnabled) {
-                    "Updating automatically"
-                } else {
-                    "Turned off"
-                },
-                icon = Icons.Outlined.CloudDownload,
-                onClick = onOpenExternalData,
-            )
-
-            // Categories and Import live under More, where they are used;
-            // these are the rarely-needed jobs, kept together and out of the way.
-            SettingsGroupHeader("Advanced")
-            SettingsItem(
-                title = "Run the monthly update now",
-                subtitle = "Adds anything due and archives finished months",
-                icon = Icons.Outlined.Refresh,
-                onClick = viewModel::runMonthlyUpdate,
-            )
-            SettingsItem(
-                title = "Rebuild the monthly archive",
-                subtitle = "Recalculates every archived month from your payments",
-                icon = Icons.Outlined.Refresh,
-                onClick = viewModel::rebuildArchive,
-            )
-            // Made-up people and payments mixed into real ones cannot be
-            // picked back out, so the example is only offered to an empty app.
-            if (!state.hasAccounts) {
+            if (showAdvanced) {
                 SettingsItem(
-                    title = "Load the example household",
-                    subtitle = "Adds a worked example so you can see how everything fits together",
-                    icon = Icons.Outlined.PlayCircle,
-                    onClick = { showExampleConfirm = true },
+                    title = "Run the monthly update now",
+                    subtitle = "Adds anything due and archives finished months",
+                    icon = Icons.Outlined.Refresh,
+                    onClick = viewModel::runMonthlyUpdate,
+                )
+                SettingsItem(
+                    title = "Rebuild the monthly archive",
+                    subtitle = "Recalculates every archived month from your payments",
+                    icon = Icons.Outlined.Refresh,
+                    onClick = viewModel::rebuildArchive,
+                )
+                // Made-up people and payments mixed into real ones cannot be
+                // picked back out, so the example is only offered to an empty app.
+                if (!state.hasAccounts) {
+                    SettingsItem(
+                        title = "Load the example household",
+                        subtitle = "Adds a worked example so you can see how everything fits together",
+                        icon = Icons.Outlined.PlayCircle,
+                        onClick = { showExampleConfirm = true },
+                    )
+                }
+                SettingsItem(
+                    title = "Delete everything",
+                    subtitle = "Clears all accounts, payments and goals",
+                    icon = Icons.Outlined.DeleteForever,
+                    onClick = { showClearConfirm = true },
                 )
             }
-            SettingsItem(
-                title = "Delete everything",
-                subtitle = "Clears all accounts, payments and goals",
-                icon = Icons.Outlined.DeleteForever,
-                onClick = { showClearConfirm = true },
-            )
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 

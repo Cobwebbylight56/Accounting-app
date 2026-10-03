@@ -78,6 +78,7 @@ class SettingsRepository @Inject constructor(
         val LIVE_ALERT_LAST = stringPreferencesKey("live_alert_last")
         val LIVE_STATEMENT_NUDGE = booleanPreferencesKey("live_statement_nudge")
         val LIVE_CARD_ACCOUNTS = stringPreferencesKey("live_card_accounts")
+        val SETUP_HIDDEN = booleanPreferencesKey("setup_checklist_hidden")
     }
 
     /** Defaults chosen so a fresh install is immediately usable and private. */
@@ -165,6 +166,7 @@ class SettingsRepository @Inject constructor(
             liveAlertLast = prefs[Keys.LIVE_ALERT_LAST].orEmpty(),
             liveStatementNudge = prefs[Keys.LIVE_STATEMENT_NUDGE] ?: true,
             liveCardAccounts = cardAccountsOf(prefs[Keys.LIVE_CARD_ACCOUNTS]),
+            setupChecklistHidden = prefs[Keys.SETUP_HIDDEN] ?: false,
         )
     }
 
@@ -312,6 +314,9 @@ class SettingsRepository @Inject constructor(
             parts[1].toLongOrNull()?.let { parts[0] to it }
         }.toMap()
 
+    /** Hides the Get set up checklist on Home for good. */
+    suspend fun hideSetupChecklist() = put(Keys.SETUP_HIDDEN, true)
+
     /** Whether a bank's "statement ready" alert brings a reminder to import it. */
     suspend fun setLiveStatementNudge(enabled: Boolean) = put(Keys.LIVE_STATEMENT_NUDGE, enabled)
 
@@ -414,6 +419,8 @@ data class AppSettings(
     val liveStatementNudge: Boolean = true,
     /** The account each card belongs to, by its last four digits: how a Google Wallet tap finds its account. */
     val liveCardAccounts: Map<String, Long> = emptyMap(),
+    /** The Get set up checklist was put away. */
+    val setupChecklistHidden: Boolean = false,
 ) {
     val isLockEnabled: Boolean get() = lockMethod != LockMethod.NONE
     val requiresPin: Boolean

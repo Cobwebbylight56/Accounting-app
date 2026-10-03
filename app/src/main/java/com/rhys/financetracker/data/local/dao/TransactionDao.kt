@@ -1051,6 +1051,10 @@ interface TransactionDao {
     )
     suspend fun countLivePaidInto(accountId: Long, amountMinor: Long, since: Long): Int
 
+    /** Whether any statement has been imported, for the Get set up checklist. */
+    @Query("SELECT COUNT(*) FROM transactions WHERE source = 'STATEMENT'")
+    fun observeStatementRowCount(): Flow<Int>
+
     /** Spending and income since [since] with no category: what "Needs a look" asks to sort. */
     @Query(
         """

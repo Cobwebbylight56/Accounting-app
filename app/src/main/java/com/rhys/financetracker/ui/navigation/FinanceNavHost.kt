@@ -231,6 +231,13 @@ private fun NavGraphBuilder.topLevelDestinations(
             onAddTransaction = { navController.navigate(Routes.transactionEdit()) },
             addActions = addActions(navController),
             inboxRoutes = inboxRoutes(navController),
+            setupRoutes = com.rhys.financetracker.ui.setup.SetupRoutes(
+                people = { navController.navigate(Routes.SETUP) },
+                accounts = { navController.navigateToTab(Routes.ACCOUNTS) },
+                statement = { navController.navigate(Routes.importForAccount()) },
+                live = { navController.navigate(Routes.SETTINGS_LIVE_PAYMENTS) },
+                backup = { navController.navigate(Routes.SETTINGS_BACKUP) },
+            ),
             onOpenInbox = { navController.navigate(Routes.INBOX) },
             onOpenAccounts = { navController.navigateToTab(Routes.ACCOUNTS) },
             onOpenRecurring = { navController.navigate(Routes.RECURRING) },

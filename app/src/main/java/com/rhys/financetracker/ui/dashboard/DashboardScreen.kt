@@ -67,6 +67,7 @@ fun DashboardScreen(
     onAddTransaction: () -> Unit,
     addActions: com.rhys.financetracker.ui.components.AddActions? = null,
     inboxRoutes: com.rhys.financetracker.ui.inbox.InboxRoutes? = null,
+    setupRoutes: com.rhys.financetracker.ui.setup.SetupRoutes? = null,
     onOpenInbox: () -> Unit = {},
     onOpenAccounts: () -> Unit,
     onOpenRecurring: () -> Unit,
@@ -213,22 +214,11 @@ fun DashboardScreen(
                     )
                 }
 
-                // Money exists but nobody has been set up to own it — an
-                // install from before the app was built around people.
-                if (individuals.isEmpty()) {
-                    item {
-                        SectionCard(title = "Who is this money for?") {
-                            Text(
-                                text = "Set yourself up as a person, then your accounts go " +
-                                    "under your name and Home becomes your tab.",
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                            Spacer(Modifier.height(12.dp))
-                            Button(onClick = onOpenSetup, modifier = Modifier.fillMaxWidth()) {
-                                Text("Set up a person")
-                            }
-                        }
-                    }
+                // Get set up: people, accounts, a statement, live payments and
+                // a backup, ticked off as they are done, in place of a prompt
+                // for each.
+                if (setupRoutes != null) {
+                    item { com.rhys.financetracker.ui.setup.GetSetUpCard(setupRoutes) }
                 }
 
                 item { HomeTiles(state = state, onOpenAccounts = onOpenAccounts) }

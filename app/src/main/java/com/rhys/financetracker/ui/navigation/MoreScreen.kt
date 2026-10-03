@@ -74,12 +74,6 @@ fun MoreScreen(
                 icon = Icons.Outlined.EventRepeat,
                 onClick = onOpenRecurring,
             )
-            SettingsItem(
-                title = "Categories",
-                subtitle = "How your spending is grouped",
-                icon = Icons.Outlined.Category,
-                onClick = onOpenCategories,
-            )
 
             SettingsGroupHeader("Tools")
             SettingsItem(
