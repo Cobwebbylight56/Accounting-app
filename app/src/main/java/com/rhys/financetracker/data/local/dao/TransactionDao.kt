@@ -994,18 +994,16 @@ interface TransactionDao {
     suspend fun countWithHash(hash: String): Int
 
     /**
-     * Payments of this amount and direction added from bank alerts since
-     * [since] (epoch millis): the same payment told twice, by the bank and
-     * by Google Wallet, arrives within moments. [type] is the TransactionType name.
+     * Moves a payment added from an alert to [accountId]: a bank's own alert
+     * for a payment Google Wallet told of first knows the account for sure.
      */
     @Query(
         """
-        SELECT COUNT(*) FROM transactions
-        WHERE source = 'LIVE' AND is_archived = 0
-          AND amount_minor = :amountMinor AND type = :type AND created_at >= :since
+        UPDATE transactions SET account_id = :accountId, updated_at = :updatedAt
+        WHERE import_hash = :hash AND source = 'LIVE' AND is_archived = 0
         """,
     )
-    suspend fun countRecentLive(amountMinor: Long, type: String, since: Long): Int
+    suspend fun moveLive(hash: String, accountId: Long, updatedAt: Long): Int
 
     /**
      * The import hashes ("live:<app>:…") of payments of this amount and

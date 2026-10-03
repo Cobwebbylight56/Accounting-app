@@ -77,6 +77,7 @@ class SettingsRepository @Inject constructor(
         val LIVE_ALERT_SEEN = stringSetPreferencesKey("live_alert_seen")
         val LIVE_ALERT_LAST = stringPreferencesKey("live_alert_last")
         val LIVE_STATEMENT_NUDGE = booleanPreferencesKey("live_statement_nudge")
+        val LIVE_CARD_ACCOUNTS = stringPreferencesKey("live_card_accounts")
     }
 
     /** Defaults chosen so a fresh install is immediately usable and private. */
@@ -163,6 +164,7 @@ class SettingsRepository @Inject constructor(
             liveAlertSeen = prefs[Keys.LIVE_ALERT_SEEN].orEmpty(),
             liveAlertLast = prefs[Keys.LIVE_ALERT_LAST].orEmpty(),
             liveStatementNudge = prefs[Keys.LIVE_STATEMENT_NUDGE] ?: true,
+            liveCardAccounts = cardAccountsOf(prefs[Keys.LIVE_CARD_ACCOUNTS]),
         )
     }
 
@@ -283,6 +285,33 @@ class SettingsRepository @Inject constructor(
         }
     }
 
+    /** Which account the card ending [ending] belongs to; null forgets the card. */
+    suspend fun setLiveCardAccount(ending: String, accountId: Long?) {
+        context.dataStore.edit { prefs ->
+            val current = cardAccountsOf(prefs[Keys.LIVE_CARD_ACCOUNTS])
+            val updated = if (accountId == null) current - ending else current + (ending to accountId)
+            prefs[Keys.LIVE_CARD_ACCOUNTS] = updated.entries.joinToString(";") { "${it.key}=${it.value}" }
+        }
+    }
+
+    /** Learns that card [ending] is [accountId]'s, unless it is already known. */
+    suspend fun rememberLiveCard(ending: String, accountId: Long) {
+        context.dataStore.edit { prefs ->
+            val current = cardAccountsOf(prefs[Keys.LIVE_CARD_ACCOUNTS])
+            if (ending !in current) {
+                prefs[Keys.LIVE_CARD_ACCOUNTS] = (current + (ending to accountId)).entries
+                    .joinToString(";") { "${it.key}=${it.value}" }
+            }
+        }
+    }
+
+    private fun cardAccountsOf(stored: String?): Map<String, Long> =
+        stored.orEmpty().split(';').mapNotNull { pair ->
+            val parts = pair.split('=')
+            if (parts.size != 2) return@mapNotNull null
+            parts[1].toLongOrNull()?.let { parts[0] to it }
+        }.toMap()
+
     /** Whether a bank's "statement ready" alert brings a reminder to import it. */
     suspend fun setLiveStatementNudge(enabled: Boolean) = put(Keys.LIVE_STATEMENT_NUDGE, enabled)
 
@@ -383,6 +412,8 @@ data class AppSettings(
     val liveAlertLast: String = "",
     /** A bank's "statement ready" alert brings a reminder to import it. */
     val liveStatementNudge: Boolean = true,
+    /** The account each card belongs to, by its last four digits: how a Google Wallet tap finds its account. */
+    val liveCardAccounts: Map<String, Long> = emptyMap(),
 ) {
     val isLockEnabled: Boolean get() = lockMethod != LockMethod.NONE
     val requiresPin: Boolean

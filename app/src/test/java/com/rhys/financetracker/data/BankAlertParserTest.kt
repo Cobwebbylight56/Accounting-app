@@ -89,8 +89,28 @@ class BankAlertParserTest {
     @Test
     fun `wallet style puts the shop in the title`() {
         val alert = read("Tesco Express", "£8.40 with Visa •••• 4321")
-        // No direction word: read nothing rather than guess.
+        // No direction word: from a bank, read nothing rather than guess.
         assertNull(alert)
+        // From Google Wallet, a tap is a card payment.
+        val tap = BankAlertParser.parse("Tesco Express", "£8.40 with Visa •••• 4321", assumeSpending = true)!!
+        assertEquals(840L, tap.amountMinor)
+        assertEquals(TransactionType.EXPENSE, tap.type)
+        assertEquals("Tesco Express", tap.payee)
+        assertEquals("4321", tap.ending)
+        val short = BankAlertParser.parse("Costa Coffee", "£3.10 with Mastercard ••1234", assumeSpending = true)!!
+        assertEquals("Costa Coffee", short.payee)
+        assertEquals("1234", short.ending)
+        // Even from Wallet, a refund is money back, and a card being added is nothing.
+        assertEquals(
+            TransactionType.INCOME,
+            BankAlertParser.parse("ASOS", "Refund of £20.00 to Visa •••• 4321", assumeSpending = true)!!.type,
+        )
+        assertNull(BankAlertParser.parse("Google Wallet", "Your Visa •••• 4321 is ready to use", assumeSpending = true))
+        // Wallet's own name is not the shop.
+        assertEquals(
+            "Card payment",
+            BankAlertParser.parse("Google Wallet", "£5.00 with Visa •••• 4321", assumeSpending = true)!!.payee,
+        )
         val paid = read("Tesco Express", "Paid £8.40 with Visa •••• 4321")!!
         assertEquals("Tesco Express", paid.payee)
         assertEquals("4321", paid.ending)

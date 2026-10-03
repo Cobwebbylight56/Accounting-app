@@ -74,6 +74,10 @@ class LivePaymentsViewModel @Inject constructor(
         viewModelScope.launch { settingsRepository.setLiveAlertAccount(app, accountId) }
     }
 
+    fun setCardAccount(ending: String, accountId: Long?) {
+        viewModelScope.launch { settingsRepository.setLiveCardAccount(ending, accountId) }
+    }
+
     fun setStatementNudge(enabled: Boolean) {
         viewModelScope.launch { settingsRepository.setLiveStatementNudge(enabled) }
     }
@@ -186,6 +190,26 @@ fun LivePaymentsScreen(
                 "named after the bank, then your main account.",
         )
 
+        SettingsGroupHeader("Your cards")
+        if (settings.liveCardAccounts.isEmpty()) {
+            SettingsNote(
+                "Cards show here once an alert names one by its last four digits. Google Wallet only " +
+                    "says which card was tapped, so this is how its payments find the right account.",
+            )
+        } else {
+            SettingsNote("Google Wallet taps on each card go to the account beside it. Your bank's alerts fill these in.")
+        }
+        settings.liveCardAccounts.entries.sortedBy { it.key }.forEach { (ending, accountId) ->
+            DropdownField(
+                label = "Card ending $ending",
+                options = listOf<AccountEntity?>(null) + state.accounts,
+                selected = state.accounts.firstOrNull { it.id == accountId },
+                onSelect = { viewModel.setCardAccount(ending, it?.id) },
+                optionLabel = { it?.name ?: "Forget this card" },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+            )
+        }
+
         val others = settings.liveAlertSeen
             .map { it.substringBefore('|') to it.substringAfter('|') }
             .filter { (app, _) -> app !in BankApps.KNOWN }
@@ -212,7 +236,8 @@ fun LivePaymentsScreen(
             "Payments from alerts are filed like statement lines and show on Home and Spending at once. " +
                 "An overpayment, or a payment to a card, Klarna or loan, comes off what you owe on it " +
                 "rather than counting as spending. A payment PayPal, Klarna or Google Wallet tells you " +
-                "about that your bank tells you about too is only added once. " +
+                "about that your bank tells you about too is only added once — and if Google Wallet " +
+                "got there first, your bank's alert moves it to the right account. " +
                 "When you import that month's statement, each one is matched to the bank's line and " +
                 "replaced by it, so nothing is counted twice. Direct Debits and standing orders often " +
                 "don't send an alert, so those still come in with the statement.",

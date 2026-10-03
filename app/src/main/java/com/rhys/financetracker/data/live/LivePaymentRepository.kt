@@ -8,7 +8,9 @@ import com.rhys.financetracker.data.importer.TransactionFingerprint
 import com.rhys.financetracker.data.local.dao.AccountDao
 import com.rhys.financetracker.data.local.dao.CategoryDao
 import com.rhys.financetracker.data.local.dao.TransactionDao
+import com.rhys.financetracker.data.local.entity.AccountEntity
 import com.rhys.financetracker.data.local.entity.TransactionEntity
+import com.rhys.financetracker.data.prefs.AppSettings
 import com.rhys.financetracker.data.prefs.SettingsRepository
 import com.rhys.financetracker.domain.model.AccountType
 import com.rhys.financetracker.domain.model.CategoryKind
@@ -59,46 +61,47 @@ class LivePaymentRepository @Inject constructor(
             return Outcome.STATEMENT_READY
         }
 
-        val alert = BankAlertParser.parse(title, text) ?: return Outcome.NOT_A_PAYMENT
+        val tapApp = app in BankApps.CARD_TAP_APPS
+        val alert = BankAlertParser.parse(title, text, assumeSpending = tapApp) ?: return Outcome.NOT_A_PAYMENT
         if (app !in BankApps.KNOWN && app !in settings.liveAlertApps) {
             // Offered on the Live payments page; nothing of the alert is kept.
             settingsRepository.noteLiveAlertApp(app, appLabel)
             return Outcome.NOT_ALLOWED
         }
 
-        // The same alert posted again (an update, or after a restart), or the
-        // same payment told twice a moment apart.
+        // The same alert posted again: an update, or after a restart.
         val hash = "live:$app:$postedAt:${alert.amountMinor}:${alert.type.name}"
         if (transactionDao.countWithHash(hash) > 0) return Outcome.ALREADY_ADDED
-        val now = Instant.now().toEpochMilli()
-        if (transactionDao.countRecentLive(alert.amountMinor, alert.type.name, now - SAME_PAYMENT_MILLIS) > 0) {
-            return Outcome.ALREADY_ADDED
-        }
-        // A PayPal, Klarna or Google Wallet payment the bank also told of, or
-        // the other way round, can be hours apart.
-        val toldByOthers = transactionDao.recentLiveHashes(alert.amountMinor, alert.type.name, now - TOLD_TWICE_MILLIS)
-            .map { it.split(':').getOrNull(1).orEmpty() }
-            .filter { it.isNotEmpty() && it != app }
-        if (toldByOthers.any { other -> app in BankApps.ALSO_TOLD_BY_BANK || other in BankApps.ALSO_TOLD_BY_BANK }) {
-            return Outcome.ALREADY_ADDED
-        }
 
         val accounts = accountDao.getAllActive()
-        val chosen = settings.liveAlertAccounts[app]?.takeIf { id -> accounts.any { it.id == id } }
-        val accountId = chosen ?: BankApps.pickAccount(
-            bank = bank,
-            ending = alert.ending,
-            accounts = accounts.map { account ->
-                BankApps.AccountOption(
-                    id = account.id,
-                    name = account.name,
-                    notes = account.notes,
-                    isSpending = account.holding == Holding.SPEND,
-                    isCard = account.type == AccountType.CREDIT_CARD,
-                )
-            },
-            defaultAccountId = settings.defaultAccountId,
-        ) ?: return Outcome.NO_ACCOUNT
+        val accountId = chooseAccount(app, bank, tapApp, alert, settings, accounts) ?: return Outcome.NO_ACCOUNT
+        // Learn the card, so a Google Wallet tap on it finds this account. The
+        // bank's own alert knows the account; a wallet's is only a first guess.
+        alert.ending?.let { ending ->
+            if (tapApp) {
+                settingsRepository.rememberLiveCard(ending, accountId)
+            } else {
+                settingsRepository.setLiveCardAccount(ending, accountId)
+            }
+        }
+
+        // The same payment told twice: by the bank and Google Wallet a moment
+        // apart, or by the bank and PayPal or Klarna hours apart. Whichever
+        // came first is kept — but the bank knows the account for certain, so
+        // when Wallet or PayPal came first, the bank's alert puts it right.
+        val now = Instant.now().toEpochMilli()
+        val sameMoment = transactionDao.recentLiveHashes(alert.amountMinor, alert.type.name, now - SAME_PAYMENT_MILLIS)
+        val sameDay = transactionDao.recentLiveHashes(alert.amountMinor, alert.type.name, now - TOLD_TWICE_MILLIS)
+        val twin = sameMoment.firstOrNull() ?: sameDay.firstOrNull { other ->
+            val otherApp = appOf(other)
+            otherApp != app && (app in BankApps.ALSO_TOLD_BY_BANK || otherApp in BankApps.ALSO_TOLD_BY_BANK)
+        }
+        if (twin != null) {
+            if (app !in BankApps.ALSO_TOLD_BY_BANK && appOf(twin) in BankApps.ALSO_TOLD_BY_BANK) {
+                transactionDao.moveLive(twin, accountId, now)
+            }
+            return Outcome.ALREADY_ADDED
+        }
 
         // Money paid to a mortgage, loan, card or pay-later plan — an
         // overpayment, a Klarna instalment — is a move into it: it comes off
@@ -164,6 +167,43 @@ class LivePaymentRepository @Inject constructor(
         )
         return Outcome.ADDED
     }
+
+    /**
+     * Where a payment from [app] goes. A bank's alerts go to the account
+     * chosen for that bank, then the card's; a wallet's to the card's account
+     * first, as one wallet holds cards from several banks. Failing both, one
+     * is picked from the card's digits and the bank's name.
+     */
+    private fun chooseAccount(
+        app: String,
+        bank: String?,
+        tapApp: Boolean,
+        alert: BankAlertParser.Alert,
+        settings: AppSettings,
+        accounts: List<AccountEntity>,
+    ): Long? {
+        fun valid(id: Long?) = id?.takeIf { wanted -> accounts.any { it.id == wanted } }
+        val forApp = valid(settings.liveAlertAccounts[app])
+        val forCard = valid(alert.ending?.let { settings.liveCardAccounts[it] })
+        (if (tapApp) forCard ?: forApp else forApp ?: forCard)?.let { return it }
+        return BankApps.pickAccount(
+            bank = bank.takeUnless { tapApp },
+            ending = alert.ending,
+            accounts = accounts.map { account ->
+                BankApps.AccountOption(
+                    id = account.id,
+                    name = account.name,
+                    notes = account.notes,
+                    isSpending = account.holding == Holding.SPEND,
+                    isCard = account.type == AccountType.CREDIT_CARD,
+                )
+            },
+            defaultAccountId = settings.defaultAccountId,
+        )
+    }
+
+    /** The app a live payment's hash ("live:<app>:…") came from. */
+    private fun appOf(hash: String): String = hash.split(':').getOrNull(1).orEmpty()
 
     /** "mortgage", "loan", "credit card" or "pay later" for borrowing; null for anything else. */
     private fun borrowingKind(type: AccountType): String? = when (type) {

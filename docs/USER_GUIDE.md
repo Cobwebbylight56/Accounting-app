@@ -528,6 +528,15 @@ confirmations are read too, into an account named after them if you have one
 (a Klarna pay-later account, say). If your bank also tells you about the same
 amount within a day, it is added once, not twice.
 
+**Google Wallet as a back-up.** When you tap your phone or watch to pay,
+Google Wallet tells you the shop and "£12.50 with Visa •••• 1234". That is read
+as a card payment too, so a tap is added even if your bank's alert is slow or
+never comes. If both arrive, it is added once. Wallet only says which card was
+used, so the app learns which account each card belongs to from your bank's
+alerts — see **Your cards** on the Live payments page, where you can set or
+change the account for each card. And if Wallet's alert came first and went to
+the wrong account, your bank's alert moves it to the right one.
+
 **Statement ready.** When your bank's app says a new statement is out, the
 app reminds you to bring it in. Switch **Tell me when a statement is ready**
 off if you'd rather not.
@@ -539,7 +548,7 @@ wording win — so nothing is counted twice.
 **Good to know.**
 * Nationwide, Lloyds, Halifax, Bank of Scotland, Barclays, HSBC, first direct,
   NatWest, RBS, Santander, Monzo, Starling, Revolut, Chase, American Express,
-  Google Wallet, PayPal, Klarna and Curve are read. Another app whose alert looks like a payment is
+  Google Wallet, Samsung Wallet, PayPal, Klarna and Curve are read. Another app whose alert looks like a payment is
   listed under **Other apps that sent payment alerts**, and is only read if
   you switch it on. Text messages, WhatsApp and email are never read.
 * Direct Debits and standing orders often send no alert; they still come in

@@ -32,8 +32,15 @@ object BankAlertParser {
         val toBorrowing: String? = null,
     )
 
-    /** The payment in an alert with this [title] and [text], or null when it is not one. */
-    fun parse(title: String?, text: String?): Alert? {
+    /**
+     * The payment in an alert with this [title] and [text], or null when it
+     * is not one.
+     *
+     * [assumeSpending] is for Google Wallet and the like, whose alert for a
+     * tap is only the shop and "£12.50 with Visa •••• 1234": every alert from
+     * them with an amount is a card payment unless it says otherwise.
+     */
+    fun parse(title: String?, text: String?, assumeSpending: Boolean = false): Alert? {
         val body = text.orEmpty().trim()
         val heading = title.orEmpty().trim()
         val all = listOf(heading, body).filter { it.isNotEmpty() }.joinToString(". ").replace(SPACES, " ")
@@ -42,7 +49,7 @@ object BankAlertParser {
         if (NOT_A_PAYMENT.any { it.containsMatchIn(lower) }) return null
 
         val amount = amountIn(all) ?: return null
-        val type = directionOf(lower) ?: return null
+        val type = directionOf(lower) ?: if (assumeSpending) TransactionType.EXPENSE else return null
         val payee = payeeIn(body, type) ?: payeeIn(all, type) ?: titleAsPayee(heading)
             ?: if (type == TransactionType.INCOME) MONEY_IN_NAME else CARD_PAYMENT_NAME
         val ending = ENDING.find(all)?.groupValues?.get(1)
@@ -207,6 +214,7 @@ object BankAlertParser {
         "nationwide", "lloyds", "halifax", "barclays", "hsbc", "natwest", "santander", "monzo", "starling",
         "revolut", "chase", "bank", "banking", "received", "sent", "contactless", "online",
         "order", "orders", "confirmed", "placed", "thanks", "thank", "receipt", "booking", "update",
+        "google", "wallet", "samsung", "pay", "gpay",
     )
 
     private const val MAX_PAYEE = 60

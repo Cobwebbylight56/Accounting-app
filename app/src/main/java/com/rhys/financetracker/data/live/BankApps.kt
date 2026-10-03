@@ -27,6 +27,7 @@ object BankApps {
         "com.chase.intl" to "Chase",
         "com.americanexpress.android.acctsvcs.uk" to "American Express",
         "com.google.android.apps.walletnfcrel" to "Google Wallet",
+        "com.samsung.android.spay" to "Samsung Wallet",
         // Payment apps: their confirmations are payments too.
         "com.paypal.android.p2pmobile" to "PayPal",
         "com.myklarnamobile" to "Klarna",
@@ -39,9 +40,17 @@ object BankApps {
      * from one of these and from another app is taken as one payment.
      */
     val ALSO_TOLD_BY_BANK: Set<String> = setOf(
-        "com.google.android.apps.walletnfcrel", "com.paypal.android.p2pmobile", "com.myklarnamobile",
-        "com.imaginecurve.curve.prd",
+        "com.google.android.apps.walletnfcrel", "com.samsung.android.spay", "com.paypal.android.p2pmobile",
+        "com.myklarnamobile", "com.imaginecurve.curve.prd",
     )
+
+    /**
+     * Phone wallets: an alert from one is a card tapped in a shop, worded as
+     * little as "£12.50 with Visa •••• 1234" under the shop's name. They say
+     * which card, not which bank, so the card's last four digits decide the
+     * account.
+     */
+    val CARD_TAP_APPS: Set<String> = setOf("com.google.android.apps.walletnfcrel", "com.samsung.android.spay")
 
     /**
      * Never read, even if allowed: messages and email can mention money
@@ -124,7 +133,7 @@ object BankApps {
         ending?.let { digits ->
             accounts.firstOrNull { digits in it.name || it.notes.orEmpty().contains(digits) }?.let { return it.id }
         }
-        if (bank != null && bank != "Google Wallet") {
+        if (bank != null) {
             val named = accounts.filter { it.name.contains(bank, ignoreCase = true) }
             val cardCompany = bank == "American Express"
             named.firstOrNull { if (cardCompany) it.isCard else it.isSpending }?.let { return it.id }
