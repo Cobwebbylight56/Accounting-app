@@ -22,6 +22,14 @@ object ReleaseNotes {
     /** Every release, newest first. */
     val ALL: List<Release> = listOf(
         Release(
+            "1.55.0", LocalDate.of(2026, 10, 10), "Capital One statements read",
+            listOf(
+                "Capital One's PDF statements are read. They only give the year in two figures (\"26 February 26\"), which stopped every row being dated.",
+                "On a card statement, the balance going up is spending — the balance check now reads it that way, so card payments aren't flagged to check.",
+                "Lines adding up a column (\"STATEMENT TOTALS\") are no longer taken for a payment, and the starting balance is the previous one, not the new one.",
+            ),
+        ),
+        Release(
             "1.54.0", LocalDate.of(2026, 10, 10), "What's left over each month",
             listOf(
                 "The tile beside Owed now shows what's left over in a month on average — what came in, less what went out, was put aside and paid off loans — over your last three full months.",

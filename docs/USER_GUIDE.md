@@ -529,6 +529,21 @@ Tap an account (in Accounts, or on a person's page) to open its page:
 
 The pencil at the top edits the account; **Import statements** adds to it.
 
+### Credit card statements (Capital One, Zopa and others)
+
+A card statement reads like any other, with three differences the app allows
+for:
+
+* The year may only be printed in two figures, as on Capital One's ("Statement
+  date 26 February 26"), and the rows show just the day and month. The year
+  is taken from the statement's own dates.
+* The balance is what you owe, so it goes **up** when you spend. Spending is
+  money out and payments to the card are money in, and the balance check
+  works that way round.
+* Lines that only add up a column ("STATEMENT TOTALS") aren't payments. A
+  "Previous balance" printed under the transactions is where they started
+  from, not where they ended.
+
 ### Statements printed newest first (Lloyds and others)
 
 Some banks — Lloyds among them, especially statements printed in a branch —

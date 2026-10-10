@@ -94,6 +94,9 @@ object PdfStatementParser {
     /** Every transaction line found in [lines], in the order they appear. */
     fun parse(lines: List<String>): List<Row> {
         val documentYear = inferYear(lines)
+        // On a card the balance is what is owed: it goes up when money is
+        // spent, the other way round from a current account.
+        val card = CARD_STATEMENT.containsMatchIn(lines.joinToString(" "))
         val read = rollBackYearEnd(readLinesHowever(lines, documentYear), documentYear)
         if (read.isEmpty()) return emptyList()
 
@@ -137,11 +140,12 @@ object PdfStatementParser {
                 val rowBalance = if (carriesBalance) balance else null
                 result += if (proved) {
                     val size = kotlin.math.abs(amountIn(others)!!.minor)
+                    val out = if (card) change!! > 0 else change!! < 0
                     Row(
                         date = line.date,
                         description = line.description,
-                        moneyOutMinor = if (change!! < 0) size else null,
-                        moneyInMinor = if (change > 0) size else null,
+                        moneyOutMinor = if (out) size else null,
+                        moneyInMinor = if (out) null else size,
                         balanceMinor = rowBalance,
                     )
                 } else {
@@ -149,7 +153,7 @@ object PdfStatementParser {
                     // check; a group of several failing says nothing about any
                     // particular row in it.
                     val rowPrevious = if (carriesBalance && pending.size == 1) before else null
-                    read(line, others, rowBalance, rowPrevious, directions)
+                    read(line, others, rowBalance, rowPrevious, directions, card)
                 }
             }
             pending.clear()
@@ -157,11 +161,22 @@ object PdfStatementParser {
         }
 
         for (line in read) {
+            // A column's total — "STATEMENT TOTALS 0.00 130.89" — is neither
+            // a payment nor a balance.
+            if (TOTALS_LINE.containsMatchIn(line.description)) continue
             // Wording settles a brought-forward line before anything else. A
             // statement whose columns are not padded out gives no useful
             // position, and reading this as a payment invents an entry the
             // size of the entire balance.
             if (line.figures.size == 1 && BALANCE_LINE.containsMatchIn(line.description)) {
+                // The opening balance printed under the rows it came before —
+                // Capital One puts "Previous Balance 0.00" at the foot. It is
+                // not the balance after them, and taking it as that would
+                // settle the card at nothing owed.
+                if (pending.isNotEmpty() && OPENING_LINE.containsMatchIn(line.description)) {
+                    if (previousBalance == null) previousBalance = line.figures.single().minor
+                    continue
+                }
                 settle(line.figures.single().minor)
                 continue
             }
@@ -253,6 +268,7 @@ object PdfStatementParser {
         balance: Long?,
         previousBalance: Long?,
         directions: Directions,
+        card: Boolean = false,
     ): Row {
         val figure = others.firstOrNull { it.minor != 0L }
             ?: others.firstOrNull()
@@ -266,11 +282,12 @@ object PdfStatementParser {
         if (balance != null && previousBalance != null) {
             val change = balance - previousBalance
             if (change != 0L && kotlin.math.abs(change) == size) {
+                val out = if (card) change > 0 else change < 0
                 return Row(
                     date = line.date,
                     description = line.description,
-                    moneyOutMinor = if (change < 0) size else null,
-                    moneyInMinor = if (change > 0) size else null,
+                    moneyOutMinor = if (out) size else null,
+                    moneyInMinor = if (out) null else size,
                     balanceMinor = balance,
                 )
             }
@@ -565,7 +582,14 @@ object PdfStatementParser {
             val resolved: LocalDate = when {
                 date != null -> date
                 lastDate == null -> {
-                    if (figures.size == 1 && BALANCE_LINE.containsMatchIn(description)) {
+                    // The summary at the top can name the new balance as well
+                    // as the previous one — Capital One's does. The balance
+                    // the rows start from is the previous one, never the new.
+                    val kept = opening?.first
+                    if (figures.size == 1 && BALANCE_LINE.containsMatchIn(description) &&
+                        !CLOSING_LINE.containsMatchIn(description) &&
+                        (OPENING_LINE.containsMatchIn(description) || kept == null || !OPENING_LINE.containsMatchIn(kept))
+                    ) {
                         opening = description to figures
                     }
                     continue
@@ -971,7 +995,14 @@ object PdfStatementParser {
         val inDates = lines.flatMap { line -> YEAR_IN_DATE.findAll(line).map { it.groupValues[1].toInt() } }
             .filter { it in plausible }
         if (inDates.isNotEmpty()) return inDates.max()
-        return lines.flatMap { YEAR.findAll(it).map { match -> match.value.toInt() } }
+        val anywhere = lines.flatMap { YEAR.findAll(it).map { match -> match.value.toInt() } }
+            .filter { it in plausible }
+            .maxOrNull()
+        if (anywhere != null) return anywhere
+        // Capital One writes the year in two digits and nowhere in full:
+        // "Statement date 26 February 26", "as at 26/02/26". Only in a whole
+        // date, so the "26" in "26 Jan 130.89" is never taken for one.
+        return lines.flatMap { line -> SHORT_YEAR_IN_DATE.findAll(line).map { 2000 + it.groupValues[1].toInt() } }
             .filter { it in plausible }
             .maxOrNull()
     }
@@ -1112,6 +1143,9 @@ object PdfStatementParser {
                 break
             }
         }
+        // Capital One adds the day it was bought: "Ebay O*02-14164 London GBR
+        // on 26 Jan". The row is already dated; the payee is the rest.
+        text = text.replace(TRAILING_ON_DATE, "")
         return text.trim(' ', '-', '–', '\t')
     }
 
@@ -1119,6 +1153,30 @@ object PdfStatementParser {
      * Wording that means "this is the balance", not "this is a payment".
      * Statements open and close with one, and some repeat it per page.
      */
+    /**
+     * A line adding up a column: "STATEMENT TOTALS", "Totals", "Total paid
+     * out". Not "Total purchase interest", which is a charge like any other.
+     */
+    private val TOTALS_LINE = Regex(
+        """(?i)^(statement\s+totals?|totals?|total\s+(paid|money)\s+(in|out)|total\s+(debits|credits|payments\s+in|payments\s+out|receipts))\s*:?$""",
+    )
+
+    /** " on 26 Jan" at the end of a description: the day it was bought, again. */
+    private val TRAILING_ON_DATE = Regex("""(?i)\s+on\s+\d{1,2}\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?$""")
+
+    /** The balance a statement ends on: "Your new balance", "Closing balance", "Carried forward". */
+    private val CLOSING_LINE = Regex(
+        """(?i)\b(new\s+(closing\s+)?balance|closing\s+balance|carried\s+forward|c/f)\b""",
+    )
+
+    /** A credit card's statement: a limit, and a minimum to pay. */
+    private val CARD_STATEMENT = Regex("""(?i)\b(credit\s+limit|minimum\s+payment)\b""")
+
+    /** The balance a statement starts from: "Previous balance", "Brought forward", "Opening balance". */
+    private val OPENING_LINE = Regex(
+        """(?i)\b(previous(\s+statement)?\s+balance|opening\s+balance|brought\s+forward|b/f|balance\s+from\s+previous)\b""",
+    )
+
     private val BALANCE_LINE = Regex(
         """(?i)\b(balance|brought forward|carried forward|b/?f|c/?f|opening|closing)\b""",
     )
@@ -1143,6 +1201,15 @@ object PdfStatementParser {
     private val YEAR_IN_DATE = Regex(
         """(?i)(?:\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+|\b\d{1,2}[/.-]\d{1,2}[/.-])((?:19|20)\d{2})\b""",
     )
+    /**
+     * A two-digit year closing a whole date: `26 February 26`, `24 Mar 26`,
+     * `26/02/26`. Not followed by more digits or by pence, so `26 Jan 130.89`
+     * — a date and an amount — has no year in it.
+     */
+    private val SHORT_YEAR_IN_DATE = Regex(
+        """(?i)(?:\b\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+|\b\d{1,2}[/.-]\d{1,2}[/.-])(\d{2})(?!\d|[.,]\d)""",
+    )
+
     private const val FIRST_PLAUSIBLE_YEAR = 1990
     private const val LAST_PLAUSIBLE_YEAR = 2100
 
