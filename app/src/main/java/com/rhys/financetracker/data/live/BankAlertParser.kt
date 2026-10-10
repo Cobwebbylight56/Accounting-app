@@ -63,6 +63,33 @@ object BankAlertParser {
     }
 
     /**
+     * The balance an alert gives — "Your balance is £840.10", "Available
+     * balance: £1,204.55", "Balance −£12.30 overdrawn" — or null when it
+     * gives none. Only an amount straight after the word counts: "Balance
+     * update: you spent £12.50" gives no balance.
+     */
+    fun balanceIn(title: String?, text: String?): Long? {
+        val all = listOfNotNull(title, text).joinToString(". ").replace(SPACES, " ")
+        for (match in MONEY.findAll(all)) {
+            val before = all.substring(maxOf(0, match.range.first - LOOK_BACK), match.range.first).lowercase()
+            if (!BALANCE_BEFORE.containsMatchIn(before)) continue
+            val digits = (match.groups[1]?.value ?: match.groups[2]?.value ?: continue).replace(",", "")
+            val pounds = digits.substringBefore('.').toLongOrNull() ?: continue
+            val pence = digits.substringAfter('.', "").padEnd(2, '0').take(2).toLongOrNull() ?: 0L
+            val minor = pounds * 100 + pence
+            val after = all.substring(match.range.last + 1, minOf(all.length, match.range.last + 1 + LOOK_BACK)).lowercase()
+            val overdrawn = before.trimEnd().let { it.endsWith("-") || it.endsWith("−") } ||
+                OVERDRAWN_AFTER.containsMatchIn(after)
+            return if (overdrawn) -minor else minor
+        }
+        return null
+    }
+
+    /** The last four digits of the card or account an alert names, if it names one. */
+    fun endingIn(title: String?, text: String?): String? =
+        ENDING.find(listOfNotNull(title, text).joinToString(". "))?.groupValues?.get(1)
+
+    /**
      * True for an alert saying a statement is ready to look at — no money
      * moved, but it is the moment to import it.
      */
@@ -154,6 +181,14 @@ object BankAlertParser {
 
     /** £12.50, £1,250, GBP 12.50, 12.50 GBP. */
     private val MONEY = Regex("""£\s?(\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)|\bGBP\s?(\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)""")
+
+    /** "balance is", "available balance:", "balance now" — right before the amount. */
+    private val BALANCE_BEFORE = Regex(
+        """\b(balance|available)(\s+balance)?(\s+(is|of|now|now is|was|remaining|left))?\s*:?\s*[-−]?\s*$""",
+    )
+
+    /** "£12.30 overdrawn", "£12.30 OD", "£12.30 DR": a balance below nothing. */
+    private val OVERDRAWN_AFTER = Regex("""^\s*(overdrawn|od|dr)\b""")
 
     private val PAID_YOU = Regex("""^(.+?)\s+(?:has\s+)?(?:paid|sent)\s+you\b""", RegexOption.IGNORE_CASE)
 

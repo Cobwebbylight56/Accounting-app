@@ -421,7 +421,37 @@ internal fun MonthList(state: DashboardState) {
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
         )
-        MonthRow(Icons.Outlined.South, "Money in", month, summary.monthIncomeMinor, colors.tileBlue)
+        // Before pay day the month's money in is nothing yet: say when the
+        // wage is coming rather than show a bare £0.00.
+        val payday = state.untilPayday
+        val wageDue = payday?.wageDueDate
+        val wageDueMinor = payday?.wageDueMinor ?: 0L
+        when {
+            wageDue != null && summary.monthIncomeMinor == 0L -> MonthRow(
+                Icons.Outlined.South,
+                "Money in",
+                "Wage due ${DateUtils.formatShort(wageDue)}",
+                wageDueMinor,
+                colors.tileBlue,
+                expected = true,
+            )
+            wageDue != null -> MonthRow(
+                Icons.Outlined.South,
+                "Money in",
+                "${Money.format(wageDueMinor)} more due ${DateUtils.formatShort(wageDue)}",
+                summary.monthIncomeMinor,
+                colors.tileBlue,
+            )
+            state.isCurrentMonth && summary.monthIncomeMinor == 0L -> MonthRow(
+                Icons.Outlined.South,
+                "Money in",
+                "Nothing in yet — your wage is found from your statements",
+                0L,
+                colors.tileBlue,
+                expected = true,
+            )
+            else -> MonthRow(Icons.Outlined.South, "Money in", month, summary.monthIncomeMinor, colors.tileBlue)
+        }
         MonthRow(Icons.Outlined.North, "Money out", month, summary.monthExpenseMinor, colors.tileBlush)
         MonthRow(Icons.Outlined.Savings, "Put aside", month, summary.savingsNetMinor, colors.tileSage)
         if (summary.loanPaymentsMinor != 0L) {
@@ -433,18 +463,43 @@ internal fun MonthList(state: DashboardState) {
                 colors.tileBlush,
             )
         }
-        MonthRow(
-            Icons.Outlined.AccountBalance,
-            "Left to spend",
-            "After the bills still to come",
-            summary.disposableMinor,
-            colors.tileMist,
-        )
+        if (payday != null) {
+            // What's really there now, less what goes out before pay day.
+            MonthRow(
+                Icons.Outlined.AccountBalance,
+                if (payday.payday != null) "Left until payday" else "Left this month",
+                "${Money.format(payday.availableMinor)} in your account" +
+                    if (payday.billsMinor > 0L) {
+                        ", less ${Money.format(payday.billsMinor)} of bills " +
+                            (payday.payday?.let { "before ${DateUtils.formatShort(it)}" } ?: "still to come")
+                    } else {
+                        payday.payday?.let { ", payday ${DateUtils.formatShort(it)}" }.orEmpty()
+                    },
+                payday.leftMinor,
+                colors.tileMist,
+            )
+        } else {
+            MonthRow(
+                Icons.Outlined.AccountBalance,
+                "Left over",
+                "What came in, less what went out",
+                summary.monthNetMinor - summary.savingsNetMinor - summary.loanPaymentsMinor,
+                colors.tileMist,
+            )
+        }
     }
 }
 
 @Composable
-private fun MonthRow(icon: ImageVector, title: String, subtitle: String, amountMinor: Long, color: Color) {
+private fun MonthRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    amountMinor: Long,
+    color: Color,
+    /** Greyed: an amount still to come rather than one that has happened. */
+    expected: Boolean = false,
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -469,8 +524,12 @@ private fun MonthRow(icon: ImageVector, title: String, subtitle: String, amountM
         Text(
             text = Money.format(amountMinor),
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = if (amountMinor < 0L) FinanceTheme.colors.negative else MaterialTheme.colorScheme.onSurface,
+            fontWeight = if (expected) FontWeight.Normal else FontWeight.SemiBold,
+            color = when {
+                expected -> MaterialTheme.colorScheme.onSurfaceVariant
+                amountMinor < 0L -> FinanceTheme.colors.negative
+                else -> MaterialTheme.colorScheme.onSurface
+            },
         )
     }
 }

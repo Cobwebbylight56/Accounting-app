@@ -44,7 +44,7 @@ class LivePaymentRepository @Inject constructor(
     private val notifier: Notifier,
 ) {
 
-    enum class Outcome { ADDED, OFF, NOT_A_PAYMENT, NOT_ALLOWED, ALREADY_ADDED, NO_ACCOUNT, STATEMENT_READY }
+    enum class Outcome { ADDED, OFF, NOT_A_PAYMENT, NOT_ALLOWED, ALREADY_ADDED, NO_ACCOUNT, STATEMENT_READY, BALANCE }
 
     /**
      * Reads one alert from [app] (shown as [appLabel]), posted at [postedAt]
@@ -87,6 +87,8 @@ class LivePaymentRepository @Inject constructor(
             Outcome.NO_ACCOUNT -> "Not added" to "Couldn't tell which account — choose one for $appLabel below"
             Outcome.STATEMENT_READY -> "Statement ready" to "A new statement to bring in"
             Outcome.NOT_ALLOWED -> return
+            // Noted where it was set, with the account's name.
+            Outcome.BALANCE -> return
             Outcome.OFF, Outcome.ADDED -> return
         }
         settingsRepository.logLiveAlert(LiveAlertLogEntry(Instant.now().toEpochMilli(), appLabel, said, detail))
@@ -105,7 +107,17 @@ class LivePaymentRepository @Inject constructor(
         }
 
         val tapApp = app in BankApps.CARD_TAP_APPS
-        val alert = BankAlertParser.parse(title, text, assumeSpending = tapApp) ?: return Outcome.NOT_A_PAYMENT
+        // The bank's own word on what is in the account, when its alert gives
+        // it: what the app shows as there to spend is then the bank's figure.
+        val balance = if (bank != null && app !in BankApps.ALSO_TOLD_BY_BANK) BankAlertParser.balanceIn(title, text) else null
+        val alert = BankAlertParser.parse(title, text, assumeSpending = tapApp)
+        if (alert == null) {
+            if (balance == null) return Outcome.NOT_A_PAYMENT
+            val accounts = accountDao.getAllActive()
+            val accountId = chooseAccount(app, bank, tapApp, BankAlertParser.endingIn(title, text), settings, accounts)
+                ?: return Outcome.NO_ACCOUNT
+            return if (setBalance(accountId, balance, accounts, appLabel)) Outcome.BALANCE else Outcome.NOT_A_PAYMENT
+        }
         if (app !in BankApps.KNOWN && app !in settings.liveAlertApps) {
             // Offered on the Live payments page; nothing of the alert is kept.
             settingsRepository.noteLiveAlertApp(app, appLabel)
@@ -117,7 +129,7 @@ class LivePaymentRepository @Inject constructor(
         if (transactionDao.countWithHash(hash) > 0) return Outcome.ALREADY_ADDED
 
         val accounts = accountDao.getAllActive()
-        val accountId = chooseAccount(app, bank, tapApp, alert, settings, accounts) ?: return Outcome.NO_ACCOUNT
+        val accountId = chooseAccount(app, bank, tapApp, alert.ending, settings, accounts) ?: return Outcome.NO_ACCOUNT
         // Learn the card, so a Google Wallet tap on it finds this account. The
         // bank's own alert knows the account; a wallet's is only a first guess.
         alert.ending?.let { ending ->
@@ -139,11 +151,16 @@ class LivePaymentRepository @Inject constructor(
             val otherApp = appOf(other)
             otherApp != app && (app in BankApps.ALSO_TOLD_BY_BANK || otherApp in BankApps.ALSO_TOLD_BY_BANK)
         }
+        // Already in, but the balance the bank gives with it still counts.
+        suspend fun alreadyIn(): Outcome {
+            if (balance != null) setBalance(accountId, balance, accounts, appLabel = null)
+            return Outcome.ALREADY_ADDED
+        }
         if (twin != null) {
             if (app !in BankApps.ALSO_TOLD_BY_BANK && appOf(twin) in BankApps.ALSO_TOLD_BY_BANK) {
                 transactionDao.moveLive(twin, accountId, now)
             }
-            return Outcome.ALREADY_ADDED
+            return alreadyIn()
         }
 
         // Money paid to a mortgage, loan, card or pay-later plan — an
@@ -169,7 +186,7 @@ class LivePaymentRepository @Inject constructor(
         if (paidInto != null &&
             transactionDao.countLivePaidInto(paidInto, alert.amountMinor, now - TOLD_TWICE_MILLIS) > 0
         ) {
-            return Outcome.ALREADY_ADDED
+            return alreadyIn()
         }
 
         // A regular payment the app has already added on its day — the car
@@ -184,7 +201,7 @@ class LivePaymentRepository @Inject constructor(
                 around = date,
             ) != null
         ) {
-            return Outcome.ALREADY_ADDED
+            return alreadyIn()
         }
 
         val learned = transactionDao.getUserFiledDescriptions(SpreadsheetImporter.LEARNED_PAYEE_LIMIT)
@@ -221,7 +238,16 @@ class LivePaymentRepository @Inject constructor(
             time,
         ).joinToString(" · ")
         settingsRepository.setLiveAlertLast(summary)
-        settingsRepository.logLiveAlert(LiveAlertLogEntry(Instant.now().toEpochMilli(), appLabel, "Added", summary))
+        // The balance after it, when the alert gives one, is the account's now.
+        val balanceSet = balance != null && setBalance(accountId, balance, accounts, appLabel = null)
+        settingsRepository.logLiveAlert(
+            LiveAlertLogEntry(
+                Instant.now().toEpochMilli(),
+                appLabel,
+                "Added",
+                summary + if (balanceSet) " · balance now ${Money.format(balance!!)}" else "",
+            ),
+        )
         return Outcome.ADDED
     }
 
@@ -231,21 +257,44 @@ class LivePaymentRepository @Inject constructor(
      * first, as one wallet holds cards from several banks. Failing both, one
      * is picked from the card's digits and the bank's name.
      */
+    /**
+     * Makes [balanceMinor] what [accountId] holds from today — the bank's own
+     * figure, so Available is what is really there. Only for an account to
+     * spend from or save in: a card's "balance" is what is owed, the other
+     * way round. With [appLabel], noted on the Live payments page.
+     */
+    private suspend fun setBalance(accountId: Long, balanceMinor: Long, accounts: List<AccountEntity>, appLabel: String?): Boolean {
+        val account = accounts.firstOrNull { it.id == accountId } ?: return false
+        if (account.holding == Holding.OWED) return false
+        val now = Instant.now()
+        val today = now.atZone(ZoneId.systemDefault()).toLocalDate()
+        // What was typed in or added on its day today still counts on top of
+        // a balance for today, and the bank's figure already has it in.
+        val countedOnTop = transactionDao.manualNetOn(accountId, today)
+        accountDao.setBalanceAsOf(accountId, balanceMinor - countedOnTop, today, now.toEpochMilli())
+        if (appLabel != null) {
+            settingsRepository.logLiveAlert(
+                LiveAlertLogEntry(now.toEpochMilli(), appLabel, "Balance", "${account.name}: ${Money.format(balanceMinor)}"),
+            )
+        }
+        return true
+    }
+
     private fun chooseAccount(
         app: String,
         bank: String?,
         tapApp: Boolean,
-        alert: BankAlertParser.Alert,
+        ending: String?,
         settings: AppSettings,
         accounts: List<AccountEntity>,
     ): Long? {
         fun valid(id: Long?) = id?.takeIf { wanted -> accounts.any { it.id == wanted } }
         val forApp = valid(settings.liveAlertAccounts[app])
-        val forCard = valid(alert.ending?.let { settings.liveCardAccounts[it] })
+        val forCard = valid(ending?.let { settings.liveCardAccounts[it] })
         (if (tapApp) forCard ?: forApp else forApp ?: forCard)?.let { return it }
         return BankApps.pickAccount(
             bank = bank.takeUnless { tapApp },
-            ending = alert.ending,
+            ending = ending,
             accounts = accounts.map { account ->
                 BankApps.AccountOption(
                     id = account.id,

@@ -100,6 +100,68 @@ class IncomeRepository @Inject constructor(
         }
     }
 
+    /**
+     * Looks for each person's wage in what has come into their accounts and
+     * sets it up, so pay never has to be typed in: the wage is added on its
+     * day each month, and their take-home is what really arrives.
+     *
+     * A wage already set up is left as it is, and one that was stopped is
+     * never brought back. Take-home is filled in when it is missing, or
+     * when it is plainly a month's pay put in as a year's — less than two
+     * months of what actually arrives.
+     *
+     * @return what was found and set up, for saying so on Home.
+     */
+    suspend fun findWages(today: LocalDate = DateUtils.today()): List<String> {
+        val paidIn = transactionDao.paidInBetween(today.minusDays(LOOK_BACK_DAYS), today).map {
+            com.rhys.financetracker.data.importer.WageFinder.PaidIn(
+                it.description, it.amountMinor, it.date, it.accountId, it.categoryName, it.personId,
+            )
+        }
+        val said = mutableListOf<String>()
+        for (wage in com.rhys.financetracker.data.importer.WageFinder.find(paidIn, today)) {
+            val person = personDao.getById(wage.personId) ?: continue
+            val first = person.name.substringBefore(' ')
+            val noWage = recurringRuleDao.getWage(wage.personId, SpreadsheetImporter.WAGE_MARKER) == null &&
+                recurringRuleDao.countStoppedWages(wage.personId, SpreadsheetImporter.WAGE_MARKER) == 0
+            if (noWage && setWage(wage.personId, wage.accountId, wage.amountMinor, wage.day, today).isSuccess) {
+                said += "$first's wage, ${com.rhys.financetracker.core.money.Money.format(wage.amountMinor)} on the " +
+                    "${wage.day}${ordinal(wage.day)}, will be added each payday"
+            }
+            val yearly = wage.amountMinor * 12
+            val net = person.netYearlyIncomeMinor
+            if (net == null || net < wage.amountMinor * 2) {
+                // Pay before tax put in the same way — a month's as a year's —
+                // would now be less than take-home: it was a month's too.
+                val gross = person.grossYearlyIncomeMinor?.let { given ->
+                    when {
+                        given >= yearly -> given
+                        given * 12 >= yearly -> given * 12
+                        else -> null
+                    }
+                }
+                personDao.update(
+                    person.copy(
+                        netYearlyIncomeMinor = yearly,
+                        grossYearlyIncomeMinor = gross,
+                        updatedAt = Instant.now().toEpochMilli(),
+                    ),
+                )
+                said += "$first's take-home is now ${com.rhys.financetracker.core.money.Money.format(wage.amountMinor)} a month, " +
+                    "from the wages paid in"
+            }
+        }
+        return said
+    }
+
+    private fun ordinal(day: Int): String = when {
+        day in 11..13 -> "th"
+        day % 10 == 1 -> "st"
+        day % 10 == 2 -> "nd"
+        day % 10 == 3 -> "rd"
+        else -> "th"
+    }
+
     /** Stops paying the wage in by itself. */
     suspend fun stopWage(personId: Long): AppResult<Unit> = runCatchingApp("Could not stop the wage") {
         val wage = recurringRuleDao.getWage(personId, SpreadsheetImporter.WAGE_MARKER) ?: return@runCatchingApp
@@ -228,5 +290,8 @@ class IncomeRepository @Inject constructor(
     private companion object {
         const val SALARY_COLOUR = "#2E7D32"
         const val OVERTIME_COLOUR = "#558B2F"
+
+        /** How far back to look for a wage: half a year of pay days. */
+        const val LOOK_BACK_DAYS = 200L
     }
 }

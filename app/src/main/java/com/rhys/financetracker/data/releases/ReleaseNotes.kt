@@ -22,6 +22,16 @@ object ReleaseNotes {
     /** Every release, newest first. */
     val ALL: List<Release> = listOf(
         Release(
+            "1.53.0", LocalDate.of(2026, 10, 10), "Your pay and your money, worked out for you",
+            listOf(
+                "Your wage is found in your statements — the same employer paying in each month — and set up by itself. It's added on payday, and the statement puts in the exact figure.",
+                "Take-home is worked out from what's really paid in. A yearly figure that was really one month's pay is put right.",
+                "When your bank's alert says what your balance is, that's what your account shows — nothing to type in.",
+                "Money in says when your wage is due, instead of £0.00 before payday.",
+                "Left to spend is now Left until payday: what's in your account, less the bills that go out before payday.",
+            ),
+        ),
+        Release(
             "1.52.0", LocalDate.of(2026, 10, 10), "What's new, and no more doubled bills",
             listOf(
                 "After each update, this note shows the new version and what changed. Every version's notes are in Settings → What's new.",

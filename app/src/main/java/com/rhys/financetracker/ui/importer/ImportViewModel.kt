@@ -50,6 +50,7 @@ class ImportViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
     private val billFinder: BillFinderRepository,
     private val importHistory: com.rhys.financetracker.data.repository.ImportHistoryRepository,
+    private val incomeRepository: com.rhys.financetracker.data.repository.IncomeRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ImportState())
@@ -585,6 +586,8 @@ class ImportViewModel @Inject constructor(
                         null
                     }
                     val bills = if (account != null) billFinder.find(account.id) else emptyList()
+                    // A statement with the wage on it sets the wage up, and take-home with it.
+                    runCatching { incomeRepository.findWages() }
                     _state.value = current.copy(
                         isBusy = false,
                         step = ImportStep.DONE,

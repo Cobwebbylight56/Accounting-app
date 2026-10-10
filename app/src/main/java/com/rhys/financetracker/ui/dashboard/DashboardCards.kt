@@ -234,6 +234,23 @@ internal fun MonthSummaryCard(state: DashboardState) {
 @Composable
 internal fun DisposableIncomeCard(state: DashboardState) {
     val summary = state.summary
+    val payday = state.untilPayday
+    if (payday != null) {
+        SectionCard(title = if (payday.payday != null) "Left until payday" else "Left this month") {
+            StatTile(
+                label = payday.payday?.let { "Until ${DateUtils.formatShort(it)}" } ?: "To the end of the month",
+                value = Money.format(payday.leftMinor, showSign = true),
+                caption = "${Money.format(payday.availableMinor)} in your account, less " +
+                    "${Money.format(payday.billsMinor)} of bills and payments still to go out",
+                emphasis = when {
+                    payday.leftMinor < 0L -> StatEmphasis.NEGATIVE
+                    payday.leftMinor < 10_000L -> StatEmphasis.WARNING
+                    else -> StatEmphasis.POSITIVE
+                },
+            )
+        }
+        return
+    }
     SectionCard(title = "Left to spend") {
         StatTile(
             label = "After the bills still to come",

@@ -239,15 +239,25 @@ bottom of Savings goals and of Bills & subscriptions → Set up by you lists the
 
 ## Making sense of the numbers
 
-### "Left to spend"
+### "Left until payday"
 
-This is the figure a spreadsheet struggles with. It is:
+For the month you're in, Home works out what you can spend before you're next
+paid:
 
-> what has come in this month, less what has gone out, less the bills that are
-> still to come before the month ends
+> what's in your current accounts now, less the bills, savings standing orders
+> and loan payments that go out of them before payday
 
-So it is not "what is in my account" — it is what you can actually spend without
-missing a bill.
+It counts from what is really in your account, not from what came in this
+month, so it doesn't sink below nothing in the days before your wage lands.
+Bills after payday are left for that pay to cover. If no wage is set up, it
+runs to the end of the month instead (**Left this month**).
+
+**Money in** says when your wage is due ("Wage due 28 Oct") rather than
+showing £0.00 before payday. Once it has arrived it shows what came in, and
+any more still due.
+
+Earlier months show **Left over**: what came in, less what went out, was put
+aside and paid off loans.
 
 ### Balances
 
@@ -760,10 +770,25 @@ they're real before adding them.
 
 ### Wage and overtime
 
-On a person's page, **Wage**: choose the account it's paid into, the take-home
-each month (filled in from their yearly pay), and the day — **Last day** of the
-month or a date. It's then paid in by itself on that day, so the month is right
-before any statement arrives. A pay rise updates it.
+**Found for you.** When a statement shows the same employer paying into
+someone's account each month (at least two months running, more than £300,
+and still being paid), the app sets their wage up by itself. That's the amount
+it usually is, on the day it usually lands, into that account. Home says so
+when it does. Their take-home is worked out from it too. If the yearly
+take-home given was less than two months of what really arrives (a month's
+pay typed in as a year's), it's put right. A wage you've stopped is never set
+up again.
+
+**Your balance from your bank's alerts.** When your banking app's alert gives
+your balance ("Your balance is £840.10"), that becomes what the account holds,
+so Available and Left until payday are the bank's figures. This needs Live
+payments switched on. It's only for accounts you spend from or save in, never
+a card's balance, which is what you owe.
+
+**Setting it yourself.** On a person's page, **Wage**: choose the account it's
+paid into, the take-home each month, and the day (**Last day** of the month or
+a date). It's then paid in by itself on that day, so the month is right before
+any statement arrives. A pay rise updates it.
 
 When the statement comes, **its wage replaces the app's** at the bank's own
 figure — even if it's different because of overtime, a bonus or a tax change —

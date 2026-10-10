@@ -159,6 +159,10 @@ interface RecurringRuleDao {
     )
     suspend fun getWage(personId: Long, marker: String): RecurringRuleEntity?
 
+    /** Whether a wage for [personId] was set up and then stopped, which the app must not undo. */
+    @Query("SELECT COUNT(*) FROM recurring_rules WHERE person_id = :personId AND notes = :marker AND is_archived = 1")
+    suspend fun countStoppedWages(personId: Long, marker: String): Int
+
     @Query("DELETE FROM recurring_rules")
     suspend fun deleteAll()
 }

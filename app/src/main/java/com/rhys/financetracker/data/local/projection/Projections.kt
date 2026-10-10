@@ -287,3 +287,13 @@ data class ImportBatchWithRemaining(
     @androidx.room.Embedded val batch: com.rhys.financetracker.data.local.entity.ImportBatchEntity,
     @ColumnInfo(name = "remaining_rows") val remainingRows: Int,
 )
+
+/** One payment into an account, with whose account it is: what a wage is looked for in. */
+data class PaidInRow(
+    @ColumnInfo(name = "description") val description: String,
+    @ColumnInfo(name = "amount_minor") val amountMinor: Long,
+    @ColumnInfo(name = "date") val date: LocalDate,
+    @ColumnInfo(name = "account_id") val accountId: Long,
+    @ColumnInfo(name = "category_name") val categoryName: String?,
+    @ColumnInfo(name = "person_id") val personId: Long?,
+)

@@ -707,6 +707,45 @@ interface TransactionDao {
         around: LocalDate,
     ): Long?
 
+    /**
+     * Money paid into accounts between two dates, with whose account it
+     * landed in — the bank's own record, not the copies the app added on a
+     * wage's day, so a wage is only ever found in what really arrived.
+     */
+    @Query(
+        """
+        SELECT t.description AS description, t.amount_minor AS amount_minor, t.date AS date,
+               t.account_id AS account_id, c.name AS category_name, a.person_id AS person_id
+        FROM transactions t
+        JOIN accounts a ON a.id = t.account_id
+        LEFT JOIN categories c ON c.id = t.category_id
+        WHERE t.type = 'INCOME' AND t.is_archived = 0 AND t.date BETWEEN :from AND :until
+          AND (t.recurring_rule_id IS NULL OR t.source = 'STATEMENT')
+        """,
+    )
+    suspend fun paidInBetween(from: LocalDate, until: LocalDate): List<com.rhys.financetracker.data.local.projection.PaidInRow>
+
+    /**
+     * What the entries typed in or added by the app on [date] move
+     * [accountId] by — the ones that still count on top of a balance given
+     * for that day (see AccountDao.COUNTS).
+     */
+    @Query(
+        """
+        SELECT IFNULL((
+            SELECT SUM(CASE WHEN type = 'INCOME' THEN amount_minor ELSE -amount_minor END)
+            FROM transactions
+            WHERE account_id = :accountId AND date = :date AND source = 'MANUAL' AND is_archived = 0
+        ), 0) + IFNULL((
+            SELECT SUM(amount_minor)
+            FROM transactions
+            WHERE transfer_account_id = :accountId AND type = 'TRANSFER' AND date = :date
+              AND source = 'MANUAL' AND is_archived = 0
+        ), 0)
+        """,
+    )
+    suspend fun manualNetOn(accountId: Long, date: LocalDate): Long
+
     /** Ties a payment to the regular payment it is one of. */
     @Query("UPDATE transactions SET recurring_rule_id = :ruleId, updated_at = :updatedAt WHERE id = :id")
     suspend fun linkToRule(id: Long, ruleId: Long, updatedAt: Long)

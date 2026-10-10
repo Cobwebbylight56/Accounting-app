@@ -4,8 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rhys.financetracker.core.money.Money
 import com.rhys.financetracker.core.time.DateUtils
-import com.rhys.financetracker.data.repository.PayeeRepository
-import com.rhys.financetracker.data.repository.PeopleMoney
 import com.rhys.financetracker.data.local.dao.DashboardWidgetDao
 import com.rhys.financetracker.data.local.dao.TransactionFilter
 import com.rhys.financetracker.data.local.dao.TransactionSort
@@ -27,6 +25,8 @@ import com.rhys.financetracker.data.repository.AccountRepository
 import com.rhys.financetracker.data.repository.CashPotRepository
 import com.rhys.financetracker.data.repository.IncomeRepository
 import com.rhys.financetracker.data.repository.InsightRepository
+import com.rhys.financetracker.data.repository.PayeeRepository
+import com.rhys.financetracker.data.repository.PeopleMoney
 import com.rhys.financetracker.data.repository.PeopleRepository
 import com.rhys.financetracker.data.repository.RecurringRepository
 import com.rhys.financetracker.data.repository.SavingsRepository
@@ -39,6 +39,7 @@ import com.rhys.financetracker.domain.model.DashboardWidget
 import com.rhys.financetracker.domain.model.TransactionType
 import com.rhys.financetracker.domain.report.FinancialSummary
 import com.rhys.financetracker.domain.report.MonthPoint
+import com.rhys.financetracker.domain.report.UntilPayday
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.LocalDate
 import java.time.YearMonth
@@ -194,6 +195,15 @@ class DashboardViewModel @Inject constructor(
     /** Feedback from the cash pot buttons, shown once and cleared. */
     private val message = MutableStateFlow<String?>(null)
     val messages: StateFlow<String?> = message
+
+    init {
+        viewModelScope.launch {
+            // Wages found in what was paid in are set up by themselves, and
+            // take-home put right from them — nothing to type.
+            val found = runCatching { incomeRepository.findWages() }.getOrDefault(emptyList())
+            if (found.isNotEmpty()) message.value = found.joinToString(". ") + "."
+        }
+    }
 
     /** The month the dashboard is showing; the user can step back through history. */
     private val visibleMonth = MutableStateFlow(DateUtils.currentYearMonth())
@@ -405,6 +415,8 @@ class DashboardViewModel @Inject constructor(
             // broken app when the entries are simply in an earlier month.
             transactionRepository.observeRecent(1),
             loanPaymentsThisMonth,
+            // Every regular payment running, for what is left until pay day.
+            recurringRepository.observeAll(),
         ),
     ) { values -> buildState(values) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DashboardState())
@@ -436,6 +448,7 @@ class DashboardViewModel @Inject constructor(
         val latest = (values[20] as List<TransactionWithDetails>)
             .firstOrNull()?.transaction?.date
         val loanPayments = values[21] as Long
+        val runningRules = (values[22] as List<RecurringRuleWithDetails>).map { it.rule }
 
         val inScope = accountList.filter { currentScope.matches(it) }
         // The month's entries for whoever's tab this is: their own, and those
@@ -457,8 +470,19 @@ class DashboardViewModel @Inject constructor(
         val savingsTotal = inScope.filter { it.isSavings }.sumOf { it.balanceMinor } +
             if (potCounts) cashPot else 0L
         val liabilities = inScope.filter { it.isLiability }.sumOf { it.balanceMinor }
-        val spendable = inScope.filterNot { it.isSavings || it.isLiability }
-            .sumOf { it.balanceMinor }
+        val spendAccounts = inScope.filterNot { it.isSavings || it.isLiability }
+        val spendable = spendAccounts.sumOf { it.balanceMinor }
+        // Only for the month we're in: what's there now, less what goes out before pay day.
+        val untilPayday = if (month == DateUtils.currentYearMonth()) {
+            UntilPayday.of(
+                rules = runningRules,
+                spendAccountIds = spendAccounts.map { it.account.id }.toSet(),
+                availableMinor = spendable,
+                today = DateUtils.today(),
+            )
+        } else {
+            null
+        }
 
         return DashboardState(
             isLoading = false,
@@ -497,6 +521,7 @@ class DashboardViewModel @Inject constructor(
             accountsInTotal = accountList.size,
             unassignedAccounts = unassigned,
             latestEntryDate = latest,
+            untilPayday = untilPayday,
         )
     }
 
@@ -814,6 +839,8 @@ data class DashboardState(
     val topInsight: Insight? = null,
     val insightCount: Int = 0,
     val widgets: List<VisibleWidget> = emptyList(),
+    /** What's left until pay day, and the wage still to come — for the month we're in only. */
+    val untilPayday: UntilPayday? = null,
 ) {
     val isCurrentMonth: Boolean get() = month == DateUtils.currentYearMonth()
     val hasAnyData: Boolean get() = accounts.isNotEmpty() || monthTransactions.isNotEmpty()
