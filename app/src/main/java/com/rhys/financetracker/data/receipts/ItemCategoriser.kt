@@ -18,7 +18,10 @@ object ItemCategoriser {
      */
     fun categoryFor(item: String, learned: Map<String, String> = emptyMap()): String? {
         learned[keyOf(item)]?.let { return it }
-        val text = " " + item.lowercase().replace(Regex("""[^a-z0-9&]+"""), " ") + " "
+        // "2X75GCOTTON" and "473MLORIGINAL": a size run into the word after it.
+        val text = " " + item.lowercase()
+            .replace(Regex("""[^a-z0-9&]+"""), " ")
+            .replace(Regex("""(\d)(ml|ltr|kg|pk|g|l|m)(?=[a-z])"""), "$1$2 ") + " "
         return RULES.firstOrNull { (_, words) -> words.any { word -> " $word " in text || (word.endsWith("*") && " ${word.dropLast(1)}" in text) } }
             ?.first
     }
@@ -60,7 +63,8 @@ object ItemCategoriser {
         ),
         "Pets" to listOf(
             "cat food", "dog food", "whiskas", "felix", "pedigree", "purina", "bakers", "cat litter", "litter",
-            "dog treats", "dentastix", "pet", "pets",
+            "dog treats", "dentastix", "pet", "pets", "cat", "cats", "for cats", "for dogs", "kitten*", "puppy",
+            "puppies", "jelly meat", "dreamies", "go cat", "bonio", "harringtons", "webbox", "marthas", "garfield",
         ),
         "Health" to listOf(
             "paracetamol", "ibuprofen", "calpol", "lemsip", "plasters", "vitamin*", "medicine", "antihistamine",
@@ -69,14 +73,16 @@ object ItemCategoriser {
         "Personal" to listOf(
             "shampoo", "conditioner", "toothpaste", "toothbrush", "deodorant", "deo", "shower gel", "body wash",
             "razor*", "soap", "moisturiser", "sanitary", "tampons", "towels", "makeup", "mascara", "lynx", "dove",
-            "colgate", "gillette", "nivea", "sensodyne", "mouthwash", "cotton buds", "hairspray",
+            "colgate", "gillette", "nivea", "sensodyne", "mouthwash", "cotton buds", "cotton wool", "cotton",
+            "cotton pads", "hairspray",
         ),
         HOUSEHOLD to listOf(
             "bleach", "washing up", "fairy", "detergent", "laundry", "persil", "ariel", "bold", "fabric",
             "softener", "comfort", "lenor", "toilet roll", "toilet tissue", "andrex", "kitchen roll", "plenty",
             "bin bags", "bin liners", "foil", "cling", "sponge*", "cleaner", "dettol", "flash", "domestos", "finish",
             "dishwasher", "batteries", "duracell", "bulb", "light bulb", "candle*", "air freshener", "febreze",
-            "tissues", "kleenex", "zoflora", "cif", "mr muscle", "wipes",
+            "tissues", "kleenex", "zoflora", "cif", "mr muscle", "wipes", "brush", "dustpan", "mop", "bucket",
+            "useable bag", "reusable bag", "carrier bag", "carrier", "bag for life",
         ),
         SNACKS to listOf(
             "crisps", "choc*", "sweets", "haribo", "mars", "snickers", "twix", "kitkat", "kit kat", "doritos",
@@ -85,6 +91,8 @@ object ItemCategoriser {
             "7up", "gum", "mints", "polo", "cookie*", "muffin", "doughnut", "donut", "flapjack", "sausage roll",
             "pasty", "meal deal", "sandwich", "latte", "cappuccino", "americano",
             "hot chocolate", "costa", "starbucks", "slush", "ice cream", "magnum", "cornetto", "drink", "drinks",
+            "oreo*", "peperami", "ribena", "marshmallow*", "squares", "biscuit*", "vimto", "fruit shoot",
+            "capri sun", "rockstar",
         ),
     )
 }

@@ -543,6 +543,16 @@ shown for you to check or correct. Then:
   can check it. When the statement comes in, it is matched to the bank's line,
   not added twice.
 
+**How the shop and total are found.** The shop's logo is a picture, so the
+name comes from the words: a shop the app knows (B&M, Home Bargains, Tesco,
+Aldi and many more) wherever it is printed — "B&M Retail Ltd" under the logo,
+"Thank you for shopping at…" at the bottom — never the slogan ("Big Brands
+Big Savings"). The total is the line that says TOTAL; failing that, what was
+paid by card, even when a creased receipt puts the amount a line away from
+"Visa"; then the subtotal; and if none of those can be read, what the items
+add up to. When the date has been torn off or wasn't printed, it is today's
+date — change it if you're scanning an older receipt.
+
 **A screenshot of a list of payments.** Take a screenshot of Google Wallet's
 payments on a card (or a banking app's list) and scan or share it: each row is
 read as its own payment — shop, amount and date (the year worked out when the

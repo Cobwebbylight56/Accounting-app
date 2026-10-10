@@ -26,29 +26,45 @@ object ReceiptParser {
         val lines = text.lines().map { it.trim() }.filter { it.isNotEmpty() }
         return Reading(
             shop = shopIn(lines),
-            totalMinor = totalIn(lines),
+            totalMinor = totalIn(lines, text),
             date = dateIn(lines, today),
             cardEnding = CARD_ENDING.find(text)?.groupValues?.get(1),
         )
     }
 
     /**
-     * The total: the largest amount on a line that says total (not subtotal,
-     * not savings), or on the line after one that says it with nothing on it;
-     * failing that, what was paid by card; failing that, the largest amount.
+     * The total, by the best evidence there is:
+     *
+     * 1. a line that says total (not subtotal, not savings);
+     * 2. what was paid by card;
+     * 3. the subtotal, when nothing came off after it;
+     * 4. what the items add up to;
+     * 5. the largest amount.
+     *
+     * A word with no amount beside it takes the amount on its own just under
+     * it — or, for the card line, just over it: on a crumpled receipt the
+     * amount printed beside "Visa" can come back a row higher.
      */
-    internal fun totalIn(lines: List<String>): Long? {
+    internal fun totalIn(lines: List<String>, text: String = lines.joinToString("\n")): Long? {
         fun amountsAt(index: Int): List<Long> =
             lines.getOrNull(index)?.let { line -> AMOUNT.findAll(line).mapNotNull { toMinor(it) }.toList() }.orEmpty()
 
-        for (keywords in listOf(TOTAL_WORDS, PAID_WORDS)) {
-            val found = lines.indices.flatMap { index ->
+        fun bareAmountAt(index: Int): List<Long> =
+            lines.getOrNull(index)?.takeIf { BARE_AMOUNT.matches(it) }?.let { amountsAt(index) }.orEmpty()
+
+        fun largestBy(keywords: Regex, notThese: Regex?, lookAbove: Boolean): Long? =
+            lines.indices.flatMap { index ->
                 val lower = lines[index].lowercase()
-                if (!keywords.containsMatchIn(lower) || NOT_TOTAL.containsMatchIn(lower)) return@flatMap emptyList()
-                amountsAt(index).ifEmpty { amountsAt(index + 1) }
-            }
-            found.maxOrNull()?.let { return it }
-        }
+                if (!keywords.containsMatchIn(lower) || notThese?.containsMatchIn(lower) == true) return@flatMap emptyList()
+                amountsAt(index)
+                    .ifEmpty { amountsAt(index + 1) }
+                    .ifEmpty { if (lookAbove) bareAmountAt(index - 1) else emptyList() }
+            }.maxOrNull()
+
+        largestBy(TOTAL_WORDS, NOT_TOTAL, lookAbove = false)?.let { return it }
+        largestBy(PAID_WORDS, NOT_TOTAL, lookAbove = true)?.let { return it }
+        largestBy(SUBTOTAL_WORDS, null, lookAbove = false)?.let { return it }
+        ReceiptItems.itemsIn(text).takeIf { it.size >= 2 }?.sumOf { it.amountMinor }?.takeIf { it > 0 }?.let { return it }
         return lines
             .filterNot { NOT_TOTAL.containsMatchIn(it.lowercase()) }
             .flatMap { line -> AMOUNT.findAll(line).mapNotNull { toMinor(it) }.toList() }
@@ -69,24 +85,50 @@ object ReceiptParser {
     }
 
     /**
-     * The shop: the first of the top lines that reads like a name — letters,
-     * not an address, a phone number, a VAT number, a time or a greeting.
+     * The shop. A shop the app knows, named anywhere a price isn't — the logo
+     * is a picture, but "B&M Retail Ltd" under it or "Thank you for shopping
+     * at Tesco" at the bottom says who it was. Failing that, the company the
+     * top lines name ("Smith & Sons Ltd"), then the first top line that reads
+     * like a name: not a slogan, an address, a phone number, a time or a
+     * greeting.
      */
     internal fun shopIn(lines: List<String>): String? {
-        val candidate = lines.take(TOP_LINES).firstOrNull { line ->
-            val lower = line.lowercase()
-            val letters = line.count { it.isLetter() }
-            letters >= 3 &&
-                letters >= line.count { it.isDigit() } &&
-                !NOT_A_NAME.containsMatchIn(lower) &&
-                !AMOUNT.containsMatchIn(line) &&
-                DATES.none { it.regex.containsMatchIn(line) }
-        } ?: return null
+        for (line in lines.filterNot { AMOUNT.containsMatchIn(it) }) {
+            val known = KnownShops.find(line) ?: continue
+            // "ASDA PETROL 4275" says more than "Asda" — and is filed as fuel.
+            val plain = line.replace(COMPANY, "").trim()
+            val words = plain.split(Regex("""\s+""")).size
+            return if (KnownShops.startsWith(plain, known) && words in 2..4 && nameLike(plain, minLetters = 2)) {
+                tidy(plain)
+            } else {
+                known.name
+            }
+        }
+        val top = lines.take(TOP_LINES)
+        val candidate = top.firstOrNull { COMPANY.containsMatchIn(it) && nameLike(it.replace(COMPANY, ""), minLetters = 2) }
+            ?.replace(COMPANY, "")
+            ?: top.firstOrNull { nameLike(it, minLetters = 3) }
+            ?: return null
+        return tidy(candidate)
+    }
+
+    private fun nameLike(line: String, minLetters: Int): Boolean {
+        val lower = line.lowercase()
+        val letters = line.count { it.isLetter() }
+        return letters >= minLetters &&
+            letters >= line.count { it.isDigit() } &&
+            !NOT_A_NAME.containsMatchIn(lower) &&
+            !SLOGAN.containsMatchIn(lower) &&
+            !AMOUNT.containsMatchIn(line) &&
+            DATES.none { it.regex.containsMatchIn(line) }
+    }
+
+    private fun tidy(name: String): String? {
         // "Amazon.co.uk" is Amazon.
-        val cleaned = candidate.trim().replace(WEB_ENDING, "").trim('*', '-', '=', '#', '.', ' ')
-        if (cleaned.length < 3) return null
-        // "TESCO STORES" reads better as "Tesco Stores".
-        return if (cleaned == cleaned.uppercase()) {
+        val cleaned = name.trim().replace(WEB_ENDING, "").trim('*', '-', '=', '#', '.', ',', ' ')
+        if (cleaned.length < 2) return null
+        // "TESCO STORES" and "costa coffee" read better as "Tesco Stores" and "Costa Coffee".
+        return if (cleaned == cleaned.uppercase() || cleaned == cleaned.lowercase()) {
             cleaned.lowercase().split(' ').joinToString(" ") { word -> word.replaceFirstChar { it.uppercase() } }
         } else {
             cleaned
@@ -100,8 +142,16 @@ object ReceiptParser {
         return (pounds * 100 + pence).takeIf { it > 0 }
     }
 
-    /** Receipt amounts always show pence: 23.99, £1,234.50, 4.20 GBP. */
-    private val AMOUNT = Regex("""(?<![\d.])£?\s?(\d{1,3}(?:,\d{3})+\.\d{2}|\d{1,5}\.\d{2})(?![\d])""")
+    /**
+     * Receipt amounts always show pence: 23.99, £1,234.50, 4.20 GBP. A total
+     * printed big and spaced out can come back as "£35. 13".
+     */
+    private val AMOUNT = Regex("""(?<![\d.])£?\s?(\d{1,3}(?:,\d{3})+\.\d{2}|\d{1,5}\.\s?\d{2})(?![\d])""")
+
+    /** A line that is only an amount: "£35.13", "35.13 GBP". */
+    private val BARE_AMOUNT = Regex("""^[£E]?\s?(\d{1,3}(?:,\d{3})+\.\d{2}|\d{1,5}\.\s?\d{2})\s*(gbp)?$""", RegexOption.IGNORE_CASE)
+
+    private val SUBTOTAL_WORDS = Regex("""\b(sub ?-?total|subtotal)\b""")
 
     private val TOTAL_WORDS = Regex(
         """\b(total|amount due|balance due|to pay|amount to pay|grand total|order total|you paid|amount paid|total paid|total charged)\b""",
@@ -116,8 +166,14 @@ object ReceiptParser {
     private val CARD_ENDING = Regex("""(?:\*{2,}|x{3,}|X{3,}|•+|ending(?: in)?)\s?(\d{4})\b""")
 
     private val NOT_A_NAME = Regex(
-        """\b(road|rd|street|st|lane|ln|avenue|ave|way|close|drive|park|retail|tel|telephone|phone|vat|reg|receipt|welcome|thank|www|http|store no|till|cashier|served by|order|orders|ordered|invoice|date|time|details)\b|\d{1,2}:\d{2}|@""",
+        """\b(road|rd|street|st|lane|ln|avenue|ave|way|close|drive|park|unit|tel|telephone|phone|vat|reg|receipt|welcome|thank|www|http|store no|till|cashier|served by|order|orders|ordered|invoice|date|time|details|voucher)\b|\d{1,2}:\d{2}|@""",
     )
+
+    /** The line a shop prints under its logo: "Big Brands Big Savings", "Every little helps". */
+    private val SLOGAN = Regex("""\b(savings|prices|brands|helps|for less)\b""")
+
+    /** A company's name as receipts print it: "B&M Retail Ltd", "Smith & Sons Limited". */
+    private val COMPANY = Regex("""\s+(retail\s+)?(stores\s+)?(uk\s+)?(ltd|limited|plc)\.?\s*$""", RegexOption.IGNORE_CASE)
 
     private val WEB_ENDING = Regex("""\.(co\.uk|com|uk|org|net)$""", RegexOption.IGNORE_CASE)
 
