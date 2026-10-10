@@ -17,6 +17,7 @@ import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.NewReleases
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Palette
@@ -70,6 +71,7 @@ fun SettingsScreen(
     onOpenImport: () -> Unit,
     onOpenSortEverything: () -> Unit = {},
     onOpenLivePayments: () -> Unit = {},
+    onOpenWhatsNew: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -219,6 +221,12 @@ fun SettingsScreen(
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 
+            SettingsItem(
+                title = "What's new",
+                subtitle = "What changed in ${BuildConfig.VERSION_NAME.substringBefore('-')} and every update before it",
+                icon = Icons.Outlined.NewReleases,
+                onClick = onOpenWhatsNew,
+            )
             SettingsItem(
                 title = "About",
                 // The version code is what Android compares when deciding

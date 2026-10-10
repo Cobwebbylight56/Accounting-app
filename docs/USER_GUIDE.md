@@ -5,6 +5,15 @@ knowledge.
 
 ---
 
+## After an update
+
+The first time you open the app after an update, a note says which version
+you now have and what's new in it, covering every update since the one you
+last used (the last three in full). Tap **Got it** and it won't show again
+for that version. Every version's notes are in **Settings → What's new**,
+with the one on your phone marked. **Settings → About** shows the version
+number, version code and build date.
+
 ## Finding your way around
 
 Along the bottom of the screen are five tabs:

@@ -19,6 +19,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
@@ -79,6 +80,7 @@ class SettingsRepository @Inject constructor(
         val LIVE_ALERT_LOG = stringPreferencesKey("live_alert_log")
         val LIVE_LISTENER_AT = longPreferencesKey("live_listener_at")
         val LIVE_TEST_HEARD = longPreferencesKey("live_test_heard")
+        val LAST_SEEN_VERSION = stringPreferencesKey("last_seen_version")
         val LIVE_STATEMENT_NUDGE = booleanPreferencesKey("live_statement_nudge")
         val LIVE_CARD_ACCOUNTS = stringPreferencesKey("live_card_accounts")
         val SETUP_HIDDEN = booleanPreferencesKey("setup_checklist_hidden")
@@ -351,6 +353,11 @@ class SettingsRepository @Inject constructor(
 
     /** When the reader last heard the app's own test alert. */
     suspend fun setLiveTestHeard(time: Long) = put(Keys.LIVE_TEST_HEARD, time)
+
+    /** The version whose What's new has been seen; null before the first. */
+    suspend fun lastSeenVersion(): String? = preferences.first()[Keys.LAST_SEEN_VERSION]
+
+    suspend fun setLastSeenVersion(version: String) = put(Keys.LAST_SEEN_VERSION, version)
 
     /** Records that Android has been asked once for permission to show reminders. */
     suspend fun setNotificationsAsked() = put(Keys.NOTIFICATIONS_ASKED, true)

@@ -10,9 +10,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -25,15 +27,19 @@ import com.rhys.financetracker.data.export.ExportManager
 import com.rhys.financetracker.data.export.ExportedFile
 import com.rhys.financetracker.data.prefs.AppSettings
 import com.rhys.financetracker.data.prefs.SettingsRepository
+import com.rhys.financetracker.data.releases.ReleaseNotes
 import com.rhys.financetracker.security.AppLockManager
 import com.rhys.financetracker.security.BiometricAuthenticator
 import com.rhys.financetracker.ui.intro.IntroScreen
 import com.rhys.financetracker.ui.lock.LockScreen
 import com.rhys.financetracker.ui.navigation.FinanceNavHost
 import com.rhys.financetracker.ui.theme.FinanceTrackerTheme
+import com.rhys.financetracker.ui.whatsnew.WhatsNewDialog
+import com.rhys.financetracker.ui.whatsnew.currentVersion
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 
 /**
  * The only activity.
@@ -84,6 +90,11 @@ class MainActivity : FragmentActivity() {
             var introDone by rememberSaveable { mutableStateOf(!freshStart) }
             val reduceMotion = com.rhys.financetracker.ui.components.rememberReduceMotion()
             val introPlaying = !introDone && settings.showIntro && !reduceMotion
+            // What changed since the version last used: shown once after an
+            // update, after the intro and the lock, before anything else pops up.
+            var whatsNew by remember { mutableStateOf<List<ReleaseNotes.Release>?>(null) }
+            LaunchedEffect(Unit) { whatsNew = whatsNewToShow() }
+            val whatsNewShowing = whatsNew?.isNotEmpty() == true
 
             FinanceTrackerTheme(
                 themeMode = settings.themeMode,
@@ -125,7 +136,8 @@ class MainActivity : FragmentActivity() {
                             } else {
                                 val pendingFile by incomingFile.collectAsStateWithLifecycle()
                                 CompositionLocalProvider(
-                                    com.rhys.financetracker.ui.components.LocalIntroShowing provides introPlaying,
+                                    com.rhys.financetracker.ui.components.LocalIntroShowing provides
+                                        (introPlaying || whatsNew == null || whatsNewShowing),
                                 ) {
                                     FinanceNavHost(
                                         onShareFile = ::shareFile,
@@ -133,6 +145,15 @@ class MainActivity : FragmentActivity() {
                                         // does not re-open the same statement.
                                         importFile = pendingFile,
                                         onImportFileHandled = { incomingFile.value = null },
+                                    )
+                                }
+                                if (!introPlaying && whatsNewShowing) {
+                                    WhatsNewDialog(
+                                        releases = whatsNew.orEmpty(),
+                                        onDismiss = {
+                                            whatsNew = emptyList()
+                                            lifecycleScope.launch { settingsRepository.setLastSeenVersion(currentVersion) }
+                                        },
                                     )
                                 }
                             }
@@ -146,6 +167,22 @@ class MainActivity : FragmentActivity() {
                 }
             }
         }
+    }
+
+    /**
+     * The notes to show for an update: every version since the one last
+     * used. Nothing on a fresh install — there is nothing it changed — and
+     * nothing once seen, which is then remembered.
+     */
+    private suspend fun whatsNewToShow(): List<ReleaseNotes.Release> {
+        val seen = settingsRepository.lastSeenVersion()
+        if (seen == currentVersion) return emptyList()
+        val freshInstall = seen == null && runCatching {
+            packageManager.getPackageInfo(packageName, 0).let { it.firstInstallTime == it.lastUpdateTime }
+        }.getOrDefault(false)
+        val notes = if (freshInstall) emptyList() else ReleaseNotes.since(seen, currentVersion)
+        if (notes.isEmpty()) settingsRepository.setLastSeenVersion(currentVersion)
+        return notes
     }
 
     /** A file arriving while the app is already running. */
