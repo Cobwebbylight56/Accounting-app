@@ -35,8 +35,8 @@ import com.rhys.financetracker.BuildConfig
 import com.rhys.financetracker.data.releases.ReleaseNotes
 import java.time.format.DateTimeFormatter
 
-/** This build's version, as release notes name it: "1.52.0", without "-debug". */
-val currentVersion: String get() = BuildConfig.VERSION_NAME.substringBefore('-')
+/** This build's version, as release notes name it: "1.52.0", without "(build 123)" or "-debug". */
+val currentVersion: String get() = ReleaseNotes.versionOf(BuildConfig.VERSION_NAME)
 
 /**
  * Shown once after an update: the version now on the phone and what changed

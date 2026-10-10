@@ -115,6 +115,13 @@ object ReleaseNotes {
         return ALL.filter { compare(it.version, current) <= 0 && compare(it.version, seen) > 0 }
     }
 
+    /**
+     * The version a build's name is, as these notes name it: "1.52.0" from
+     * "1.52.0 (build 123)" off the build server, or "1.52.0-debug".
+     */
+    fun versionOf(buildName: String): String =
+        Regex("""^\d+(\.\d+)*""").find(buildName.trim())?.value ?: buildName.trim()
+
     /** "1.52.0" against "1.9.3", part by part as numbers. */
     fun compare(one: String, other: String): Int {
         val a = one.split('.').map { it.toIntOrNull() ?: 0 }

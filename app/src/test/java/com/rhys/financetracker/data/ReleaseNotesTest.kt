@@ -12,8 +12,16 @@ class ReleaseNotesTest {
     fun `every update says what's new in it`() {
         // Adding a release without its notes fails here: put an entry at the
         // top of ReleaseNotes.ALL for the version in version.properties.
-        assertEquals(BuildConfig.VERSION_NAME.substringBefore('-'), ReleaseNotes.ALL.first().version)
+        assertEquals(ReleaseNotes.versionOf(BuildConfig.VERSION_NAME), ReleaseNotes.ALL.first().version)
         assertTrue(ReleaseNotes.ALL.all { it.headline.isNotBlank() && it.changes.isNotEmpty() })
+    }
+
+    @Test
+    fun `the version is read from however the build names it`() {
+        assertEquals("1.52.0", ReleaseNotes.versionOf("1.52.0 (build 123)"))
+        assertEquals("1.52.0", ReleaseNotes.versionOf("1.52.0-debug"))
+        assertEquals("1.52.0", ReleaseNotes.versionOf("1.52.0 (build 123)-debug"))
+        assertEquals("1.52.0", ReleaseNotes.versionOf("1.52.0"))
     }
 
     @Test

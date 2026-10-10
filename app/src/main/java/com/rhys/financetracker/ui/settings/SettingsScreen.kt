@@ -223,7 +223,7 @@ fun SettingsScreen(
 
             SettingsItem(
                 title = "What's new",
-                subtitle = "What changed in ${BuildConfig.VERSION_NAME.substringBefore('-')} and every update before it",
+                subtitle = "What changed in ${com.rhys.financetracker.ui.whatsnew.currentVersion} and every update before it",
                 icon = Icons.Outlined.NewReleases,
                 onClick = onOpenWhatsNew,
             )
