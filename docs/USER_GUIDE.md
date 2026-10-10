@@ -529,6 +529,40 @@ Tap an account (in Accounts, or on a person's page) to open its page:
 
 The pencil at the top edits the account; **Import statements** adds to it.
 
+### Statements in any layout
+
+Most banks print a statement the same way: a date at the start of each row
+and the amounts down the right. When a PDF isn't laid out like that, the app
+reads it a second way. It looks for a date and an amount wherever they are on
+each line:
+
+* **Dates** at the start, the end or the middle, in any common form:
+  27/01/2026, 27-Jan-26, 27 Jan, 27th January 2026, 2026-01-27, or month first
+  (Jan 27, 2026) as Revolut and American Express write it. A card statement
+  printing two dates (when it was bought and when it went through) is read by
+  the first.
+* **Amounts** with or without £, with a minus, in brackets, or marked CR or DR.
+* **Rows over several lines**: a date printed once with the day's payments
+  under it, a payee carried onto the next line, or an amount on a line of its
+  own.
+
+Lines the statement uses to describe itself are left out: due dates,
+limits, minimum payments, rates, page numbers and totals. So is anything dated
+far from the rest.
+
+Which way the money went is taken from, strongest first:
+1. A sign or CR/DR on the amount.
+2. The running balance.
+3. The words ("Payment received", "Refund", "Direct debit").
+4. Otherwise it's money out.
+
+On a card it's the other way round: a minus is a payment or refund.
+
+This second reader is only used when the usual one can't make sense of the
+statement, so statements that already read well (Nationwide, Lloyds) read
+exactly as before. If neither can read it, **Show what was read** shows the
+text so the layout can be added.
+
 ### Credit card statements (Capital One, Zopa and others)
 
 A card statement reads like any other, with three differences the app allows

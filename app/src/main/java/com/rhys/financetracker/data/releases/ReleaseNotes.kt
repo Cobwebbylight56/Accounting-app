@@ -22,8 +22,9 @@ object ReleaseNotes {
     /** Every release, newest first. */
     val ALL: List<Release> = listOf(
         Release(
-            "1.55.0", LocalDate.of(2026, 10, 10), "Capital One statements read",
+            "1.55.0", LocalDate.of(2026, 10, 10), "Statements in any layout",
             listOf(
+                "A new statement reader for any layout: dates at the start, the end or the middle of a line, in any common form (27/01/2026, 27 Jan, Jan 27, 2026, 2026-01-27), amounts with £, minus, brackets, CR or DR, a date heading several payments, and payees or amounts on the line below. It takes over whenever the usual reader can't make sense of a PDF.",
                 "Capital One's PDF statements are read. They only give the year in two figures (\"26 February 26\"), which stopped every row being dated.",
                 "On a card statement, the balance going up is spending — the balance check now reads it that way, so card payments aren't flagged to check.",
                 "Lines adding up a column (\"STATEMENT TOTALS\") are no longer taken for a payment, and the starting balance is the previous one, not the new one.",

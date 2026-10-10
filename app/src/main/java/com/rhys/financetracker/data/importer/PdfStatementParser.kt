@@ -66,7 +66,7 @@ object PdfStatementParser {
      * be imported rather than producing nonsense.
      */
     fun toSheet(lines: List<String>, sheetName: String): SheetData? {
-        val rows = parse(lines)
+        val usual = parse(lines)
         // Two rows is the ordinary bar, and it is there so that a letter or a
         // payslip with a couple of dated figures on it is not offered as a
         // statement. A savings account breaks that assumption honestly: a
@@ -75,7 +75,24 @@ object PdfStatementParser {
         // did not recognise. So a single row is accepted when the document
         // says outright that it is a statement — a running balance line, or
         // headings naming a date beside a money column.
-        if (rows.size < MIN_ROWS && !(rows.isNotEmpty() && saysItIsAStatement(lines))) return null
+        val statementSaysSo = saysItIsAStatement(lines) || CARD_STATEMENT.containsMatchIn(lines.joinToString(" "))
+        val usualReads = usual.size >= MIN_ROWS || (usual.isNotEmpty() && saysItIsAStatement(lines))
+        // Any other layout — dates at the end, month first, a date heading
+        // several rows, amounts on a line of their own — goes to the reader
+        // that looks for a date and an amount wherever they are. The usual
+        // reader stays first wherever it reads a statement properly: it
+        // checks itself against the running balance column by column.
+        val rows = if (usualReads && usual.size >= TRUSTED_ROWS) {
+            usual
+        } else {
+            val flexible = FlexibleStatementReader.parse(lines)
+            val flexibleReads = flexible.size >= MIN_ROWS || (flexible.isNotEmpty() && statementSaysSo)
+            when {
+                usualReads && !(flexibleReads && flexible.size >= usual.size * 2 && flexible.size - usual.size >= 3) -> usual
+                flexibleReads -> flexible
+                else -> return null
+            }
+        }
 
         return SheetData(
             name = sheetName,
@@ -1183,6 +1200,9 @@ object PdfStatementParser {
 
     /** At least this many transaction lines before a PDF counts as a statement. */
     private const val MIN_ROWS = 2
+
+    /** This many rows read the usual way and the statement is the usual layout. */
+    private const val TRUSTED_ROWS = 5
 
     private val WHITESPACE = Regex("\\s+")
 
