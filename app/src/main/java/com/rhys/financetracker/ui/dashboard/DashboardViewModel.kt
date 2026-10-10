@@ -37,6 +37,7 @@ import com.rhys.financetracker.domain.insight.InsightReport
 import com.rhys.financetracker.domain.model.CategoryKind
 import com.rhys.financetracker.domain.model.DashboardWidget
 import com.rhys.financetracker.domain.model.TransactionType
+import com.rhys.financetracker.domain.report.AverageLeftOver
 import com.rhys.financetracker.domain.report.FinancialSummary
 import com.rhys.financetracker.domain.report.MonthPoint
 import com.rhys.financetracker.domain.report.UntilPayday
@@ -308,6 +309,43 @@ class DashboardViewModel @Inject constructor(
         )
     }
 
+    /**
+     * What's left over in a month on average, over the last few full months
+     * before the one on screen that had pay in them — so a month before the
+     * statements began doesn't drag it down.
+     */
+    private val averageLeftOver: Flow<AverageLeftOver?> = monthFlow.flatMapLatest { (month, currentScope) ->
+        val last = month.minusMonths(1)
+        val first = month.minusMonths(AverageLeftOver.MONTHS)
+        transactionRepository.observeMonthlyTotals(
+            start = first.atDay(1),
+            end = last.atEndOfMonth(),
+            accountId = currentScope.accountId,
+            personIds = currentScope.personIds,
+        ).flatMapLatest { rows ->
+            val from = rows.filter { it.incomeMinor > 0L }.mapNotNull { DateUtils.parseYearMonthKey(it.yearMonth) }.minOrNull()
+            if (from == null) {
+                flowOf(null)
+            } else {
+                val counted = rows.filter { row -> DateUtils.parseYearMonthKey(row.yearMonth)?.let { !it.isBefore(from) } == true }
+                val start = from.atDay(1)
+                val end = last.atEndOfMonth()
+                combine(
+                    transactionRepository.observePotFlow(CategoryKind.SAVING, start, end, currentScope.accountId, currentScope.personIds),
+                    transactionRepository.observeLoanPayments(start, end, currentScope.accountId, currentScope.personIds),
+                ) { saved, loans ->
+                    AverageLeftOver.of(
+                        incomeMinor = counted.sumOf { it.incomeMinor },
+                        expenseMinor = counted.sumOf { it.expenseMinor },
+                        savedMinor = saved.netMinor,
+                        loanPaymentsMinor = loans,
+                        months = (java.time.temporal.ChronoUnit.MONTHS.between(from, last) + 1).toInt(),
+                    )
+                }
+            }
+        }
+    }
+
     private fun potFlow(kind: CategoryKind) = monthFlow.flatMapLatest { (month, currentScope) ->
         val range = DateUtils.monthRange(month)
         transactionRepository.observePotFlow(
@@ -417,6 +455,7 @@ class DashboardViewModel @Inject constructor(
             loanPaymentsThisMonth,
             // Every regular payment running, for what is left until pay day.
             recurringRepository.observeAll(),
+            averageLeftOver,
         ),
     ) { values -> buildState(values) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DashboardState())
@@ -449,6 +488,7 @@ class DashboardViewModel @Inject constructor(
             .firstOrNull()?.transaction?.date
         val loanPayments = values[21] as Long
         val runningRules = (values[22] as List<RecurringRuleWithDetails>).map { it.rule }
+        val leftOverAverage = values[23] as AverageLeftOver?
 
         val inScope = accountList.filter { currentScope.matches(it) }
         // The month's entries for whoever's tab this is: their own, and those
@@ -522,6 +562,7 @@ class DashboardViewModel @Inject constructor(
             unassignedAccounts = unassigned,
             latestEntryDate = latest,
             untilPayday = untilPayday,
+            averageLeftOver = leftOverAverage,
         )
     }
 
@@ -841,6 +882,8 @@ data class DashboardState(
     val widgets: List<VisibleWidget> = emptyList(),
     /** What's left until pay day, and the wage still to come — for the month we're in only. */
     val untilPayday: UntilPayday? = null,
+    /** What's left over in a month on average, over the last few full months. */
+    val averageLeftOver: AverageLeftOver? = null,
 ) {
     val isCurrentMonth: Boolean get() = month == DateUtils.currentYearMonth()
     val hasAnyData: Boolean get() = accounts.isNotEmpty() || monthTransactions.isNotEmpty()

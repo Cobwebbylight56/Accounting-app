@@ -327,11 +327,20 @@ internal fun HomeTiles(state: DashboardState, onOpenAccounts: () -> Unit) {
                     height = TALL_TILE,
                     onClick = onOpenAccounts,
                 )
+                // What's left over in a month on average; until there are
+                // full months to go on, take-home, then this month's money in.
+                val average = state.averageLeftOver
                 val monthly = income.netMonthlyMinor
                 HomeTile(
                     icon = Icons.Outlined.Payments,
-                    value = com.rhys.financetracker.ui.components.animatedMoney(monthly ?: summary.monthIncomeMinor),
-                    label = if (monthly != null) "Take-home a month" else "Money in this month",
+                    value = com.rhys.financetracker.ui.components.animatedMoney(
+                        average?.perMonthMinor ?: monthly ?: summary.monthIncomeMinor,
+                    ),
+                    label = when {
+                        average != null -> "Left over a month, on average"
+                        monthly != null -> "Take-home a month"
+                        else -> "Money in this month"
+                    },
                     color = colors.tileMist,
                     height = SHORT_TILE,
                     onClick = null,

@@ -66,4 +66,13 @@ class UntilPaydayTest {
         val between = listOf(rule("To joint", 30_000, 20, TransactionType.TRANSFER, to = 9L))
         assertEquals(0L, UntilPayday.of(between, setOf(current, 9L), 64_000, today).billsMinor)
     }
+
+    @Test
+    fun `left over a month, on average`() {
+        // Three months: £5,586.48 in, £3,000 out, £1,212 put aside, £666.03 to the car loan.
+        val average = com.rhys.financetracker.domain.report.AverageLeftOver.of(558_648, 300_000, 121_200, 66_603, months = 3)!!
+        assertEquals(23_615L, average.perMonthMinor)
+        assertEquals(3, average.months)
+        assertNull(com.rhys.financetracker.domain.report.AverageLeftOver.of(0, 0, 0, 0, months = 0))
+    }
 }

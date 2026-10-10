@@ -259,6 +259,11 @@ any more still due.
 Earlier months show **Left over**: what came in, less what went out, was put
 aside and paid off loans.
 
+**Left over a month, on average** — the tile beside Owed — is that same
+figure averaged over the last three full months that had pay in them, so
+months before your statements began don't drag it down. Until there's a full
+month to go on, the tile shows your take-home a month instead.
+
 ### Balances
 
 An account's balance is always its starting balance plus every transaction on

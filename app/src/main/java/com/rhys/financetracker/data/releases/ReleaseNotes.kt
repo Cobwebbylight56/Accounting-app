@@ -22,6 +22,13 @@ object ReleaseNotes {
     /** Every release, newest first. */
     val ALL: List<Release> = listOf(
         Release(
+            "1.54.0", LocalDate.of(2026, 10, 10), "What's left over each month",
+            listOf(
+                "The tile beside Owed now shows what's left over in a month on average — what came in, less what went out, was put aside and paid off loans — over your last three full months.",
+                "Until there's a full month to go on, it shows take-home a month instead.",
+            ),
+        ),
+        Release(
             "1.53.0", LocalDate.of(2026, 10, 10), "Your pay and your money, worked out for you",
             listOf(
                 "Your wage is found in your statements — the same employer paying in each month — and set up by itself. It's added on payday, and the statement puts in the exact figure.",
