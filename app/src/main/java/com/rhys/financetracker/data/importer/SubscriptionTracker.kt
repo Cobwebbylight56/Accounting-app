@@ -63,9 +63,8 @@ object SubscriptionTracker {
             .filterNot { payment ->
                 TransactionFingerprint.normaliseDescription(payment.description).split(' ').any { it in UNDONE }
             }
-            .groupBy { RecurringDetector.keyOf(it.description) }
-            .filterKeys { it.isNotBlank() }
-            .mapNotNull { (key, group) -> judge(key, group, coveredTo) }
+            .let(RecurringDetector::series)
+            .mapNotNull { judge(it.key, it.payments, coveredTo) }
             .sortedWith(compareBy<Subscription> { it.status.ordinal }.thenByDescending { it.monthlyMinor })
     }
 

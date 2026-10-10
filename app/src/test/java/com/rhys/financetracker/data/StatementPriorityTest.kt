@@ -236,4 +236,33 @@ class StatementPriorityTest {
         )
         assertEquals(10L, corrections.values.single().existing.id)
     }
+
+    @Test
+    fun `a regular payment the app added is replaced by the statement even after a price change`() {
+        // The app added "Sky" at last month's £32.00 on the 12th; the bank
+        // took £35.00 as "SKY DIGITAL 88231" on the 13th. One bill, not two.
+        val added = recorded(10, "Sky", 3_200, 12, source = RecordSource.MANUAL).copy(scheduled = true)
+        val corrections = StatementPriority.corrections(
+            listOf(statementRow(1, "SKY DIGITAL 88231", 3_500, 13)),
+            listOf(added),
+        )
+        assertEquals(10L, corrections.values.single().existing.id)
+    }
+
+    @Test
+    fun `only the app's own regular payments are matched at a different amount`() {
+        // Typed in by hand at £32: a different amount is a different payment.
+        val typed = recorded(10, "Sky", 3_200, 12, source = RecordSource.MANUAL)
+        assertTrue(StatementPriority.corrections(listOf(statementRow(1, "SKY DIGITAL 88231", 3_500, 13)), listOf(typed)).isEmpty())
+        // And a regular payment is never matched to a very different amount.
+        val added = typed.copy(scheduled = true)
+        assertTrue(StatementPriority.corrections(listOf(statementRow(1, "SKY STORE", 9_900, 13)), listOf(added)).isEmpty())
+    }
+
+    @Test
+    fun `a short name agrees with the longer one it is part of`() {
+        assertTrue(StatementPriority.payeesAgree("Sky", "SKY DIGITAL 88231"))
+        assertTrue(StatementPriority.payeesAgree("EE", "EE LIMITED"))
+        assertTrue(!StatementPriority.payeesAgree("Card payment", "SKY DIGITAL"))
+    }
 }

@@ -37,6 +37,31 @@ class Notifier @Inject constructor(
         const val ROLLOVER = 1005
         const val BACKUP = 1006
         const val STATEMENT_READY = 1100
+        const val LIVE_TEST = 1200
+    }
+
+    /**
+     * A pretend bank alert, posted so the alert reader can show it hears
+     * them. Marked as a test, so it is never taken for a payment.
+     *
+     * @return false when the app may not post notifications, so no test can run.
+     */
+    fun postLiveTest(): Boolean {
+        if (!hasPermission) return false
+        val manager = context.getSystemService<NotificationManager>() ?: return false
+        val notification = NotificationCompat.Builder(context, NotificationChannels.SYSTEM)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("Testing live payments")
+            .setContentText("If the app can read alerts, this goes in a moment. Nothing is added.")
+            .addExtras(android.os.Bundle().apply { putBoolean(LIVE_TEST_EXTRA, true) })
+            .setAutoCancel(true)
+            .build()
+        return runCatching { manager.notify(Ids.LIVE_TEST, notification) }.isSuccess
+    }
+
+    companion object {
+        /** Marks the test alert, so the reader knows it for what it is. */
+        const val LIVE_TEST_EXTRA = "com.rhys.financetracker.LIVE_TEST"
     }
 
     val hasPermission: Boolean

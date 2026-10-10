@@ -11,6 +11,7 @@ import com.rhys.financetracker.data.local.dao.TransactionDao
 import com.rhys.financetracker.data.local.entity.AccountEntity
 import com.rhys.financetracker.data.local.entity.TransactionEntity
 import com.rhys.financetracker.data.prefs.AppSettings
+import com.rhys.financetracker.data.prefs.LiveAlertLogEntry
 import com.rhys.financetracker.data.prefs.SettingsRepository
 import com.rhys.financetracker.domain.model.AccountType
 import com.rhys.financetracker.domain.model.CategoryKind
@@ -50,6 +51,48 @@ class LivePaymentRepository @Inject constructor(
      * epoch millis, and adds the payment in it when there is one.
      */
     suspend fun record(app: String, appLabel: String, title: String?, text: String?, postedAt: Long): Outcome {
+        val outcome = read(app, appLabel, title, text, postedAt)
+        log(app, appLabel, title, text, outcome)
+        return outcome
+    }
+
+    /** Android has started the alert reader. */
+    suspend fun listenerConnected() = settingsRepository.setLiveListenerAt(Instant.now().toEpochMilli())
+
+    /** The alert reader heard the app's own test alert: reading alerts works. */
+    suspend fun testHeard() {
+        val now = Instant.now().toEpochMilli()
+        settingsRepository.setLiveTestHeard(now)
+        settingsRepository.logLiveAlert(
+            LiveAlertLogEntry(now, "Test", "Heard", "Reading alerts works — nothing was added"),
+        )
+    }
+
+    /**
+     * Notes on the Live payments page what came of an alert from a banking
+     * app, so it can be seen working — or seen not reading something it
+     * should. Only banking apps and ones allowed; only a payment's amount and
+     * payee are kept, or, for an alert with a £ in it that wasn't read as a
+     * payment, its words, to show what was missed.
+     */
+    private suspend fun log(app: String, appLabel: String, title: String?, text: String?, outcome: Outcome) {
+        val settings = settingsRepository.settings.first()
+        if (outcome == Outcome.OFF || outcome == Outcome.ADDED) return
+        if (app !in BankApps.KNOWN && app !in settings.liveAlertApps) return
+        val words = listOfNotNull(title, text).joinToString(" — ").replace(Regex("""\s+"""), " ").trim()
+        val (said, detail) = when (outcome) {
+            Outcome.NOT_A_PAYMENT ->
+                if ('£' in words) "Not read as a payment" to words.take(MAX_LOGGED) else return
+            Outcome.ALREADY_ADDED -> "Already in" to "Told twice, or added on its day already"
+            Outcome.NO_ACCOUNT -> "Not added" to "Couldn't tell which account — choose one for $appLabel below"
+            Outcome.STATEMENT_READY -> "Statement ready" to "A new statement to bring in"
+            Outcome.NOT_ALLOWED -> return
+            Outcome.OFF, Outcome.ADDED -> return
+        }
+        settingsRepository.logLiveAlert(LiveAlertLogEntry(Instant.now().toEpochMilli(), appLabel, said, detail))
+    }
+
+    private suspend fun read(app: String, appLabel: String, title: String?, text: String?, postedAt: Long): Outcome {
         val settings = settingsRepository.settings.first()
         if (!settings.liveAlerts) return Outcome.OFF
         if (app in BankApps.NEVER) return Outcome.NOT_ALLOWED
@@ -170,15 +213,15 @@ class LivePaymentRepository @Inject constructor(
             accounts.firstOrNull { it.id == accountId }?.name,
             paidOff?.let { id -> accounts.firstOrNull { it.id == id }?.name },
         ).joinToString(" → ")
-        settingsRepository.setLiveAlertLast(
-            listOfNotNull(
-                (if (alert.type == TransactionType.INCOME) "+" else "") + Money.format(alert.amountMinor),
-                alert.payee,
-                categoryName,
-                account,
-                time,
-            ).joinToString(" · "),
-        )
+        val summary = listOfNotNull(
+            (if (alert.type == TransactionType.INCOME) "+" else "") + Money.format(alert.amountMinor),
+            alert.payee,
+            categoryName,
+            account,
+            time,
+        ).joinToString(" · ")
+        settingsRepository.setLiveAlertLast(summary)
+        settingsRepository.logLiveAlert(LiveAlertLogEntry(Instant.now().toEpochMilli(), appLabel, "Added", summary))
         return Outcome.ADDED
     }
 
@@ -246,6 +289,9 @@ class LivePaymentRepository @Inject constructor(
 
         /** How far from its day a regular payment may actually go out. */
         const val SCHEDULED_DAYS = 4L
+
+        /** How much of a missed alert is kept to show what it said. */
+        const val MAX_LOGGED = 160
         val TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM, HH:mm")
     }
 }

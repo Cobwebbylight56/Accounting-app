@@ -94,8 +94,9 @@ object StatementPriority {
         for ((candidate, date) in rows) {
             val type = candidate.transactionType ?: TransactionType.EXPENSE
             for (entry in correctable) {
-                if (entry.amountMinor != candidate.amountMinor || !sameDirection(entry, type)) continue
+                if (!sameDirection(entry, type)) continue
                 val agreed = payeesAgree(candidate.name, entry.description)
+                if (entry.amountMinor != candidate.amountMinor && !(agreed && repriced(entry, candidate.amountMinor))) continue
                 val gap = kotlin.math.abs(ChronoUnit.DAYS.between(entry.date, date))
                 if (gap <= if (agreed) AGREED_DAYS else NEARBY_DAYS) {
                     possible += Possible(candidate, entry, agreed, gap)
@@ -144,6 +145,18 @@ object StatementPriority {
         entry.type == type ||
             (entry.source == RecordSource.LIVE && entry.type == TransactionType.TRANSFER && type == TransactionType.EXPENSE)
 
+    /**
+     * True when [entry] is one the app added on a regular payment's day and
+     * the statement's amount is near it: the bill went up or down, and the
+     * app's copy, at the old amount, is that payment — the statement's
+     * amount replaces it, instead of the month counting the bill twice.
+     */
+    private fun repriced(entry: ExistingEntry, statementMinor: Long): Boolean {
+        if (!entry.scheduled || entry.amountMinor <= 0L || statementMinor <= 0L) return false
+        val ratio = maxOf(entry.amountMinor, statementMinor).toDouble() / minOf(entry.amountMinor, statementMinor)
+        return ratio <= 1 + REPRICED
+    }
+
     /** A pairing the amounts and dates allow, with the evidence for it. */
     private data class Possible(
         val candidate: ImportCandidate,
@@ -161,9 +174,22 @@ object StatementPriority {
      */
     internal fun payeesAgree(one: String, other: String): Boolean {
         val first = distinctiveWords(one)
-        if (first.isEmpty()) return false
-        return distinctiveWords(other).any { it in first }
+        if (first.isNotEmpty() && distinctiveWords(other).any { it in first }) return true
+        // A short name — "Sky", "EE", "BT" — is all there in the longer
+        // "SKY DIGITAL 88231": too short to count on its own, but every word
+        // of it is there.
+        val a = nameWords(one)
+        val b = nameWords(other)
+        if (a.isEmpty() || b.isEmpty()) return false
+        val (small, big) = if (a.size <= b.size) a to b else b to a
+        return small.all { it in big }
     }
+
+    private fun nameWords(text: String): Set<String> =
+        TransactionFingerprint.normaliseDescription(text)
+            .split(' ')
+            .filter { it.length >= 2 && it.none(Char::isDigit) && it !in COMMON_WORDS && it !in SHORT_NOISE }
+            .toSet()
 
     private fun distinctiveWords(text: String): Set<String> =
         TransactionFingerprint.normaliseDescription(text)
@@ -182,6 +208,14 @@ object StatementPriority {
 
     /** How far apart they may be on the amount alone, which is weaker evidence. */
     private const val NEARBY_DAYS = 4L
+
+    /** How far a regular payment's amount may move and still be the same payment. */
+    private const val REPRICED = 0.30
+
+    /** Two-letter words that are paperwork, not a payee: "dd", "so", "uk". */
+    private val SHORT_NOISE = setOf(
+        "dd", "so", "uk", "gb", "co", "fp", "bp", "to", "on", "at", "of", "by", "ref", "the", "and", "www", "com",
+    )
 
     /** Shorter than this identifies nothing: "co", "uk", "dd". */
     private const val MIN_WORD = 4

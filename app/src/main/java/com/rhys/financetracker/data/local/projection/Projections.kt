@@ -232,6 +232,8 @@ data class ExistingEntry(
     @ColumnInfo(name = "category_id") val categoryId: Long?,
     @ColumnInfo(name = "notes") val notes: String?,
     @ColumnInfo(name = "source") val source: RecordSource,
+    /** Added by the app on a regular payment's day, at the amount last known. */
+    @ColumnInfo(name = "scheduled") val scheduled: Boolean = false,
 )
 
 /**

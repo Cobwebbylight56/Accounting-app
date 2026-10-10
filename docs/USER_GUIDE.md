@@ -647,8 +647,30 @@ your banking app's alert says money moved — "You spent £12.50 at Tesco",
    your banking app.)
 
 Each payment is filed into a category just like a statement line, goes into
-the right account, and shows on Home and Spending straight away. The page
-shows the last one added.
+the right account, and shows on Home and Spending straight away.
+
+**Is it working?** Tap **Test it** on the Live payments page. The app posts a
+pretend alert and checks that it can read it. **Working** means payment alerts
+from your banking apps are read the same way. Nothing is added. If the test
+alert isn't heard:
+1. Turn notification access off and on again for Finance Tracker, then test
+   again.
+2. If that doesn't fix it, set Finance Tracker's battery use to
+   **Unrestricted**. Some phones stop apps running in the background.
+
+The test needs the app's own notifications allowed. If Android lets go of the
+alert reader, the app asks for it back.
+
+**What it heard lately.** The page lists the last 20 alerts from your banking
+apps and what was done with each:
+* **Added** — with the amount and payee.
+* **Already in** — told twice, or already added on its day.
+* **Not added** — it couldn't tell which account; choose one below.
+* **Not read as a payment** — the alert mentions a £ amount but wasn't read as
+  a payment. Its words are shown so you can see what was missed. Send a
+  screenshot and the reading can be taught that wording.
+
+**Clear this list** empties it.
 
 **Which account.** By default a payment goes to an account with the card's
 last four digits in its name, then one named after the bank ("Nationwide"),
@@ -695,9 +717,14 @@ wording win — so nothing is counted twice.
   and balance alerts are ignored.
 * Two alerts for the same amount within a few minutes (your bank and Google
   Wallet telling you about one payment) are added once.
-* Everything happens on the phone. Nothing is sent anywhere, and an alert
-  that isn't a payment is never kept. Switch it off, or take the access away
-  in Android's settings, to stop.
+* Everything happens on the phone. Nothing is sent anywhere. Only banking
+  apps' alerts are noted in **What it heard lately**, and only the last 20.
+  An alert's words are kept only when it mentions a £ amount but wasn't read
+  as a payment. Switch it off, or take the access away in Android's settings,
+  to stop.
+* A payment the app already added on its day as a regular payment (see
+  **Making a payment regular**) isn't added again when the bank's alert for
+  it comes.
 
 ### Bills found in statements
 
@@ -854,6 +881,21 @@ it was paid in, so a gap stands out, and says which account or card pays it.
 
 It's judged against the latest statement you've imported for each account, so
 a card you haven't imported lately doesn't make everything on it look stopped.
+
+**One payment, one row.** Banks change what they call a payee, for example
+"VIRGIN MEDIA" for a while and then "VIRGIN MEDIA PYMTS", or "SKY UK LTD"
+and then "SKY DIGITAL". When one name takes over from the other at much the
+same amount, they're one regular payment, shown under the name it goes by
+now. A price rise doesn't split it either.
+
+Two separate payments to one company stay apart, for example two policies
+with the same insurer. They're kept apart when each is paid at its own steady
+amount in the same months as the other. The same goes for a bill that's
+already set up under a slightly different name: it isn't suggested again.
+
+When a bill's price changes, the copy the app added on its day (at the old
+price) is still matched to the statement's line, which puts in the new
+amount, so the month doesn't count the bill twice.
 The total at the top is what the ones still going cost a month and a year, and
 the graph shows what they came to each month. Tap one to see every payment.
 

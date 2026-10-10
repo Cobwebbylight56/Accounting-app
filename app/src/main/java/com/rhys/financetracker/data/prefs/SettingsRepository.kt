@@ -76,6 +76,9 @@ class SettingsRepository @Inject constructor(
         val LIVE_ALERT_APPS = stringSetPreferencesKey("live_alert_apps")
         val LIVE_ALERT_SEEN = stringSetPreferencesKey("live_alert_seen")
         val LIVE_ALERT_LAST = stringPreferencesKey("live_alert_last")
+        val LIVE_ALERT_LOG = stringPreferencesKey("live_alert_log")
+        val LIVE_LISTENER_AT = longPreferencesKey("live_listener_at")
+        val LIVE_TEST_HEARD = longPreferencesKey("live_test_heard")
         val LIVE_STATEMENT_NUDGE = booleanPreferencesKey("live_statement_nudge")
         val LIVE_CARD_ACCOUNTS = stringPreferencesKey("live_card_accounts")
         val SETUP_HIDDEN = booleanPreferencesKey("setup_checklist_hidden")
@@ -169,6 +172,9 @@ class SettingsRepository @Inject constructor(
             liveCardAccounts = cardAccountsOf(prefs[Keys.LIVE_CARD_ACCOUNTS]),
             setupChecklistHidden = prefs[Keys.SETUP_HIDDEN] ?: false,
             needsLookSnoozedUntil = prefs[Keys.NEEDS_LOOK_SNOOZED_UNTIL],
+            liveAlertLog = LiveAlertLogEntry.parse(prefs[Keys.LIVE_ALERT_LOG]),
+            liveListenerAt = prefs[Keys.LIVE_LISTENER_AT],
+            liveTestHeardAt = prefs[Keys.LIVE_TEST_HEARD],
         )
     }
 
@@ -328,6 +334,24 @@ class SettingsRepository @Inject constructor(
     /** What was added last, for the Live payments page. */
     suspend fun setLiveAlertLast(summary: String) = put(Keys.LIVE_ALERT_LAST, summary)
 
+    /** Notes what was heard from a banking app and what came of it, newest first, keeping the last few. */
+    suspend fun logLiveAlert(entry: LiveAlertLogEntry) {
+        context.dataStore.edit { prefs ->
+            val kept = listOf(entry) + LiveAlertLogEntry.parse(prefs[Keys.LIVE_ALERT_LOG])
+            prefs[Keys.LIVE_ALERT_LOG] = LiveAlertLogEntry.write(kept.take(LiveAlertLogEntry.KEPT))
+        }
+    }
+
+    suspend fun clearLiveAlertLog() {
+        context.dataStore.edit { it.remove(Keys.LIVE_ALERT_LOG) }
+    }
+
+    /** When Android last connected the alert reader: proof it is running. */
+    suspend fun setLiveListenerAt(time: Long) = put(Keys.LIVE_LISTENER_AT, time)
+
+    /** When the reader last heard the app's own test alert. */
+    suspend fun setLiveTestHeard(time: Long) = put(Keys.LIVE_TEST_HEARD, time)
+
     /** Records that Android has been asked once for permission to show reminders. */
     suspend fun setNotificationsAsked() = put(Keys.NOTIFICATIONS_ASKED, true)
 
@@ -428,10 +452,40 @@ data class AppSettings(
     val setupChecklistHidden: Boolean = false,
     /** The Needs a look pop-up stays away until then (epoch millis). */
     val needsLookSnoozedUntil: Long? = null,
+    /** What the alert reader heard lately from banking apps and what came of it, newest first. */
+    val liveAlertLog: List<LiveAlertLogEntry> = emptyList(),
+    /** When Android last connected the alert reader (epoch millis). */
+    val liveListenerAt: Long? = null,
+    /** When the alert reader last heard the test alert (epoch millis). */
+    val liveTestHeardAt: Long? = null,
 ) {
     val isLockEnabled: Boolean get() = lockMethod != LockMethod.NONE
     val requiresPin: Boolean
         get() = lockMethod == LockMethod.PIN || lockMethod == LockMethod.PIN_AND_BIOMETRIC
     val allowsBiometric: Boolean
         get() = lockMethod == LockMethod.BIOMETRIC || lockMethod == LockMethod.PIN_AND_BIOMETRIC
+}
+
+/**
+ * One alert the reader heard from a banking app, for the Live payments page:
+ * when, from which app, and what came of it — "Added: £12.50 · TESCO", "Not
+ * a payment". Kept on the phone only, the last [KEPT] of them.
+ */
+data class LiveAlertLogEntry(val at: Long, val app: String, val outcome: String, val detail: String) {
+    companion object {
+        const val KEPT = 20
+
+        fun parse(stored: String?): List<LiveAlertLogEntry> =
+            stored.orEmpty().lines().mapNotNull { line ->
+                val parts = line.split('\t')
+                if (parts.size < 4) return@mapNotNull null
+                parts[0].toLongOrNull()?.let { LiveAlertLogEntry(it, parts[1], parts[2], parts[3]) }
+            }
+
+        fun write(entries: List<LiveAlertLogEntry>): String =
+            entries.joinToString("\n") { entry ->
+                listOf(entry.at.toString(), entry.app, entry.outcome, entry.detail)
+                    .joinToString("\t") { it.replace(Regex("""[\t\n\r]+"""), " ") }
+            }
+    }
 }

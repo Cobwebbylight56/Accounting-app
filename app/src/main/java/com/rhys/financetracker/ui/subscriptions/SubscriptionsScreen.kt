@@ -177,7 +177,7 @@ fun SubscriptionsScreen(
                         modifier = Modifier.padding(top = 8.dp),
                     )
                 }
-                items(group, key = { "${it.name}-${it.accountId}" }) { subscription ->
+                items(group, key = { "${it.name}-${it.accountId}-${it.amountMinor}-${it.lastDate}" }) { subscription ->
                     SubscriptionRow(
                         subscription = subscription,
                         accountName = state.accountNames[subscription.accountId],

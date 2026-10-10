@@ -2,6 +2,7 @@ package com.rhys.financetracker.data.importer
 
 import com.rhys.financetracker.domain.model.Frequency
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.temporal.ChronoUnit
 
 /**
@@ -103,17 +104,139 @@ object RecurringDetector {
         payments: List<Payment>,
         known: List<KnownBill>,
     ): List<RegularPayment> {
-        val groups = payments
-            .filterNot { payment ->
-                TransactionFingerprint.normaliseDescription(payment.description)
-                    .split(' ').any { it in NOT_A_BILL }
-            }
-            .groupBy { keyOf(it.description) to it.accountId }
-            .filterKeys { it.first.isNotBlank() }
-        return groups.mapNotNull { (key, group) -> judge(key.first, group) }
+        val kept = payments.filterNot { payment ->
+            TransactionFingerprint.normaliseDescription(payment.description)
+                .split(' ').any { it in NOT_A_BILL }
+        }
+        // A bill belongs to an account, so each account's payments are gathered on their own.
+        return kept.groupBy { it.accountId }.values
+            .flatMap { series(it) }
+            .mapNotNull { judge(it.key, it.payments) }
             .filterNot { found -> known.any { isSameBill(found, it) } }
             .sortedByDescending { it.amountMinor }
     }
+
+    /** One thing paid for again and again: its payments, and the payee name it goes by now. */
+    data class Series(val key: String, val payments: List<Payment>)
+
+    /**
+     * [payments] gathered into one list per thing paid for.
+     *
+     * By payee name first — but a name is not always one thing, nor one
+     * thing always one name:
+     *
+     * * **One payee, two things.** Two policies with the same insurer, each
+     *   paid every month at its own amount, are two payments. Steady amounts
+     *   paid side by side in the same months are kept apart; a price rise,
+     *   where one amount follows the other, stays one.
+     * * **One thing, two names.** The bank calls it "VIRGIN MEDIA" for a
+     *   while and "VIRGIN MEDIA PYMTS" after, or "SKY UK LTD" and then "SKY
+     *   DIGITAL". Names of the same payee ([samePayee]) at much the same
+     *   amount, one after the other rather than both in the same months, are
+     *   one payment — under the name it goes by now.
+     */
+    fun series(payments: List<Payment>): List<Series> {
+        val pieces = payments
+            .groupBy { keyOf(it.description) }
+            .filterKeys { it.isNotBlank() }
+            .flatMap { (key, group) -> splitSideBySide(group).map { Series(key, it) } }
+            .toMutableList()
+        // Join names of one payee, until there is nothing left to join.
+        var joined = true
+        while (joined) {
+            joined = false
+            loop@ for (i in pieces.indices) {
+                for (j in i + 1 until pieces.size) {
+                    val a = pieces[i]
+                    val b = pieces[j]
+                    if (a.key == b.key || !samePayee(a.key, b.key)) continue
+                    if (!similarAmounts(a.payments, b.payments) || monthsInCommon(a.payments, b.payments) > 1) continue
+                    val all = (a.payments + b.payments).sortedBy { it.date }
+                    pieces[i] = Series(keyOf(all.last().description), all)
+                    pieces.removeAt(j)
+                    joined = true
+                    break@loop
+                }
+            }
+        }
+        return pieces
+    }
+
+    /**
+     * A payee's payments as one list, or as several when it is paid for
+     * more than one thing at once: steady amounts, each paid in the same
+     * months as the other. A shop paid all sorts of amounts stays one list.
+     */
+    private fun splitSideBySide(group: List<Payment>): List<List<Payment>> {
+        val amounts = group.map { it.amountMinor }.sorted()
+        if (amounts.last() <= amounts.first() * (1 + SAME_AMOUNT)) return listOf(group)
+        // The same amount each time, give or take pennies: a policy, a plan.
+        val clusters = mutableListOf<MutableList<Payment>>()
+        for (payment in group.sortedBy { it.amountMinor }) {
+            val cluster = clusters.lastOrNull()
+            if (cluster != null && payment.amountMinor <= cluster.first().amountMinor * (1 + EXACT_AMOUNT)) {
+                cluster += payment
+            } else {
+                clusters += mutableListOf(payment)
+            }
+        }
+        val steady = clusters.filter { cluster -> cluster.map { YearMonth.from(it.date) }.distinct().size >= 2 }
+        // Most of it at a few steady amounts, or it is a shop, not two bills.
+        if (steady.sumOf { it.size } < group.size * MOSTLY_STEADY) return listOf(group)
+        // A price rise: the new amount follows the old, so it is still one.
+        val joined = mutableListOf<MutableList<Payment>>()
+        for (cluster in steady.sortedBy { c -> c.minOf { it.date } }) {
+            val median = cluster.map { it.amountMinor }.sorted()[cluster.size / 2]
+            val follows = joined
+                .filter { monthsInCommon(it, cluster) <= 1 }
+                .minByOrNull { other -> kotlin.math.abs(other.map { it.amountMinor }.sorted()[other.size / 2] - median) }
+            if (follows != null) follows += cluster else joined += cluster.toMutableList()
+        }
+        return joined.map { list -> list.sortedBy { it.date } }
+    }
+
+    /**
+     * Whether two payee names are one payee: one is the other with more
+     * added ("sky" and "sky digital", "virgin media" and "virgin media
+     * pymts"), or they start with the same name that isn't a card
+     * processor's ("PAYPAL *NETFLIX" and "PAYPAL *SPOTIFY" are not one).
+     */
+    internal fun samePayee(one: String, other: String): Boolean {
+        val a = one.split(' ').filter { it.isNotBlank() }
+        val b = other.split(' ').filter { it.isNotBlank() }
+        if (a.isEmpty() || b.isEmpty()) return false
+        val (small, big) = if (a.size <= b.size) a to b else b to a
+        if (small.all { it in big } && small.any { it !in PROCESSORS }) return true
+        val first = a.first()
+        return first == b.first() && first.length >= 3 && first !in PROCESSORS
+    }
+
+    private fun similarAmounts(one: List<Payment>, other: List<Payment>): Boolean {
+        val a = one.map { it.amountMinor }.sorted()[one.size / 2].coerceAtLeast(1L)
+        val b = other.map { it.amountMinor }.sorted()[other.size / 2].coerceAtLeast(1L)
+        return maxOf(a, b).toDouble() / minOf(a, b) <= 1 + SIMILAR_AMOUNT
+    }
+
+    private fun monthsInCommon(one: List<Payment>, other: List<Payment>): Int =
+        one.map { YearMonth.from(it.date) }.toSet().intersect(other.map { YearMonth.from(it.date) }.toSet()).size
+
+    /** Names that only say how it was paid, so sharing one says nothing about the payee. */
+    private val PROCESSORS = setOf(
+        "paypal", "pp", "amazon", "amzn", "google", "apple", "klarna", "clearpay", "sumup", "zettle",
+        "izettle", "sq", "square", "stripe", "sp", "uber", "www", "com", "co", "net", "and",
+    )
+
+    /** Amounts this close are one amount: a few pence of rounding, or VAT. */
+    private const val SAME_AMOUNT = 0.10
+
+    /** Paid at this amount every time, near enough: what a policy or a plan costs. */
+    private const val EXACT_AMOUNT = 0.03
+
+    /** Amounts this close may be one thing under two names, with a price rise between. */
+    private const val SIMILAR_AMOUNT = 0.30
+
+    /** How much of a payee's payments must be at steady amounts to be read as separate bills. */
+    private const val MOSTLY_STEADY = 0.8
 
     private fun judge(key: String, group: List<Payment>): RegularPayment? {
         val sorted = group.sortedBy { it.date }
@@ -180,11 +303,22 @@ object RecurringDetector {
         }
     }
 
+    /**
+     * Whether [found] is a bill already set up: the same name, or the same
+     * amount from the same account — or the same payee under a slightly
+     * different name ("Virgin Media" set up, "VIRGIN MEDIA PYMTS" found) at
+     * much the same amount.
+     */
     private fun isSameBill(found: RegularPayment, known: KnownBill): Boolean {
-        val sameName = keyOf(known.name) == keyOf(found.name) && keyOf(known.name).isNotBlank()
+        val knownKey = keyOf(known.name)
+        val foundKey = keyOf(found.name)
+        val sameName = knownKey == foundKey && knownKey.isNotBlank()
         val sameAmount = known.accountId == found.accountId &&
             known.amountMinor == found.amountMinor
-        return sameName || sameAmount
+        val ratio = maxOf(known.amountMinor, found.amountMinor).toDouble() / minOf(known.amountMinor, found.amountMinor).coerceAtLeast(1L)
+        val samePayeeNearAmount = knownKey.isNotBlank() && foundKey.isNotBlank() &&
+            samePayee(knownKey, foundKey) && ratio <= 1 + SIMILAR_AMOUNT
+        return sameName || sameAmount || samePayeeNearAmount
     }
 
     private fun titleCase(text: String) =

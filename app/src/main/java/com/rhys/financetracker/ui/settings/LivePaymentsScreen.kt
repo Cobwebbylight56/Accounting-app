@@ -17,8 +17,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,11 +41,17 @@ import com.rhys.financetracker.data.live.BankAlertListener
 import com.rhys.financetracker.data.live.BankApps
 import com.rhys.financetracker.data.local.entity.AccountEntity
 import com.rhys.financetracker.data.prefs.AppSettings
+import com.rhys.financetracker.data.prefs.LiveAlertLogEntry
 import com.rhys.financetracker.data.prefs.SettingsRepository
 import com.rhys.financetracker.data.repository.AccountRepository
+import com.rhys.financetracker.notify.Notifier
 import com.rhys.financetracker.ui.components.DropdownField
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -59,7 +67,18 @@ data class LivePaymentsState(
 class LivePaymentsViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     accountRepository: AccountRepository,
+    private val notifier: Notifier,
 ) : ViewModel() {
+
+    /**
+     * Posts the pretend alert the reader should hear. False when the app may
+     * not post notifications, so there is nothing to hear.
+     */
+    fun postTest(): Boolean = notifier.postLiveTest()
+
+    fun clearLog() {
+        viewModelScope.launch { settingsRepository.clearLiveAlertLog() }
+    }
 
     val state: StateFlow<LivePaymentsState> =
         combine(settingsRepository.settings, accountRepository.observeActive()) { settings, accounts ->
@@ -148,8 +167,14 @@ fun LivePaymentsScreen(
                     ) { Text("Allow notification access") }
                 }
             }
-        } else if (settings.liveAlerts) {
-            SettingsNote("Working: alerts from the banking apps below are read as they arrive.")
+        }
+
+        if (settings.liveAlerts && hasAccess) {
+            WorkingCheck(
+                testHeardAt = settings.liveTestHeardAt,
+                listenerAt = settings.liveListenerAt,
+                onTest = viewModel::postTest,
+            )
         }
 
         SettingsSwitch(
@@ -160,9 +185,19 @@ fun LivePaymentsScreen(
             enabled = settings.liveAlerts,
         )
 
-        if (settings.liveAlertLast.isNotBlank()) {
-            SettingsGroupHeader("Last added")
-            SettingsNote(settings.liveAlertLast)
+        if (settings.liveAlerts) {
+            SettingsGroupHeader("What it heard lately")
+            if (settings.liveAlertLog.isEmpty()) {
+                SettingsNote(
+                    "Nothing yet. Each payment alert from your banking apps shows here with what was done " +
+                        "with it — added, already in, or not read as a payment.",
+                )
+            } else {
+                settings.liveAlertLog.forEach { entry -> HeardLine(entry) }
+                TextButton(onClick = viewModel::clearLog, modifier = Modifier.padding(horizontal = 8.dp)) {
+                    Text("Clear this list")
+                }
+            }
         }
 
         SettingsGroupHeader("Which account each app's payments go to")
@@ -243,12 +278,101 @@ fun LivePaymentsScreen(
                 "don't send an alert, so those still come in with the statement.",
         )
         SettingsNote(
-            "Alerts are read on this phone only. Nothing is sent anywhere, and the text of an alert " +
-                "that isn't a payment is never kept. Turn the switch off, or take the app's notification " +
-                "access away in Android's settings, to stop at any time.",
+            "Alerts are read on this phone only and nothing is sent anywhere. Only banking apps' alerts " +
+                "are noted under What it heard lately: a payment's amount and payee, or — for an alert " +
+                "that mentions a £ amount but wasn't read as a payment — its words, so you can see what " +
+                "was missed. The last 20 are kept; Clear this list removes them. Turn the switch off, or " +
+                "take the app's notification access away in Android's settings, to stop at any time.",
         )
     }
 }
+
+/**
+ * Whether reading alerts really works: a pretend alert is posted, and the
+ * reader says when it hears it. Not heard within a few seconds, it says what
+ * usually fixes that.
+ */
+@Composable
+private fun WorkingCheck(testHeardAt: Long?, listenerAt: Long?, onTest: () -> Boolean) {
+    var startedAt by remember { mutableStateOf<Long?>(null) }
+    var blocked by remember { mutableStateOf(false) }
+    var timedOut by remember { mutableStateOf(false) }
+    val started = startedAt
+    LaunchedEffect(started) {
+        if (started != null) {
+            timedOut = false
+            delay(TEST_WAIT_MILLIS)
+            timedOut = true
+        }
+    }
+    val heard = started != null && testHeardAt != null && testHeardAt >= started
+    val (headline, detail, colour) = when {
+        blocked -> Triple(
+            "Can't test yet",
+            "The test needs the app's own notifications. Allow them in Android's settings for Finance Tracker, then test again.",
+            MaterialTheme.colorScheme.tertiaryContainer,
+        )
+        heard -> Triple(
+            "Working",
+            "The test alert was read straight away. Payment alerts from your banking apps are read the same way.",
+            MaterialTheme.colorScheme.primaryContainer,
+        )
+        started != null && !timedOut -> Triple("Testing…", "Posting a test alert and listening for it.", MaterialTheme.colorScheme.surfaceVariant)
+        started != null -> Triple(
+            "The test alert wasn't heard",
+            "Turn notification access off and on again for Finance Tracker, then test again. Some phones " +
+                "also stop apps in the background: set Finance Tracker's battery use to Unrestricted.",
+            MaterialTheme.colorScheme.errorContainer,
+        )
+        else -> Triple(
+            "Is it working?",
+            listenerAt?.let { "The alert reader last started ${TIME.format(Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()))}. " }
+                .orEmpty() + "Test it to be sure: a pretend alert is posted and read. Nothing is added.",
+            MaterialTheme.colorScheme.surfaceVariant,
+        )
+    }
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        colors = CardDefaults.cardColors(containerColor = colour),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Text(headline, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Text(detail, style = MaterialTheme.typography.bodyMedium)
+            Button(
+                onClick = {
+                    blocked = false
+                    if (onTest()) startedAt = System.currentTimeMillis() else blocked = true
+                },
+                enabled = started == null || heard || timedOut,
+                modifier = Modifier.padding(top = 10.dp),
+            ) { Text(if (started == null) "Test it" else "Test again") }
+        }
+    }
+}
+
+/** One alert heard: when, from which app, what came of it, and the detail. */
+@Composable
+private fun HeardLine(entry: LiveAlertLogEntry) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 5.dp)) {
+        Text(
+            "${TIME.format(Instant.ofEpochMilli(entry.at).atZone(ZoneId.systemDefault()))} · ${entry.app} — ${entry.outcome}",
+            style = MaterialTheme.typography.labelLarge,
+            color = if (entry.outcome == "Added" || entry.outcome == "Heard") {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
+        )
+        if (entry.detail.isNotBlank()) {
+            Text(entry.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+private val TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM, HH:mm")
+
+/** How long the test waits to hear its alert before saying it wasn't. */
+private const val TEST_WAIT_MILLIS = 6_000L
 
 private fun hasNotificationAccess(context: Context): Boolean =
     context.packageName in NotificationManagerCompat.getEnabledListenerPackages(context)

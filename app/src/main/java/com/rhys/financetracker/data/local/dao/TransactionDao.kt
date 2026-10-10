@@ -159,7 +159,8 @@ interface TransactionDao {
      */
     @Query(
         """
-        SELECT id, date, amount_minor, type, description, category_id, notes, source
+        SELECT id, date, amount_minor, type, description, category_id, notes, source,
+               (recurring_rule_id IS NOT NULL) AS scheduled
         FROM transactions
         WHERE is_archived = 0
           AND account_id = :accountId
@@ -737,7 +738,7 @@ interface TransactionDao {
         """
         SELECT t.id AS id, t.date AS date, t.amount_minor AS amount_minor, t.type AS type,
                t.description AS description, t.category_id AS category_id, t.notes AS notes,
-               t.source AS source
+               t.source AS source, 1 AS scheduled
         FROM transactions t
         JOIN recurring_rules r ON r.id = t.recurring_rule_id
         WHERE t.account_id = :accountId AND t.is_archived = 0 AND t.type = 'INCOME'
