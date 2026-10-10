@@ -31,6 +31,9 @@ object DefaultData {
     /** The shared/household person, present in every database. */
     const val SHARED_PERSON_NAME = "Joint"
 
+    /** Food's colour: the snacks and treats on a receipt, apart from the green of Groceries. */
+    const val FOOD_COLOUR = "#F57C00"
+
     fun defaultPeople(): List<PersonEntity> = listOf(
         PersonEntity(
             name = SHARED_PERSON_NAME,
@@ -74,8 +77,12 @@ object DefaultData {
         SeedCategory("Mobile", CategoryKind.EXPENSE, "#3949AB", "Smartphone", parent = "Utilities"),
 
         // ------------------------------------------------------------ food
-        SeedCategory("Food", CategoryKind.EXPENSE, "#558B2F", "ShoppingCart", isSystem = true),
+        // Orange, apart from the green of Groceries: on a receipt's breakdown
+        // Food is the snacks and treats, next to the groceries.
+        SeedCategory("Food", CategoryKind.EXPENSE, DefaultData.FOOD_COLOUR, "ShoppingCart", isSystem = true),
         SeedCategory("Groceries", CategoryKind.EXPENSE, "#558B2F", "ShoppingCart", parent = "Food"),
+        // A receipt's drinks, apart from its groceries and its snacks (Food).
+        SeedCategory("Drinks", CategoryKind.EXPENSE, "#1E88E5", "LocalDrink", parent = "Food"),
         SeedCategory("Eating out", CategoryKind.EXPENSE, "#7CB342", "Restaurant", parent = "Food"),
 
         // ------------------------------------------------------- transport
@@ -105,10 +112,9 @@ object DefaultData {
         // ------------------------------------------------------------ misc
         SeedCategory("Shopping", CategoryKind.EXPENSE, "#00695C", "ShoppingBag"),
         // What a split payment's parts go to: the T-shirt in the big shop,
-        // the drink and crisps on the fuel receipt.
+        // the cleaning things with the food. Snacks go to Food, drinks to Drinks.
         SeedCategory("Clothes", CategoryKind.EXPENSE, "#AD1457", "Checkroom"),
         SeedCategory("Household", CategoryKind.EXPENSE, "#00897B", "CleaningServices"),
-        SeedCategory("Snacks & drinks", CategoryKind.EXPENSE, "#F57C00", "LocalCafe"),
         SeedCategory("Hobbies", CategoryKind.EXPENSE, "#5E35B1", "Palette"),
         SeedCategory("Pets", CategoryKind.EXPENSE, "#8D6E63", "Pets"),
         SeedCategory("Health", CategoryKind.EXPENSE, "#D81B60", "MedicalServices"),

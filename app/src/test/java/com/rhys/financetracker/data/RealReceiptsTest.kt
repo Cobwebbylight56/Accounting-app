@@ -94,10 +94,7 @@ class RealReceiptsTest {
         )
         assertEquals(3_513L, items.sumOf { it.amountMinor })
         assertEquals(
-            listOf(
-                "Household", null, null, "Snacks & drinks", "Snacks & drinks", "Personal", "Pets", "Pets",
-                "Snacks & drinks", null,
-            ),
+            listOf("Household", null, null, "Drinks", "Drinks", "Personal", "Pets", "Pets", "Drinks", "Groceries"),
             items.map { ItemCategoriser.categoryFor(it.name) },
         )
     }
@@ -153,11 +150,20 @@ class RealReceiptsTest {
         assertEquals(5_110L, items.sumOf { it.amountMinor })
         val byCategory = items.groupBy { ItemCategoriser.categoryFor(it.name) }
             .mapValues { (_, list) -> list.sumOf { it.amountMinor } }
-        // Cat food, kitten milk: £12.12.
-        assertEquals(1_212L, byCategory["Pets"])
-        // Drinks, Oreos, Peperami, Squares and so on.
-        assertEquals(3_056L, byCategory["Snacks & drinks"])
-        // The bag and the foil.
-        assertEquals(219L, byCategory["Household"])
+        assertEquals(
+            mapOf(
+                // Red Bull, Dr Pepper, the iced latte, Ribena.
+                "Drinks" to 2_140L,
+                // Cat food and kitten milk.
+                "Pets" to 1_212L,
+                // Oreos, Peperami, Squares, the mallows.
+                "Food" to 985L,
+                // The curry kits, sausage slices, milk bottles.
+                "Groceries" to 554L,
+                // The bag and the foil.
+                "Household" to 219L,
+            ),
+            byCategory,
+        )
     }
 }

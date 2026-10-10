@@ -60,7 +60,9 @@ import com.rhys.financetracker.domain.recurrence.RegularSchedule
 import com.rhys.financetracker.ui.components.ColorDot
 import com.rhys.financetracker.ui.components.colorFromHex
 import com.rhys.financetracker.ui.navigation.Routes
+import com.rhys.financetracker.ui.receipts.PartGroupsList
 import com.rhys.financetracker.ui.receipts.PaymentReceipts
+import com.rhys.financetracker.ui.receipts.groupParts
 import com.rhys.financetracker.ui.theme.FinanceTheme
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -274,25 +276,14 @@ fun TransactionViewScreen(
                 if (parts.isNotEmpty()) {
                     Card(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("Split by category", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                            parts.forEach { part ->
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    ColorDot(colorFromHex(part.categoryColor ?: details.categoryColor), size = 8.dp)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(part.label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f), maxLines = 1)
-                                    Text(
-                                        (part.categoryName ?: details.categoryName ?: "") + "  " + Money.format(part.amountMinor),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            }
-                            OutlinedButton(onClick = { onSplit(entry.id) }) { Text("Change the split") }
+                            Text("Breakdown by category", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                            PartGroupsList(groupParts(parts, details.categoryName, details.categoryColor))
+                            OutlinedButton(onClick = { onSplit(entry.id) }) { Text("Change the breakdown") }
                         }
                     }
                 } else {
                     OutlinedButton(onClick = { onSplit(entry.id) }, modifier = Modifier.fillMaxWidth()) {
-                        Text("Split across categories")
+                        Text("Break down by category")
                     }
                 }
             }

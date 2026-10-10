@@ -317,8 +317,8 @@ fun TransactionEditScreen(
 }
 
 /**
- * "Split by category": how the payment is split, or how many items its
- * receipt has to split it by.
+ * "Break down by category": how the payment is broken down, or how many
+ * items its receipt has to break it down by.
  */
 @Composable
 private fun SplitButton(viewModel: TransactionEditViewModel, onSplit: () -> Unit) {
@@ -328,17 +328,16 @@ private fun SplitButton(viewModel: TransactionEditViewModel, onSplit: () -> Unit
         androidx.compose.material3.OutlinedButton(onClick = onSplit, modifier = Modifier.fillMaxWidth()) {
             Text(
                 when {
-                    parts.isNotEmpty() -> "Split into ${parts.size} parts — change"
-                    items >= 2 -> "Split by what's on the receipt ($items items)"
-                    else -> "Split by category"
+                    parts.isNotEmpty() -> "Broken down by category — change"
+                    items >= 2 -> "Break down by what's on the receipt ($items items)"
+                    else -> "Break down by category"
                 },
             )
         }
         if (parts.isNotEmpty()) {
             Text(
-                parts.groupBy { it.categoryName ?: "Its own category" }
-                    .map { (name, rows) -> "$name ${com.rhys.financetracker.core.money.Money.format(rows.sumOf { it.amountMinor })}" }
-                    .joinToString(" · "),
+                com.rhys.financetracker.ui.receipts.groupParts(parts, "Other", null)
+                    .joinToString(" · ") { "${it.name} ${com.rhys.financetracker.core.money.Money.format(it.totalMinor)}" },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

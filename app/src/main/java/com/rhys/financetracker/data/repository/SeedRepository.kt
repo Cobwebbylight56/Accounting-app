@@ -12,6 +12,7 @@ import com.rhys.financetracker.data.local.entity.RecurringRuleEntity
 import com.rhys.financetracker.data.local.entity.SavingsGoalEntity
 import com.rhys.financetracker.data.local.seed.DefaultData
 import com.rhys.financetracker.data.local.seed.SampleData
+import com.rhys.financetracker.domain.model.CategoryKind
 import com.rhys.financetracker.domain.model.TransactionType
 import java.time.LocalDate
 import java.time.YearMonth
@@ -59,8 +60,26 @@ class SeedRepository @Inject constructor(
             // needed it would never have seen it.
             if (seedMissingCategories()) didSeed = true
             if (seedMissingWidgets()) didSeed = true
+            separateFoodFromGroceries()
             didSeed
         }
+
+    /**
+     * Food and Groceries were both given the same green, which was fine while
+     * Food only headed the list; now a receipt is broken down into both, they
+     * have to look different. Only the colour the app gave it is changed — a
+     * colour somebody picked is left alone.
+     */
+    private suspend fun separateFoodFromGroceries() {
+        val dao = database.categoryDao()
+        val food = dao.getByNameAndKind("Food", CategoryKind.EXPENSE) ?: return
+        val groceries = dao.getByNameAndKind("Groceries", CategoryKind.EXPENSE) ?: return
+        if (food.colorHex.equals(OLD_FOOD_COLOUR, ignoreCase = true) &&
+            groceries.colorHex.equals(OLD_FOOD_COLOUR, ignoreCase = true)
+        ) {
+            dao.update(food.copy(colorHex = DefaultData.FOOD_COLOUR))
+        }
+    }
 
     /**
      * Adds any default category the database does not already hold by name.
@@ -267,5 +286,10 @@ class SeedRepository @Inject constructor(
             idsByName[seed.name] = database.categoryDao()
                 .insert(seed.toEntity(1_000 + index, parentId))
         }
+    }
+
+    private companion object {
+        /** The green Food was first given, the same as Groceries'. */
+        const val OLD_FOOD_COLOUR = "#558B2F"
     }
 }
