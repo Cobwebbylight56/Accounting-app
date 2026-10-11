@@ -83,14 +83,18 @@ object RegularSchedule {
      * A first guess at what kind of payment this is, from what the app knows:
      * money into a saver is moving to savings, a payment to a loan or card
      * is usually a direct debit, and the bank's own "DD" or "SO" settles it.
+     * Paid from a credit card it is a card payment: a card can't pay a
+     * direct debit or a standing order.
      */
     fun guessKind(
         type: TransactionType,
         description: String,
         toHolding: Holding?,
         isSubscription: Boolean,
+        fromHolding: Holding? = null,
     ): PaymentKind {
         if (type == TransactionType.INCOME) return PaymentKind.MONEY_IN
+        if (type == TransactionType.EXPENSE && fromHolding == Holding.OWED) return PaymentKind.CARD
         val words = description.lowercase().split(Regex("[^a-z]+")).filter { it.isNotBlank() }.toSet()
         val text = description.lowercase()
         if ("dd" in words || "ddr" in words || "direct debit" in text) return PaymentKind.DIRECT_DEBIT

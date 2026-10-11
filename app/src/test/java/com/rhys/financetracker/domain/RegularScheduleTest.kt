@@ -86,6 +86,14 @@ class RegularScheduleTest {
     }
 
     @Test
+    fun `paid from a credit card it is a card payment, never a direct debit`() {
+        assertEquals(PaymentKind.CARD, RegularSchedule.guessKind(TransactionType.EXPENSE, "AVIVA INSURANCE", null, false, fromHolding = Holding.OWED))
+        assertEquals(PaymentKind.CARD, RegularSchedule.guessKind(TransactionType.EXPENSE, "SKY DIGITAL DD", null, false, fromHolding = Holding.OWED))
+        // From the bank, a bill is still a direct debit.
+        assertEquals(PaymentKind.DIRECT_DEBIT, RegularSchedule.guessKind(TransactionType.EXPENSE, "AVIVA INSURANCE", null, false, fromHolding = Holding.SPEND))
+    }
+
+    @Test
     fun `describes it plainly`() {
         assertEquals("on the 1st of each month", RegularSchedule.describe(Frequency.MONTHLY, LocalDate.of(2026, 10, 1)))
         assertEquals("on the 22nd of each month", RegularSchedule.describe(Frequency.MONTHLY, LocalDate.of(2026, 10, 22)))

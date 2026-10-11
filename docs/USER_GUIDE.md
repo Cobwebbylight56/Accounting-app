@@ -600,6 +600,22 @@ spending was counted when the card was used). This is checked after every
 import and whenever Home opens, whichever statement came in first. If you
 undo the bank statement's import, the card keeps its payment.
 
+#### Put right by themselves
+
+When the app gets better at reading statements, what was read before is put
+right too, with nothing to undo or import again. After every import and
+whenever Home opens:
+
+* A payment dated in the future, a year ahead by mistake, goes back a year.
+* On a card, lines of the statement's own writing taken for payments ("New
+  transactions", "Dear Mr …") are put away, and "Payment – Thank You" read as
+  money out becomes paying the card off.
+* Spending on a card read as money in (a subscription at its usual amount, on
+  its usual day) becomes spending again.
+* A regular payment from a card called a direct debit becomes a card payment.
+
+Each one changed has a note saying why.
+
 ### Statements printed newest first (Lloyds and others)
 
 Some banks — Lloyds among them, especially statements printed in a branch —
@@ -980,6 +996,14 @@ to and easily cancelled, like Netflix, Audible, Claude or Uber One — and
 **Bills & services** — what the household needs, like insurance, the phone,
 broadband, TV, the car, council tax and energy. Each shows its own monthly
 total. A payment to a person (a window cleaner, say) counts as a service.
+
+**Standing orders to people** are bills too, like rent to a landlord or the
+childminder: the statement says "SO", or it's the very same sum every time,
+three times or more. Sending someone money now and then isn't.
+
+Each row says how it's paid: **Direct debit** or **Standing order** when the
+statement says so, and always **Card payment** on a credit card. A card can't
+pay a direct debit or a standing order.
 
 
 **Bills & subscriptions → In your statements** (from the Spending tab or More) lists everything

@@ -60,6 +60,8 @@ object SubscriptionTracker {
         val paymentIds: Set<Long> = emptySet(),
         /** When it started, how long it runs or that it was cancelled, if you said. */
         val plan: SubscriptionPlan? = null,
+        /** A direct debit or standing order, when the statement or the payee says so. */
+        val paidBy: com.rhys.financetracker.domain.model.PaymentKind? = null,
     ) {
         val key: String get() = SubscriptionPlan.keyOf(name)
 
@@ -102,7 +104,7 @@ object SubscriptionTracker {
         val coveredTo = payments.groupBy { it.accountId }
             .mapValues { (_, rows) -> minOf(rows.maxOf { it.date }, today) }
         return payments
-            .filterNot { it.categoryName in NOT_SUBSCRIPTIONS }
+            .filterNot { it.categoryName in NOT_REGULAR }
             .filterNot { payment ->
                 TransactionFingerprint.normaliseDescription(payment.description).split(' ').any { it in UNDONE }
             }
@@ -127,6 +129,14 @@ object SubscriptionTracker {
         val spread = (amounts.last() - amounts.first()).toDouble() / median
         val marked = sorted.any { RecurringDetector.isMarkedRegular(it.description) }
         if (spread > (if (marked) MARKED_SPREAD else STEADY_SPREAD)) return null
+        // Money to a person is only a bill when it's a standing order: the
+        // bank says so, or it's the very same sum every time — rent to a
+        // landlord, the childminder. Sending money now and then is not.
+        if (sorted.all { it.categoryName in TO_PEOPLE } && !marked &&
+            (amounts.first() != amounts.last() || sorted.size < MIN_STANDING_ORDERS)
+        ) {
+            return null
+        }
 
         // About one payment per period, not a shop visited several times in it.
         val every = daysOf(frequency)
@@ -161,10 +171,25 @@ object SubscriptionTracker {
             categoryName = last.categoryName,
             timesPaid = sorted.size,
             firstDate = sorted.first().date,
+            paidBy = paidBy(sorted),
             paidByMonth = sorted.groupBy { YearMonth.from(it.date) }.mapValues { (_, rows) -> rows.sumOf { it.amountMinor } },
             paymentIds = sorted.map { it.id }.filter { it != 0L }.toSet(),
         )
     }
+
+    /** "DD" or "SO" on the statement says how; a fixed sum to a person is a standing order. */
+    private fun paidBy(payments: List<RecurringDetector.Payment>): com.rhys.financetracker.domain.model.PaymentKind? {
+        val texts = payments.map { " " + TransactionFingerprint.normaliseDescription(it.description) + " " }
+        return when {
+            texts.any { text -> STANDING_ORDER_WORDS.any { it in text } } -> com.rhys.financetracker.domain.model.PaymentKind.STANDING_ORDER
+            texts.any { text -> DIRECT_DEBIT_WORDS.any { it in text } } -> com.rhys.financetracker.domain.model.PaymentKind.DIRECT_DEBIT
+            payments.all { it.categoryName in TO_PEOPLE } -> com.rhys.financetracker.domain.model.PaymentKind.STANDING_ORDER
+            else -> null
+        }
+    }
+
+    private val STANDING_ORDER_WORDS = listOf(" so ", " s o ", " sto ", " standing order ")
+    private val DIRECT_DEBIT_WORDS = listOf(" dd ", " d d ", " ddr ", " direct debit ")
 
     /** The next payment after one on [date]. */
     private fun step(date: LocalDate, frequency: Frequency): LocalDate = when (frequency) {
@@ -195,8 +220,14 @@ object SubscriptionTracker {
         else -> 12
     }
 
-    /** Money put away or moved between people is regular, but not a subscription. */
-    private val NOT_SUBSCRIPTIONS = setOf("Savings", "Cash", "Transfers & payments", "People & services")
+    /** Money put away or taken out as cash is regular, but not a bill or a subscription. */
+    private val NOT_REGULAR = setOf("Savings", "Cash")
+
+    /** Money to people: a bill only when it's a standing order. */
+    private val TO_PEOPLE = setOf("Transfers & payments", "People & services")
+
+    /** A fixed sum to a person this many times is a standing order. */
+    private const val MIN_STANDING_ORDERS = 3
 
     /** A payment that came back or was undone is not a payment for anything. */
     private val UNDONE = setOf("returned", "refund", "refunded", "reversal", "reversed", "unpaid", "recalled")

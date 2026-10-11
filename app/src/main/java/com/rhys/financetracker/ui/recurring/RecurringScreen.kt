@@ -329,10 +329,13 @@ private fun RecurringRow(
                     Text(
                         text = Money.format(rule.amountMinor),
                         style = MaterialTheme.typography.bodyLarge,
-                        color = when (rule.type) {
-                            TransactionType.INCOME -> colors.income
-                            TransactionType.EXPENSE -> colors.expense
-                            TransactionType.TRANSFER -> colors.transfer
+                        // As everywhere else: on a card yellow, paying a card off green.
+                        color = when {
+                            item.isOnCredit -> colors.card
+                            item.paysOffCredit -> colors.income
+                            rule.type == TransactionType.INCOME -> colors.income
+                            rule.type == TransactionType.EXPENSE -> colors.expense
+                            else -> colors.transfer
                         },
                     )
                     if (rule.isVariableAmount) {

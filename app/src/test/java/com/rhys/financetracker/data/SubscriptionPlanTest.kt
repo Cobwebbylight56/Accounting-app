@@ -83,6 +83,29 @@ class SubscriptionPlanTest {
     }
 
     @Test
+    fun `rent to a landlord by standing order is a bill, money sent now and then is not`() {
+        fun toPerson(name: String, pence: (Int) -> Long, months: IntRange) =
+            months.map { Payment(name, pence(it), LocalDate.of(2026, it, 1), "Transfers & payments", 1L) }
+        val payments = toPerson("J SMITH RENT", { 65_000 }, 1..10) +
+            toPerson("H EVANS", { 2_000L + it * 500 }, 1..10) +
+            coverage
+        val found = SubscriptionTracker.track(payments, today = today).associateBy { it.name }
+        val rent = found.getValue("J Smith Rent")
+        assertTrue(rent.status.isGoing)
+        assertFalse(rent.isSubscription)
+        assertEquals(com.rhys.financetracker.domain.model.PaymentKind.STANDING_ORDER, rent.paidBy)
+        assertNull(found["H Evans"])
+    }
+
+    @Test
+    fun `the statement's DD or SO says how it's paid`() {
+        val payments = monthly("SKY DIGITAL DD", 3_500, 12, 1..10) + monthly("NETFLIX.COM", 1_099, 15, 1..10) + coverage
+        val found = SubscriptionTracker.track(payments, today = today).associateBy { it.name }
+        assertEquals(com.rhys.financetracker.domain.model.PaymentKind.DIRECT_DEBIT, found.getValue("Sky Digital").paidBy)
+        assertNull(found.getValue("Netflix Com").paidBy)
+    }
+
+    @Test
     fun `plans are kept and read back`() {
         val plans = listOf(
             SubscriptionPlan("audible uk", startedOn = LocalDate.of(2024, 3, 2)),

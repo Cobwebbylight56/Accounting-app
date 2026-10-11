@@ -144,7 +144,16 @@ data class RecurringRuleWithDetails(
     @ColumnInfo(name = "category_name") val categoryName: String?,
     @ColumnInfo(name = "category_color") val categoryColor: String?,
     @ColumnInfo(name = "person_name") val personName: String?,
+    /** Where its account counts, and the account it pays into: OWED for a card or loan. */
+    @ColumnInfo(name = "account_holding") val accountHolding: Holding? = null,
+    @ColumnInfo(name = "transfer_account_holding") val transferAccountHolding: Holding? = null,
 ) {
+    /** Paid on a credit card or other borrowing: it adds to what's owed. */
+    val isOnCredit: Boolean get() = rule.type == TransactionType.EXPENSE && accountHolding == Holding.OWED
+
+    /** Pays off a card or loan, from another account. */
+    val paysOffCredit: Boolean get() = rule.type == TransactionType.TRANSFER && transferAccountHolding == Holding.OWED
+
     fun isOverdue(today: LocalDate): Boolean = !rule.isPaused && rule.nextDueDate.isBefore(today)
     fun isDueWithin(days: Long, today: LocalDate): Boolean =
         !rule.isPaused && !rule.nextDueDate.isBefore(today) &&

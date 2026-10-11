@@ -354,19 +354,31 @@ private fun BillRow(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = DateUtils.relativeDescription(item.rule.nextDueDate) +
-                    (item.personName?.let { " · $it" } ?: ""),
+                text = listOfNotNull(
+                    DateUtils.relativeDescription(item.rule.nextDueDate),
+                    item.rule.paymentKind?.shortName,
+                    item.accountName,
+                    item.personName,
+                ).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,
                 color = if (isOverdue) {
                     FinanceTheme.colors.negative
                 } else {
                     MaterialTheme.colorScheme.onSurfaceVariant
                 },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
         Text(
             text = Money.format(item.rule.amountMinor),
             style = MaterialTheme.typography.bodyLarge,
+            // On a card yellow, paying a card off green, as everywhere else.
+            color = when {
+                item.isOnCredit -> FinanceTheme.colors.card
+                item.paysOffCredit -> FinanceTheme.colors.income
+                else -> MaterialTheme.colorScheme.onSurface
+            },
         )
     }
 }

@@ -128,15 +128,20 @@ class SpendingViewModel @Inject constructor(
     private val month = MutableStateFlow(DateUtils.currentYearMonth())
     private val personId = MutableStateFlow<Long?>(null)
 
-    /** The entries that are subscription payments, found once from the statements. */
-    private val subscriptionIds = MutableStateFlow<Set<Long>>(emptySet())
+    /**
+     * The entries that are subscription payments, found once from the
+     * statements, and the regular payments set up by you that are subscriptions.
+     */
+    private val subscriptionIds = MutableStateFlow<Pair<Set<Long>, Set<Long>>>(emptySet<Long>() to emptySet())
 
     init {
         viewModelScope.launch {
-            subscriptionIds.value = runCatching { billFinder.subscriptions() }.getOrDefault(emptyList())
+            val found = runCatching { billFinder.subscriptions() }.getOrDefault(emptyList())
                 .filter { it.isSubscription }
                 .flatMap { it.paymentIds }
                 .toSet()
+            val setUp = runCatching { billFinder.subscriptionRuleIds() }.getOrDefault(emptySet())
+            subscriptionIds.value = found to setUp
         }
     }
 
@@ -154,7 +159,7 @@ class SpendingViewModel @Inject constructor(
                     dateTo = months.last().atEndOfMonth(),
                     personIds = p?.let { setOf(it) }.orEmpty(),
                 ),
-            ).map { rows -> SpendingSplit.byMonth(rows, ids) }
+            ).map { rows -> SpendingSplit.byMonth(rows, ids.first, ids.second) }
         }
 
     private val people = peopleRepository.observeActive().map { list -> list.filterNot { it.isShared } }

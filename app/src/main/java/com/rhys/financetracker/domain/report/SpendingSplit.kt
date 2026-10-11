@@ -20,15 +20,23 @@ object SpendingSplit {
     /**
      * @param subscriptionIds the entries that are subscription payments; see
      *   [com.rhys.financetracker.data.importer.SubscriptionTracker.Subscription.paymentIds].
+     * @param subscriptionRuleIds the regular payments set up by you that are
+     *   subscriptions: every entry of theirs is one too.
      */
-    fun byMonth(rows: List<TransactionWithDetails>, subscriptionIds: Set<Long>): Map<YearMonth, Part> =
+    fun byMonth(
+        rows: List<TransactionWithDetails>,
+        subscriptionIds: Set<Long>,
+        subscriptionRuleIds: Set<Long> = emptySet(),
+    ): Map<YearMonth, Part> =
         rows.asSequence()
             .filter { it.transaction.type == TransactionType.EXPENSE && !it.transaction.isArchived }
             // Left out of money out altogether, as the month's totals leave them out.
             .filter { it.categoryKind != CategoryKind.SAVING && it.categoryKind != CategoryKind.TRANSFER }
             .groupBy { YearMonth.from(it.transaction.date) }
             .mapValues { (_, inMonth) ->
-                val (subscriptions, rest) = inMonth.partition { it.transaction.id in subscriptionIds }
+                val (subscriptions, rest) = inMonth.partition {
+                    it.transaction.id in subscriptionIds || it.transaction.recurringRuleId in subscriptionRuleIds
+                }
                 Part(
                     cardMinor = rest.filter { it.isOnCredit }.sumOf { it.transaction.amountMinor },
                     subscriptionsMinor = subscriptions.sumOf { it.transaction.amountMinor },

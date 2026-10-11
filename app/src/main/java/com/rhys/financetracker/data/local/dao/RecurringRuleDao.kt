@@ -21,12 +21,15 @@ interface RecurringRuleDao {
             a.name AS account_name,
             c.name AS category_name,
             c.color_hex AS category_color,
-            p.name AS person_name
+            p.name AS person_name,
+            a.holding AS account_holding,
+            ta.holding AS transfer_account_holding
         """
 
         const val DETAIL_JOINS = """
             FROM recurring_rules r
             LEFT JOIN accounts a ON a.id = r.account_id
+            LEFT JOIN accounts ta ON ta.id = r.transfer_account_id
             LEFT JOIN categories c ON c.id = r.category_id
             LEFT JOIN people p ON p.id = COALESCE(r.person_id, a.person_id)
         """
@@ -116,6 +119,21 @@ interface RecurringRuleDao {
 
     @Update
     suspend fun update(rule: RecurringRuleEntity)
+
+    /**
+     * A regular payment from a credit card is a card payment: a card can't
+     * pay a direct debit or a standing order, whatever an older version
+     * guessed. Returns how many were put right.
+     */
+    @Query(
+        """
+        UPDATE recurring_rules SET payment_kind = 'CARD', updated_at = :updatedAt
+        WHERE type = 'EXPENSE'
+          AND (payment_kind IS NULL OR payment_kind IN ('DIRECT_DEBIT', 'STANDING_ORDER'))
+          AND account_id IN (SELECT id FROM accounts WHERE holding = 'OWED')
+        """,
+    )
+    suspend fun cardPaymentsAsCard(updatedAt: Long): Int
 
     @Delete
     suspend fun delete(rule: RecurringRuleEntity)

@@ -61,6 +61,7 @@ import com.rhys.financetracker.data.importer.SubscriptionTracker.Status
 import com.rhys.financetracker.data.importer.SubscriptionTracker.Subscription
 import com.rhys.financetracker.data.repository.AccountRepository
 import com.rhys.financetracker.data.repository.BillFinderRepository
+import com.rhys.financetracker.domain.model.PaymentKind
 import com.rhys.financetracker.ui.components.BarGroup
 import com.rhys.financetracker.ui.components.ChartEntry
 import com.rhys.financetracker.ui.components.ChartLegend
@@ -86,6 +87,8 @@ data class SubscriptionsState(
     val isLoading: Boolean = true,
     val subscriptions: List<Subscription> = emptyList(),
     val accountNames: Map<Long, String> = emptyMap(),
+    /** Credit cards and other borrowing: what's paid from them is a card payment. */
+    val cardAccounts: Set<Long> = emptySet(),
 ) {
     val active: List<Subscription> get() = subscriptions.filter { it.status == Status.ACTIVE }
     val monthlyMinor: Long get() = active.sumOf { it.monthlyMinor }
@@ -114,8 +117,13 @@ class SubscriptionsViewModel @Inject constructor(
     private fun reload() {
         viewModelScope.launch {
             val found = runCatching { billFinder.subscriptions() }.getOrDefault(emptyList())
-            val names = accountRepository.observeAllWithBalances().first().associate { it.account.id to it.account.name }
-            _state.value = SubscriptionsState(isLoading = false, subscriptions = found, accountNames = names)
+            val accounts = accountRepository.observeAllWithBalances().first()
+            _state.value = SubscriptionsState(
+                isLoading = false,
+                subscriptions = found,
+                accountNames = accounts.associate { it.account.id to it.account.name },
+                cardAccounts = accounts.filter { it.isLiability }.map { it.account.id }.toSet(),
+            )
         }
     }
 
@@ -232,6 +240,7 @@ fun SubscriptionsScreen(
                     SubscriptionRow(
                         subscription = subscription,
                         accountName = state.accountNames[subscription.accountId],
+                        onCard = subscription.accountId in state.cardAccounts,
                         onClick = { editingKey = subscription.key },
                     )
                 }
@@ -254,6 +263,7 @@ fun SubscriptionsScreen(
                         SubscriptionRow(
                             subscription = subscription,
                             accountName = state.accountNames[subscription.accountId],
+                            onCard = subscription.accountId in state.cardAccounts,
                             onClick = { editingKey = subscription.key },
                         )
                     }
@@ -394,7 +404,7 @@ private fun MonthlyGraph(subscriptions: List<Subscription>, noun: String) {
 private const val MOST_NAMED = 6
 
 @Composable
-private fun SubscriptionRow(subscription: Subscription, accountName: String?, onClick: () -> Unit) {
+private fun SubscriptionRow(subscription: Subscription, accountName: String?, onCard: Boolean, onClick: () -> Unit) {
     val colors = FinanceTheme.colors
     val going = subscription.status.isGoing
     Column(
@@ -419,8 +429,13 @@ private fun SubscriptionRow(subscription: Subscription, accountName: String?, on
             )
         }
         Text(
-            text = listOfNotNull(subscription.frequency.displayName, accountName, subscription.categoryName)
-                .joinToString(" · "),
+            text = listOfNotNull(
+                subscription.frequency.displayName,
+                // A card can't pay a direct debit or standing order: on one, it's a card payment.
+                if (onCard) PaymentKind.CARD.shortName else subscription.paidBy?.shortName,
+                accountName,
+                subscription.categoryName,
+            ).joinToString(" · "),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

@@ -3,14 +3,20 @@ package com.rhys.financetracker.data.repository
 import androidx.room.withTransaction
 import com.rhys.financetracker.core.time.DateUtils
 import com.rhys.financetracker.data.importer.CardSpendingCheck
+import com.rhys.financetracker.data.importer.CardStatementJunk
+import com.rhys.financetracker.data.importer.MerchantCategoriser
+import com.rhys.financetracker.data.importer.PdfStatementParser
 import com.rhys.financetracker.data.importer.RepaymentPairing
 import com.rhys.financetracker.data.importer.TransactionFingerprint
 import com.rhys.financetracker.data.local.AppDatabase
 import com.rhys.financetracker.data.local.dao.AccountDao
 import com.rhys.financetracker.data.local.dao.CategoryDao
+import com.rhys.financetracker.data.local.dao.RecurringRuleDao
 import com.rhys.financetracker.data.local.dao.TransactionDao
 import com.rhys.financetracker.data.local.entity.TransactionEntity
+import com.rhys.financetracker.domain.model.CategoryKind
 import com.rhys.financetracker.domain.model.Holding
+import com.rhys.financetracker.domain.model.RecordSource
 import com.rhys.financetracker.domain.model.TransactionType
 import java.time.Instant
 import java.time.LocalDate
@@ -26,6 +32,12 @@ import javax.inject.Singleton
  *   December. A statement can't hold a payment that hasn't happened yet:
  *   it was the year before.
  * * **Card spending read as money in.** See [CardSpendingCheck].
+ * * **A card's regular payment called a direct debit.** A card can't pay a
+ *   direct debit or a standing order; it's a card payment.
+ * * **A card statement's own writing taken for payments** — "New
+ *   transactions", "Dear Mr …" — put away; see [CardStatementJunk].
+ * * **Paying a card off read as spending on it** — "Direct Debit Payment -
+ *   Thank You" as money out — turned round to money in.
  *
  * Run after every import and whenever Home opens.
  */
@@ -35,11 +47,48 @@ class StatementRepairRepository @Inject constructor(
     private val transactionDao: TransactionDao,
     private val accountDao: AccountDao,
     private val categoryDao: CategoryDao,
+    private val recurringRuleDao: RecurringRuleDao,
 ) {
 
     /** Puts right whatever needs it; returns how many entries changed. */
     suspend fun putRight(today: LocalDate = DateUtils.today()): Int =
-        backFromTheFuture(today) + cardSpendingReadAsIn(today)
+        backFromTheFuture(today) + cardStatementText(today) + cardSpendingReadAsIn(today) +
+            recurringRuleDao.cardPaymentsAsCard(Instant.now().toEpochMilli())
+
+    /** On cards: the statement's own lines put away, and paying it off turned to money in. */
+    private suspend fun cardStatementText(today: LocalDate): Int {
+        val cards = accountDao.getAllActive().filter { it.holding == Holding.OWED }.map { it.id }.toSet()
+        if (cards.isEmpty()) return 0
+        val rows = transactionDao.liveSince(today.minusDays(LOOK_BACK_DAYS))
+            .filter { it.accountId in cards && it.source == RecordSource.STATEMENT && it.type != TransactionType.TRANSFER }
+        val junk = rows.filter { CardStatementJunk.isJunk(it.description) }
+        val paidOff = rows.filter { row ->
+            row.type == TransactionType.EXPENSE && row !in junk &&
+                PdfStatementParser.cardDirectionFromWording(row.description) == false
+        }
+        if (junk.isEmpty() && paidOff.isEmpty()) return 0
+        val transfers = categoryDao.getByNameAndKind(MerchantCategoriser.PEOPLE_IN, CategoryKind.TRANSFER)
+        val now = Instant.now().toEpochMilli()
+        database.withTransaction {
+            junk.forEach { row ->
+                transactionDao.update(row.copy(isArchived = true, notes = noted(row.notes, NOT_A_PAYMENT), updatedAt = now))
+            }
+            paidOff.forEach { row ->
+                transactionDao.update(
+                    row.copy(
+                        type = TransactionType.INCOME,
+                        categoryId = transfers?.id ?: row.categoryId,
+                        importHash = row.importHash?.let {
+                            TransactionFingerprint.of(row.accountId, row.date, row.amountMinor, TransactionType.INCOME, row.description)
+                        },
+                        notes = noted(row.notes, PAID_OFF),
+                        updatedAt = now,
+                    ),
+                )
+            }
+        }
+        return junk.size + paidOff.size
+    }
 
     private suspend fun backFromTheFuture(today: LocalDate): Int {
         val ahead = transactionDao.statementRowsAfter(today.plusDays(1))
@@ -114,5 +163,7 @@ class StatementRepairRepository @Inject constructor(
         const val LOOK_BACK_DAYS = 400L
         const val ALREADY_HERE = "Dated a year ahead by mistake; the same payment is already here."
         const val READ_AS_IN = "Read as money in by mistake: it was spent on the card."
+        const val NOT_A_PAYMENT = "Part of the statement's own writing, read as a payment by mistake."
+        const val PAID_OFF = "Read as money out by mistake: it paid the card off."
     }
 }

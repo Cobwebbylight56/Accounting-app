@@ -54,6 +54,22 @@ class BillFinderRepository @Inject constructor(
         return com.rhys.financetracker.data.importer.SubscriptionTracker.track(payments, plans, today)
     }
 
+    /**
+     * The regular payments set up by you that are subscriptions, so their
+     * payments count as subscriptions too — Netflix set up by hand as much
+     * as Netflix found in a statement.
+     */
+    suspend fun subscriptionRuleIds(): Set<Long> {
+        val categories = categoryDao.getAll().associate { it.id to it.name }
+        return recurringRuleDao.getAll()
+            .filter { rule ->
+                rule.type == TransactionType.EXPENSE &&
+                    SubscriptionKinds.isSubscription(rule.name, rule.categoryId?.let { categories[it] })
+            }
+            .map { it.id }
+            .toSet()
+    }
+
     /** Remembers when a subscription started, how long it runs, or that it was cancelled. */
     suspend fun savePlan(plan: com.rhys.financetracker.data.importer.SubscriptionPlan) {
         settingsRepository.saveSubscriptionPlan(plan)
@@ -111,6 +127,7 @@ class BillFinderRepository @Inject constructor(
                             description = bill.name,
                             toHolding = null,
                             isSubscription = SubscriptionKinds.isSubscription(bill.name, bill.categoryName),
+                            fromHolding = accountDao.getById(bill.accountId)?.holding,
                         ),
                         notes = "Found in a statement: ${bill.reason.lowercase()}.",
                     ),

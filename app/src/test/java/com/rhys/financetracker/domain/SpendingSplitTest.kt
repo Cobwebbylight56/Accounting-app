@@ -67,6 +67,13 @@ class SpendingSplitTest {
     }
 
     @Test
+    fun `a subscription set up by hand counts as one too`() {
+        val netflix = row(8, 1_099, Holding.SPEND).let { it.copy(transaction = it.transaction.copy(recurringRuleId = 40L)) }
+        val part = SpendingSplit.byMonth(listOf(netflix), subscriptionIds = emptySet(), subscriptionRuleIds = setOf(40L)).getValue(september)
+        assertEquals(1_099L, part.subscriptionsMinor)
+    }
+
+    @Test
     fun `never more than the month's money out`() {
         val part = SpendingSplit.Part(cardMinor = 9_000L, subscriptionsMinor = 2_000L)
         val point = SpendingSplit.applied(listOf(MonthPoint(september, 0L, 5_000L)), mapOf(september to part)).single()

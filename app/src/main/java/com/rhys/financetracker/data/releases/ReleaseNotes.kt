@@ -22,6 +22,17 @@ object ReleaseNotes {
     /** Every release, newest first. */
     val ALL: List<Release> = listOf(
         Release(
+            "1.59.0", LocalDate.of(2026, 10, 11), "Regular payments right on every card",
+            listOf(
+                "A regular payment from a credit card is a Card payment, never a Direct debit or Standing order. Ones already set up are put right by themselves.",
+                "Subscriptions you set up yourself count as subscriptions on the Spending charts too.",
+                "Set up by you and Home's coming-up bills show card payments in yellow and paying a card off in green, like everywhere else.",
+                "A standing order to a person, like rent to a landlord, is listed under Bills & services. A fixed sum to someone every month counts; sending money now and then doesn't.",
+                "Each subscription and bill says how it's paid: Direct debit, Standing order or Card payment.",
+                "Junk lines an older version read from a Capital One statement (\"New transactions\", \"Dear Mr …\") are put away, and \"Payment – Thank You\" read as money out is turned into paying the card off. No need to undo and import again.",
+            ),
+        ),
+        Release(
             "1.58.0", LocalDate.of(2026, 10, 11), "Subscriptions that end, and cards on the charts",
             listOf(
                 "Subscriptions that have stopped or been cancelled are hidden, like Uber One. A line at the bottom shows them if you want.",

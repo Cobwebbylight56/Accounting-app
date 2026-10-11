@@ -114,6 +114,7 @@ class TransactionViewViewModel @Inject constructor(
                 description = entry.description,
                 toHolding = entry.transferAccountId?.let { accounts.get(it)?.holding },
                 isSubscription = SubscriptionKinds.isSubscription(entry.description, details.categoryName),
+                fromHolding = details.accountHolding,
             )
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PaymentKind.DIRECT_DEBIT)
