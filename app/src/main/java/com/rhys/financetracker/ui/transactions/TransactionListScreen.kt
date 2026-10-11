@@ -67,6 +67,7 @@ import com.rhys.financetracker.ui.components.ColorDot
 import com.rhys.financetracker.ui.components.ConfirmDialog
 import com.rhys.financetracker.ui.components.EmptyState
 import com.rhys.financetracker.ui.components.LoadingState
+import com.rhys.financetracker.ui.components.amountOf
 import com.rhys.financetracker.ui.components.colorFromHex
 import com.rhys.financetracker.ui.theme.FinanceTheme
 
@@ -463,11 +464,7 @@ private fun TransactionRow(
                         TransactionType.TRANSFER -> "→ ${Money.format(entry.amountMinor)}"
                     },
                     style = MaterialTheme.typography.bodyLarge,
-                    color = when (entry.type) {
-                        TransactionType.INCOME -> colors.income
-                        TransactionType.EXPENSE -> colors.expense
-                        TransactionType.TRANSFER -> colors.transfer
-                    },
+                    color = colors.amountOf(item),
                 )
                 if (entry.type == TransactionType.TRANSFER && item.transferAccountName != null) {
                     Text(

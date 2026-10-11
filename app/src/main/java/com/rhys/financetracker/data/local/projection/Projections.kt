@@ -37,7 +37,23 @@ data class TransactionWithDetails(
     @ColumnInfo(name = "receipt_count") val receiptCount: Int = 0,
     /** Direct debit, standing order…, when it is one of a regular payment's. */
     @ColumnInfo(name = "regular_kind") val regularKind: com.rhys.financetracker.domain.model.PaymentKind? = null,
+    /** Where its account counts, and the account it moved to: OWED for a card or loan. */
+    @ColumnInfo(name = "account_holding") val accountHolding: Holding? = null,
+    @ColumnInfo(name = "transfer_account_holding") val transferAccountHolding: Holding? = null,
 ) {
+    /** Spent on a credit card or other borrowing: it adds to what's owed. */
+    val isOnCredit: Boolean
+        get() = transaction.type == TransactionType.EXPENSE && accountHolding == Holding.OWED
+
+    /** A card or loan being paid off: money in on it, or moved into it from another account. */
+    val paysOffCredit: Boolean
+        get() = when (transaction.type) {
+            // Money back from a shop is a refund, not the card being paid.
+            TransactionType.INCOME -> accountHolding == Holding.OWED && categoryName != "Refunds"
+            TransactionType.TRANSFER -> transferAccountHolding == Holding.OWED
+            TransactionType.EXPENSE -> false
+        }
+
     /** Money moved to or from a person rather than spent or earned. */
     val isPersonTransfer: Boolean
         get() = categoryKind == com.rhys.financetracker.domain.model.CategoryKind.TRANSFER &&

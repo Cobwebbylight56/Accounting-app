@@ -585,10 +585,13 @@ for:
 
 #### Paying a card off, and the card's page
 
-On a card's page, spending on it is **red** — it adds to what you owe — and
-paying it off is **yellow**, marked **Paid off**. The top shows what's owed
-("£130.89 owed") and what's left to spend of the limit, and the month-end
-graph is what was owed at the end of each month, in yellow.
+Spending on a card is **yellow**, so it stands apart from spending from your
+current account, which is **red**. That's the same everywhere: the card's
+page, Money, Home and the payment itself. Paying a card off is **green**,
+marked **Paid off** — on the card's page and on the account it was paid from.
+The card's page shows what's owed ("£130.89 owed") and what's left to spend
+of the limit, and the month-end graph is what was owed at the end of each
+month, in yellow.
 
 The payment usually shows on both statements: money out of your bank to the
 card, and money in on the card. With both imported, it counts once — as money

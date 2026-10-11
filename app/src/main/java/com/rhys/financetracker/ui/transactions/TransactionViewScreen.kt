@@ -58,6 +58,7 @@ import com.rhys.financetracker.domain.model.TransactionType
 import com.rhys.financetracker.domain.recurrence.RecurringTransactionGenerator
 import com.rhys.financetracker.domain.recurrence.RegularSchedule
 import com.rhys.financetracker.ui.components.ColorDot
+import com.rhys.financetracker.ui.components.amountOf
 import com.rhys.financetracker.ui.components.colorFromHex
 import com.rhys.financetracker.ui.navigation.Routes
 import com.rhys.financetracker.ui.receipts.PartGroupsList
@@ -220,11 +221,7 @@ fun TransactionViewScreen(
                     sign + Money.format(entry.amountMinor),
                     style = MaterialTheme.typography.displaySmall,
                     fontWeight = FontWeight.SemiBold,
-                    color = when (entry.type) {
-                        TransactionType.INCOME -> colors.income
-                        TransactionType.EXPENSE -> colors.expense
-                        TransactionType.TRANSFER -> MaterialTheme.colorScheme.onSurface
-                    },
+                    color = colors.amountOf(details, transferColor = MaterialTheme.colorScheme.onSurface),
                 )
                 Text(
                     DateUtils.format(entry.date),

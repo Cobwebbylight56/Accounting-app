@@ -109,8 +109,9 @@ data class FinanceColors(
     val negative: Color,
     val neutral: Color,
     /**
-     * A credit card being paid off, and what's owed on one: yellow, so paying
-     * the card isn't mistaken for money coming in, nor spending for a bill.
+     * Credit: spending on a card, and what's owed on one. Yellow, so it
+     * stands apart from spending from the bank (red). Paying it off is
+     * green, like money in.
      */
     val card: Color,
     /** Series colours for charts, in the order they should be used. */

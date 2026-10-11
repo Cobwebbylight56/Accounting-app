@@ -55,7 +55,9 @@ interface TransactionDao {
             p.color_hex AS person_color,
             (SELECT COUNT(*) FROM transaction_splits sp WHERE sp.transaction_id = t.id) AS split_count,
             (SELECT COUNT(*) FROM receipts rc WHERE rc.transaction_id = t.id) AS receipt_count,
-            (SELECT rr.payment_kind FROM recurring_rules rr WHERE rr.id = t.recurring_rule_id) AS regular_kind
+            (SELECT rr.payment_kind FROM recurring_rules rr WHERE rr.id = t.recurring_rule_id) AS regular_kind,
+            a.holding AS account_holding,
+            ta.holding AS transfer_account_holding
         """
 
         /**

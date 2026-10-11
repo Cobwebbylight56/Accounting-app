@@ -45,6 +45,7 @@ import com.rhys.financetracker.ui.components.ProgressBarRow
 import com.rhys.financetracker.ui.components.SectionCard
 import com.rhys.financetracker.ui.components.StatEmphasis
 import com.rhys.financetracker.ui.components.StatTile
+import com.rhys.financetracker.ui.components.amountOf
 import com.rhys.financetracker.ui.components.chartColorAt
 import com.rhys.financetracker.ui.components.colorFromHex
 import com.rhys.financetracker.ui.theme.FinanceTheme
@@ -835,11 +836,7 @@ private fun TransactionRowCompact(item: TransactionWithDetails, onClick: () -> U
                 TransactionType.TRANSFER -> Money.format(entry.amountMinor)
             },
             style = MaterialTheme.typography.bodyLarge,
-            color = when (entry.type) {
-                TransactionType.INCOME -> colors.income
-                TransactionType.EXPENSE -> colors.expense
-                TransactionType.TRANSFER -> colors.transfer
-            },
+            color = colors.amountOf(item),
         )
     }
 }

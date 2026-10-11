@@ -22,6 +22,13 @@ object ReleaseNotes {
     /** Every release, newest first. */
     val ALL: List<Release> = listOf(
         Release(
+            "1.57.0", LocalDate.of(2026, 10, 11), "Credit in yellow, paid off in green",
+            listOf(
+                "Anything spent on a credit card is yellow, so it stands apart from spending from your current account, which stays red. That's on the card's page, in Money, on Home and on the payment itself.",
+                "Paying a card off is green and marked \"Paid off\" — on the card, and on the account it was paid from.",
+            ),
+        ),
+        Release(
             "1.56.0", LocalDate.of(2026, 10, 11), "Credit cards that work like credit cards",
             listOf(
                 "On a credit card's page, paying it off shows in yellow, marked \"Paid off\". Spending on it stays red, because it adds to what you owe.",

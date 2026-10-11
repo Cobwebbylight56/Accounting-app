@@ -338,7 +338,7 @@ fun AccountDetailScreen(
                         )
                     }
                     state.recent.forEach { item ->
-                        PaymentRow(item, accountId = viewModel.accountId, owed = state.isOwed) {
+                        PaymentRow(item, accountId = viewModel.accountId) {
                             onOpenTransaction(item.transaction.id)
                         }
                     }
@@ -552,15 +552,14 @@ private fun MonthEndsCard(ends: List<MonthEnd>, owed: Boolean) {
 private const val MONTH_ENDS_LISTED = 6
 
 @Composable
-private fun PaymentRow(item: TransactionWithDetails, accountId: Long, owed: Boolean, onClick: () -> Unit) {
+private fun PaymentRow(item: TransactionWithDetails, accountId: Long, onClick: () -> Unit) {
     val entry = item.transaction
-    val colors = FinanceTheme.colors
     // A move into this account is money in here, whichever way it is stored.
     val isIn = entry.type == TransactionType.INCOME ||
         (entry.type == TransactionType.TRANSFER && entry.transferAccountId == accountId)
-    // Money in on a card is it being paid off: yellow, so it isn't taken for
-    // income. Spending on it stays red — it adds to what's owed.
-    val paidOff = owed && isIn && item.categoryName != REFUNDS
+    // Spending on a card is yellow, set apart from the bank's red; paying it
+    // off is green, on the card's page and on the account it was paid from.
+    val paidOff = item.paysOffCredit
     Row(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -584,16 +583,13 @@ private fun PaymentRow(item: TransactionWithDetails, accountId: Long, owed: Bool
             text = (if (isIn) "+" else "−") + Money.format(entry.amountMinor),
             style = MaterialTheme.typography.bodyMedium,
             color = when {
-                paidOff -> colors.card
-                isIn -> colors.income
-                else -> colors.expense
+                item.isOnCredit -> FinanceTheme.colors.card
+                paidOff || isIn -> FinanceTheme.colors.income
+                else -> FinanceTheme.colors.expense
             },
         )
     }
 }
-
-/** Money back from a shop on a card is a refund, not the card being paid off. */
-private const val REFUNDS = "Refunds"
 
 /** Loans and mortgages: borrowing paid off month by month. */
 private val LOAN_TYPES = setOf(
