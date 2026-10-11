@@ -81,8 +81,9 @@ object FlexibleStatementReader {
         }
         text.append(line.substring(at))
         val words = text.toString()
-            .replace(TRAILING_ON_DATE, "")
             .replace(SPACES, " ")
+            .trim()
+            .replace(TRAILING_ON_DATE, "")
             .trim(' ', '-', '–', '|', ':', '*', '£')
         val lower = words.lowercase()
         return Piece(
@@ -172,9 +173,11 @@ object FlexibleStatementReader {
     private fun assemble(pieces: List<Piece>): Pair<Long?, List<Record>> {
         var opening: Long? = null
         val records = mutableListOf<Record>()
-        var lastDate: LocalDate? = null
-        // A dated line still waiting for its amount, on the line or lines after.
-        var waiting: Pair<LocalDate, StringBuilder>? = null
+        // A date on a line of its own, heading the payments straight under it.
+        var heading: LocalDate? = null
+        // A dated payee still waiting for its amount: on the next line, or
+        // the one after if the payee runs onto a second line.
+        var waiting: Triple<LocalDate, StringBuilder, Int>? = null
 
         for (piece in pieces) {
             if (piece.summary || piece.opening) {
@@ -182,45 +185,70 @@ object FlexibleStatementReader {
                 if (piece.opening && records.isEmpty() && piece.amounts.size == 1) {
                     opening = piece.amounts.single().signedMinor
                 }
+                heading = null
                 waiting = null
                 continue
             }
             val date = piece.date
+            val held = waiting
             when {
                 date != null && piece.amounts.isNotEmpty() -> {
-                    records += Record(date, piece.text, piece.amounts)
+                    if (isPayee(piece.text)) records += Record(date, piece.text, piece.amounts)
+                    heading = null
                     waiting = null
-                    lastDate = date
+                }
+                date != null && piece.text.isBlank() -> {
+                    heading = date
+                    waiting = null
                 }
                 date != null -> {
-                    // A date heading the rows under it, or a row whose amount is below.
-                    waiting = date to StringBuilder(piece.text)
-                    lastDate = date
+                    // "27/09/2026 Card payment", the payee and amount below.
+                    waiting = if (isPayee(piece.text) || piece.text.length <= SHORT_LINE) Triple(date, StringBuilder(piece.text), 0) else null
+                    heading = null
+                }
+                piece.amounts.isNotEmpty() && held != null && piece.text.count(Char::isLetter) <= BARE_AMOUNT_LETTERS -> {
+                    // The amount on a line of its own, for the payee above.
+                    val text = held.second.toString().trim()
+                    if (isPayee(text)) records += Record(held.first, text, piece.amounts)
+                    waiting = null
+                }
+                piece.amounts.isNotEmpty() && heading != null && isPayee(piece.text) -> {
+                    // One of the payments under a date printed once.
+                    records += Record(heading, piece.text, piece.amounts)
+                    waiting = null
                 }
                 piece.amounts.isNotEmpty() -> {
-                    val held = waiting
-                    if (held != null) {
-                        val text = listOf(held.second.toString(), piece.text).filter { it.isNotBlank() }.joinToString(" ")
-                        if (text.isNotBlank()) records += Record(held.first, text, piece.amounts)
-                        // The date may head more rows yet.
-                        waiting = held.first to StringBuilder()
-                    } else if (lastDate != null && piece.text.isNotBlank() && piece.text.any { it.isLetter() }) {
-                        // One of several payments under a date printed once.
-                        records += Record(lastDate, piece.text, piece.amounts)
-                    }
+                    heading = null
+                    waiting = null
                 }
-                piece.text.isNotBlank() -> {
-                    // The payee carried onto the next line, before its amount.
-                    waiting?.let { held ->
-                        if (held.second.length + piece.text.length <= MAX_DESCRIPTION) {
-                            if (held.second.isNotEmpty()) held.second.append(' ')
-                            held.second.append(piece.text)
-                        }
-                    }
+                held != null && held.third < 1 && piece.text.length <= SHORT_LINE && isPayee(piece.text) -> {
+                    // The payee carried onto one more line, before its amount.
+                    waiting = Triple(held.first, held.second.append(' ').append(piece.text), held.third + 1)
+                }
+                else -> {
+                    // Anything else — a sentence, an address — ends what came before.
+                    heading = null
+                    waiting = null
                 }
             }
         }
-        return opening to records.filter { it.text.any(Char::isLetter) }
+        return opening to records
+    }
+
+    /**
+     * Whether [text] reads like who a payment was with, rather than a piece
+     * of the statement's own writing: "TESCO STORES 3294", "Direct Debit
+     * Payment - Thank You" — not "Mr Rhys Evans at", "is", "Minimum Payments
+     * will be taken on or just after", or a sentence from the small print.
+     */
+    internal fun isPayee(text: String): Boolean {
+        val words = text.lowercase().split(' ').filter { it.isNotBlank() }
+        if (text.count(Char::isLetter) < MIN_LETTERS || words.isEmpty()) return false
+        if (words.size > MAX_WORDS) return false
+        if (words.first().trimEnd('.', ',') in ADDRESSING) return false
+        if (words.last().trimEnd('.', ',', ':') in DANGLING) return false
+        if (words.count { it in PROSE } >= 2) return false
+        return true
     }
 
     /**
@@ -257,7 +285,10 @@ object FlexibleStatementReader {
                 // A minus on a card is a payment to it or a refund; on an account, money out.
                 Mark.MINUS -> !card
                 Mark.PLUS -> card
-                Mark.NONE -> proved ?: PdfStatementParser.directionFromWording(record.text) ?: true
+                Mark.NONE -> proved
+                    ?: (if (card) PdfStatementParser.cardDirectionFromWording(record.text) else null)
+                    ?: PdfStatementParser.directionFromWording(record.text)
+                    ?: true
             }
             // Spending adds to what's owed on a card and takes from an account.
             previous = balance ?: before?.let { if (out == card) it + size else it - size }
@@ -316,7 +347,7 @@ object FlexibleStatementReader {
 
     /** What a statement says about itself, rather than a transaction. */
     private val SUMMARY = Regex(
-        """\b(balance (brought|carried) forward|(previous|opening|closing|new|current|available|statement|account) balance|your (new )?balance|available (to spend|credit|funds)|credit limit|minimum (payment|repayment)|payment due|due (date|on|by)|repayment due|statement (date|period|for|number)|interest rate|estimated interest|annual rate|apr|aer|page \d+|issued on|date of birth|sort code|account (number|no)|iban|bic|period|summary|overdraft limit|arranged overdraft)\b""",
+        """\b(balance (brought|carried) forward|(previous|opening|closing|new|current|available|statement|account) balance|your (new )?balance|available (to spend|credit|funds)|credit limit|minimum (payments?|repayments?)|new transactions|payments received|payments and credits|payment due|due (date|on|by)|repayment due|statement (date|period|for|number)|interest rate|estimated interest|annual rate|apr|aer|page \d+|issued on|date of birth|sort code|account (number|no)|iban|bic|period|summary|overdraft limit|arranged overdraft)\b""",
     )
 
     /** A line that is only a column's total. */
@@ -329,6 +360,36 @@ object FlexibleStatementReader {
     private val CARD = Regex("""(?i)\b(credit\s+limit|minimum\s+payment)\b""")
 
     private const val MAX_DESCRIPTION = 80
+
+    /** A payee is at least this many letters. */
+    private const val MIN_LETTERS = 3
+
+    /** Longer than this, it's a sentence. */
+    private const val MAX_WORDS = 10
+
+    /** A second line of a payee is short. */
+    private const val SHORT_LINE = 40
+
+    /** An amount on its own line may carry a word as short as "GBP". */
+    private const val BARE_AMOUNT_LETTERS = 3
+
+    /** How a letter starts: "Mr Rhys Evans", "Dear …". */
+    private val ADDRESSING = setOf("mr", "mrs", "miss", "ms", "dr", "dear", "hello", "hi")
+
+    /**
+     * A line ending in one of these runs on into the next: a piece of a
+     * sentence. Not "you": a card's "Payment - Thank You" ends in it.
+     */
+    private val DANGLING = setOf(
+        "at", "on", "in", "is", "be", "of", "to", "by", "for", "the", "and", "or", "will", "your", "as",
+        "a", "an", "if", "we", "it", "that", "this", "with", "from", "after", "before", "are",
+    )
+
+    /** Words of a sentence rather than a payee; two of them and it is prose. */
+    private val PROSE = setOf(
+        "will", "be", "you", "your", "we", "our", "if", "is", "are", "was", "have", "has", "this", "that",
+        "taken", "make", "made", "please", "may", "can", "should", "would", "when", "which", "it",
+    )
     private const val MAX_SPREAD_DAYS = 400L
     private const val FIRST_YEAR = 1990
     private const val LAST_YEAR = 2100

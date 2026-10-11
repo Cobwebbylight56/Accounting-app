@@ -22,6 +22,17 @@ object ReleaseNotes {
     /** Every release, newest first. */
     val ALL: List<Release> = listOf(
         Release(
+            "1.56.0", LocalDate.of(2026, 10, 11), "Credit cards that work like credit cards",
+            listOf(
+                "On a credit card's page, paying it off shows in yellow, marked \"Paid off\". Spending on it stays red, because it adds to what you owe.",
+                "The card's page shows what you owe — \"£130.89 owed\" and what's left to spend of your limit — and the month-end graph is what's owed, in yellow, instead of a balance falling below zero.",
+                "\"Direct Debit Payment – Thank You\" on a card statement is money in, paying the card off. It used to be read as money out.",
+                "A card statement's summary and small print — \"Payments received\", \"New transactions\", your name and address — are no longer read as payments. The any-layout reader now only steps in when the usual one reads nothing.",
+                "A card payment that's on both your bank and card statements counts once, as money moved from your bank to the card: not spending, and not income.",
+                "Paying a card off is filed under Transfers & payments, so it isn't counted as money in.",
+            ),
+        ),
+        Release(
             "1.55.0", LocalDate.of(2026, 10, 10), "Statements in any layout",
             listOf(
                 "A new statement reader for any layout: dates at the start, the end or the middle of a line, in any common form (27/01/2026, 27 Jan, Jan 27, 2026, 2026-01-27), amounts with £, minus, brackets, CR or DR, a date heading several payments, and payees or amounts on the line below. It takes over whenever the usual reader can't make sense of a PDF.",

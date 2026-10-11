@@ -1,5 +1,6 @@
 package com.rhys.financetracker.data
 
+import com.rhys.financetracker.data.importer.FlexibleStatementReader
 import com.rhys.financetracker.data.importer.PdfStatementParser
 import java.time.LocalDate
 import org.junit.Assert.assertEquals
@@ -48,6 +49,40 @@ class CardStatementTest {
     fun `a column's totals are not a payment`() {
         val text = lines("capital-one.txt")
         assertTrue(PdfStatementParser.parse(text).none { "TOTALS" in it.description })
+    }
+
+    @Test
+    fun `Capital One - paying it off by Direct Debit is money in, and the summary is not a row`() {
+        val text = lines("capital-one-repaid.txt")
+        val rows = PdfStatementParser.parse(text)
+        assertEquals(
+            listOf("Tesco Stores 3294 Newport GBR", "Direct Debit Payment - Thank You", "Amazon.co.uk*AB12C London GBR"),
+            rows.map { it.description },
+        )
+        assertEquals(listOf(4_560L, null, 4_350L), rows.map { it.moneyOutMinor })
+        assertEquals(listOf(null, 3_999L, null), rows.map { it.moneyInMinor })
+        val sheet = requireNotNull(PdfStatementParser.toSheet(text, "Capital One"))
+        assertEquals(3, sheet.rows.size - 1) // under the headings
+    }
+
+    @Test
+    fun `Capital One - the any-layout reader finds only the payments too`() {
+        val rows = FlexibleStatementReader.parse(lines("capital-one-repaid.txt"), LocalDate.of(2026, 4, 1))
+        // Not "Protect Your Identity", "is", "New transactions", "Payments
+        // received", "Mr A Customer at" or "Dear Mr A Customer, Your Direct Debit".
+        assertEquals(
+            listOf("Tesco Stores 3294 Newport GBR", "Direct Debit Payment - Thank You", "Amazon.co.uk*AB12C London GBR"),
+            rows.map { it.description },
+        )
+        assertEquals(listOf(4_560L, null, 4_350L), rows.map { it.moneyOutMinor })
+        assertEquals(listOf(null, 3_999L, null), rows.map { it.moneyInMinor })
+    }
+
+    @Test
+    fun `a card's payment wording`() {
+        assertEquals(false, PdfStatementParser.cardDirectionFromWording("Direct Debit Payment - Thank You"))
+        assertEquals(false, PdfStatementParser.cardDirectionFromWording("PAYMENT RECEIVED - THANK YOU"))
+        assertNull(PdfStatementParser.cardDirectionFromWording("Tesco Stores"))
     }
 
     @Test

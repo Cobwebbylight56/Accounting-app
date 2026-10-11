@@ -1189,6 +1189,19 @@ interface TransactionDao {
     @Query("UPDATE transactions SET is_confirmed = 1, updated_at = :updatedAt WHERE id = :id")
     suspend fun confirm(id: Long, updatedAt: Long)
 
+    /** Every entry held from [from] on, for finding a card payment held twice. */
+    @Query("SELECT * FROM transactions WHERE is_archived = 0 AND date >= :from")
+    suspend fun liveSince(from: LocalDate): List<TransactionEntity>
+
+    /** Money in put away with [note] on it, so it can come back if what it was paired with goes. */
+    @Query(
+        """
+        SELECT * FROM transactions
+        WHERE is_archived = 1 AND type = 'INCOME' AND notes LIKE '%' || :note || '%'
+        """,
+    )
+    suspend fun putAwayWithNote(note: String): List<TransactionEntity>
+
     @Query("DELETE FROM transactions")
     suspend fun deleteAll()
 }

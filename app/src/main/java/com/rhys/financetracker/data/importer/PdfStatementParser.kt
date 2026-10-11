@@ -82,15 +82,15 @@ object PdfStatementParser {
         // that looks for a date and an amount wherever they are. The usual
         // reader stays first wherever it reads a statement properly: it
         // checks itself against the running balance column by column.
-        val rows = if (usualReads && usual.size >= TRUSTED_ROWS) {
-            usual
-        } else {
-            val flexible = FlexibleStatementReader.parse(lines)
-            val flexibleReads = flexible.size >= MIN_ROWS || (flexible.isNotEmpty() && statementSaysSo)
-            when {
-                usualReads && !(flexibleReads && flexible.size >= usual.size * 2 && flexible.size - usual.size >= 3) -> usual
-                flexibleReads -> flexible
-                else -> return null
+        // Only when the usual reader finds nothing: where it reads a
+        // statement at all it checks itself against the running balance,
+        // and a statement's own wording — the summary, the small print — is
+        // never mistaken for a payment by it.
+        val rows = when {
+            usualReads -> usual
+            else -> {
+                val flexible = FlexibleStatementReader.parse(lines)
+                if (flexible.size >= MIN_ROWS || (flexible.isNotEmpty() && statementSaysSo)) flexible else return null
             }
         }
 
@@ -327,7 +327,8 @@ object PdfStatementParser {
         // where the busy direction is money arriving. A line saying "Received
         // from" or "Interest" is evidence about that row; the busier column is
         // a guess about the whole file, so the row's own wording goes first.
-        val said = directionFromWording(line.description)
+        val said = (if (card) cardDirectionFromWording(line.description) else null)
+            ?: directionFromWording(line.description)
         val outward = when {
             figure.minor < 0L -> true
             line.marker != null -> line.marker !in CREDIT_MARKERS
@@ -912,6 +913,15 @@ object PdfStatementParser {
      * card payment" is money leaving, and the words for money arriving are
      * kept narrow for the same reason.
      */
+    /**
+     * On a card statement, a payment *to* the card — "Direct Debit Payment -
+     * Thank You", "Payment received" — is money in: it pays the card off.
+     * "Direct debit" there is how the card was paid, not money going out.
+     * Null when the line says nothing of the kind.
+     */
+    internal fun cardDirectionFromWording(description: String): Boolean? =
+        if (CARD_PAYMENT_IN.containsMatchIn(description)) false else null
+
     internal fun directionFromWording(description: String): Boolean? {
         val text = description.lowercase()
         // "Returned direct debit" is the direct debit's money coming back,
@@ -924,6 +934,11 @@ object PdfStatementParser {
 
     /** Money coming back: a payment the bank returned or reversed. */
     private val RETURNED_WORDS = Regex("""(?i)\b(returned|reversal|reversed|unpaid|recalled)\b""")
+
+    /** A payment made to a card, as its statement words it. */
+    private val CARD_PAYMENT_IN = Regex(
+        """(?i)\b(payment\s*[-–]?\s*thank\s*you|thank\s*you\s+for\s+your\s+payment|payment\s+received|direct\s+debit\s+payment|paid\s+by\s+direct\s+debit|payment\s+thankyou|card\s+repayment|repayment\s+received)\b""",
+    )
 
     /** How a statement writes "money left the account". */
     private val OUTGOING_WORDS = Regex(
@@ -1200,9 +1215,6 @@ object PdfStatementParser {
 
     /** At least this many transaction lines before a PDF counts as a statement. */
     private const val MIN_ROWS = 2
-
-    /** This many rows read the usual way and the statement is the usual layout. */
-    private const val TRUSTED_ROWS = 5
 
     private val WHITESPACE = Regex("\\s+")
 

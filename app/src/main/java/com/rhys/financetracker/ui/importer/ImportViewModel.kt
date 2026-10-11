@@ -51,6 +51,7 @@ class ImportViewModel @Inject constructor(
     private val billFinder: BillFinderRepository,
     private val importHistory: com.rhys.financetracker.data.repository.ImportHistoryRepository,
     private val incomeRepository: com.rhys.financetracker.data.repository.IncomeRepository,
+    private val repayments: com.rhys.financetracker.data.repository.RepaymentRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ImportState())
@@ -588,6 +589,8 @@ class ImportViewModel @Inject constructor(
                     val bills = if (account != null) billFinder.find(account.id) else emptyList()
                     // A statement with the wage on it sets the wage up, and take-home with it.
                     runCatching { incomeRepository.findWages() }
+                    // A card paid from the bank, now on both statements, counts once.
+                    runCatching { repayments.countOnce() }
                     _state.value = current.copy(
                         isBusy = false,
                         step = ImportStep.DONE,

@@ -108,6 +108,9 @@ data class AccountDetailState(
 ) {
     /** True for borrowing that is paid off month by month. */
     val isLoan: Boolean get() = account?.account?.type in LOAN_TYPES
+
+    /** A card, loan or pay-later: its balance is what's owed, and money in pays it off. */
+    val isOwed: Boolean get() = account?.isLiability == true
     val missingMonths: List<YearMonth> get() = coverage.filterNot { it.isIn }.map { it.month }
 }
 
@@ -314,7 +317,7 @@ fun AccountDetailScreen(
             item { StatementsCard(state = state, onUndo = { undoing = it }) }
 
             if (state.monthEnds.isNotEmpty()) {
-                item { MonthEndsCard(state.monthEnds) }
+                item { MonthEndsCard(state.monthEnds, owed = state.isOwed) }
             }
 
             item {
@@ -335,7 +338,7 @@ fun AccountDetailScreen(
                         )
                     }
                     state.recent.forEach { item ->
-                        PaymentRow(item, accountId = viewModel.accountId) {
+                        PaymentRow(item, accountId = viewModel.accountId, owed = state.isOwed) {
                             onOpenTransaction(item.transaction.id)
                         }
                     }
@@ -382,12 +385,32 @@ private fun BalanceHeader(item: AccountWithBalance) {
                 color = FinanceTheme.colors.onTile,
             )
             Spacer(Modifier.height(6.dp))
-            Text(
-                text = com.rhys.financetracker.ui.components.animatedMoney(item.balanceMinor),
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = FinanceTheme.colors.onTile,
-            )
+            if (item.isLiability) {
+                // A card's balance is what's owed: "£130.89 owed", not "−£130.89".
+                val owed = -item.balanceMinor
+                Text(
+                    text = com.rhys.financetracker.ui.components.animatedMoney(if (owed >= 0L) owed else -owed) +
+                        if (owed >= 0L) " owed" else " in credit",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = FinanceTheme.colors.onTile,
+                )
+                val limit = account.creditLimitMinor?.takeIf { it > 0L }
+                if (limit != null) {
+                    Text(
+                        text = "${Money.format((limit - owed).coerceAtLeast(0L))} left to spend of ${Money.format(limit)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = FinanceTheme.colors.onTile,
+                    )
+                }
+            } else {
+                Text(
+                    text = com.rhys.financetracker.ui.components.animatedMoney(item.balanceMinor),
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = FinanceTheme.colors.onTile,
+                )
+            }
             Text(
                 text = "Counted from ${Money.format(account.openingBalanceMinor)} on " +
                     DateUtils.format(account.openingBalanceDate) + ", plus everything since",
@@ -480,22 +503,27 @@ private fun ImportRow(item: ImportBatchWithRemaining, onUndo: () -> Unit) {
 }
 
 @Composable
-private fun MonthEndsCard(ends: List<MonthEnd>) {
-    SectionCard(title = "Balance at each month end") {
+private fun MonthEndsCard(ends: List<MonthEnd>, owed: Boolean) {
+    val colors = FinanceTheme.colors
+    // On a card or loan the line is what's owed: up when it's spent on,
+    // down when it's paid off — not a balance sinking below nothing.
+    fun shown(end: MonthEnd) = if (owed) -end.balanceMinor else end.balanceMinor
+    SectionCard(title = if (owed) "Owed at each month end" else "Balance at each month end") {
         val oldestFirst = ends.sortedBy { it.month }
         TrendLineChart(
             labels = oldestFirst.map { DateUtils.monthNameShort(it.month.monthValue) },
             series = listOf(
                 LineSeries(
-                    name = "Balance",
-                    values = oldestFirst.map { it.balanceMinor },
-                    color = MaterialTheme.colorScheme.primary,
+                    name = if (owed) "Owed" else "Balance",
+                    values = oldestFirst.map { shown(it) },
+                    color = if (owed) colors.card else MaterialTheme.colorScheme.primary,
                 ),
             ),
             height = 180.dp,
         )
         Spacer(Modifier.height(8.dp))
         ends.take(MONTH_ENDS_LISTED).forEach { end ->
+            val figure = shown(end)
             Row(modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
                 Text(
                     text = DateUtils.formatMonth(end.month),
@@ -503,9 +531,17 @@ private fun MonthEndsCard(ends: List<MonthEnd>) {
                     modifier = Modifier.weight(1f),
                 )
                 Text(
-                    text = Money.format(end.balanceMinor),
+                    text = when {
+                        !owed -> Money.format(figure)
+                        figure < 0L -> "${Money.format(-figure)} in credit"
+                        else -> "${Money.format(figure)} owed"
+                    },
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (end.balanceMinor < 0L) FinanceTheme.colors.negative else MaterialTheme.colorScheme.onSurface,
+                    color = when {
+                        owed -> colors.card
+                        figure < 0L -> colors.negative
+                        else -> MaterialTheme.colorScheme.onSurface
+                    },
                 )
             }
         }
@@ -516,12 +552,15 @@ private fun MonthEndsCard(ends: List<MonthEnd>) {
 private const val MONTH_ENDS_LISTED = 6
 
 @Composable
-private fun PaymentRow(item: TransactionWithDetails, accountId: Long, onClick: () -> Unit) {
+private fun PaymentRow(item: TransactionWithDetails, accountId: Long, owed: Boolean, onClick: () -> Unit) {
     val entry = item.transaction
     val colors = FinanceTheme.colors
     // A move into this account is money in here, whichever way it is stored.
     val isIn = entry.type == TransactionType.INCOME ||
         (entry.type == TransactionType.TRANSFER && entry.transferAccountId == accountId)
+    // Money in on a card is it being paid off: yellow, so it isn't taken for
+    // income. Spending on it stays red — it adds to what's owed.
+    val paidOff = owed && isIn && item.categoryName != REFUNDS
     Row(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -531,7 +570,12 @@ private fun PaymentRow(item: TransactionWithDetails, accountId: Long, onClick: (
         Column(modifier = Modifier.weight(1f)) {
             Text(entry.description, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                text = listOfNotNull(DateUtils.formatShort(entry.date), item.regularKind?.shortName, item.categoryName).joinToString(" · "),
+                text = listOfNotNull(
+                    DateUtils.formatShort(entry.date),
+                    "Paid off".takeIf { paidOff },
+                    item.regularKind?.shortName,
+                    item.categoryName,
+                ).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -539,10 +583,17 @@ private fun PaymentRow(item: TransactionWithDetails, accountId: Long, onClick: (
         Text(
             text = (if (isIn) "+" else "−") + Money.format(entry.amountMinor),
             style = MaterialTheme.typography.bodyMedium,
-            color = if (isIn) colors.income else colors.expense,
+            color = when {
+                paidOff -> colors.card
+                isIn -> colors.income
+                else -> colors.expense
+            },
         )
     }
 }
+
+/** Money back from a shop on a card is a refund, not the card being paid off. */
+private const val REFUNDS = "Refunds"
 
 /** Loans and mortgages: borrowing paid off month by month. */
 private val LOAN_TYPES = setOf(

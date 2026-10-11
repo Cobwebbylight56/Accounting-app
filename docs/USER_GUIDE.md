@@ -558,9 +558,11 @@ Which way the money went is taken from, strongest first:
 
 On a card it's the other way round: a minus is a payment or refund.
 
-This second reader is only used when the usual one can't make sense of the
-statement, so statements that already read well (Nationwide, Lloyds) read
-exactly as before. If neither can read it, **Show what was read** shows the
+This second reader is only used when the usual one reads nothing at all, so
+statements that already read well (Nationwide, Lloyds, Capital One) read
+exactly as before. It only takes a line as a payment when it reads like a
+payee — not a sentence from the small print, a greeting ("Dear Mr …"), or
+your name and address. If neither can read it, **Show what was read** shows the
 text so the layout can be added.
 
 ### Credit card statements (Capital One, Zopa and others)
@@ -577,6 +579,23 @@ for:
 * Lines that only add up a column ("STATEMENT TOTALS") aren't payments. A
   "Previous balance" printed under the transactions is where they started
   from, not where they ended.
+* "Direct Debit Payment – Thank You", "Payment received – thank you" and the
+  like are you paying the card off: money in on the card, filed under
+  **Transfers & payments** so it isn't counted as income.
+
+#### Paying a card off, and the card's page
+
+On a card's page, spending on it is **red** — it adds to what you owe — and
+paying it off is **yellow**, marked **Paid off**. The top shows what's owed
+("£130.89 owed") and what's left to spend of the limit, and the month-end
+graph is what was owed at the end of each month, in yellow.
+
+The payment usually shows on both statements: money out of your bank to the
+card, and money in on the card. With both imported, it counts once — as money
+moved from the bank to the card, so it's neither spending nor income (the
+spending was counted when the card was used). This is checked after every
+import and whenever Home opens, whichever statement came in first. If you
+undo the bank statement's import, the card keeps its payment.
 
 ### Statements printed newest first (Lloyds and others)
 

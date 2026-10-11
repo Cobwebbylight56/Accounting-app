@@ -170,6 +170,16 @@ class MerchantCategoriserTest {
     }
 
     @Test
+    fun `paying a credit card off is a transfer, not income`() {
+        val transfers = MerchantCategoriser.PEOPLE_IN
+        assertEquals(transfers, categoryFor("Direct Debit Payment - Thank You", INCOME))
+        assertEquals(transfers, categoryFor("PAYMENT RECEIVED - THANK YOU", INCOME))
+        assertEquals(transfers, categoryFor("Thank you for your payment", INCOME))
+        // A refund on the card is still a refund.
+        assertEquals("Refunds", categoryFor("REFUND AMAZON", INCOME))
+    }
+
+    @Test
     fun `what you decided before beats the built-in guess`() {
         // Sainsbury's is groceries by default, but this one was filed as Fuel
         // and should stay there on every later import.

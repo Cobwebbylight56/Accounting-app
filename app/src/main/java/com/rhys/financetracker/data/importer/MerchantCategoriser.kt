@@ -27,7 +27,7 @@ object MerchantCategoriser {
      * app re-sorts everything it filed by itself — never anything the user
      * filed — so old payments follow the improved rules too.
      */
-    const val RULES_VERSION = 3
+    const val RULES_VERSION = 4
 
     /**
      * The category for [description], or null when nothing matches.
@@ -435,10 +435,16 @@ object MerchantCategoriser {
         rule("Selling", "vinted", "depop", "gumtree", "facebook mktp", "ebay payout"),
         // Money a person sent: "Bank credit H Payne", "Faster payment from J
         // Smith". Last, so wages, benefits and refunds are named first.
+        //
+        // And a credit card being paid off, as its own statement words it:
+        // "Direct Debit Payment - Thank You". The money came from another of
+        // the household's accounts, so it isn't income.
         rule(
             PEOPLE_IN,
             "bank credit", "faster payment from", "faster payment received", "fp from", "payment from",
             "transfer from", "credit from", "received from", "mobile payment from",
+            "payment thank you", "payment received thank you", "thank you for your payment", "payment thankyou",
+            "card repayment",
         ),
     )
 

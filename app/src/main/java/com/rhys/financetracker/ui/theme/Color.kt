@@ -108,6 +108,11 @@ data class FinanceColors(
     val positive: Color,
     val negative: Color,
     val neutral: Color,
+    /**
+     * A credit card being paid off, and what's owed on one: yellow, so paying
+     * the card isn't mistaken for money coming in, nor spending for a bill.
+     */
+    val card: Color,
     /** Series colours for charts, in the order they should be used. */
     val chartSeries: List<Color>,
     /**
@@ -145,6 +150,7 @@ data class FinanceColors(
             positive = Color(0xFF1B7A4B),
             negative = Color(0xFFB3261E),
             neutral = Color(0xFF5F6B66),
+            card = Color(0xFF856700),
             chartSeries = listOf(
                 Color(0xFF1B5E4B), Color(0xFF0277BD), Color(0xFFAD1457), Color(0xFFEF6C00),
                 Color(0xFF5E35B1), Color(0xFF00838F), Color(0xFF558B2F), Color(0xFFC62828),
@@ -177,6 +183,7 @@ data class FinanceColors(
             positive = Color(0xFF6FD79B),
             negative = Color(0xFFFFB4AB),
             neutral = Color(0xFFA5B0AB),
+            card = Color(0xFFF2C94C),
             chartSeries = listOf(
                 Color(0xFF6FD79B), Color(0xFF7EC8F0), Color(0xFFF48FB1), Color(0xFFFFB74D),
                 Color(0xFFB39DDB), Color(0xFF7ED6DE), Color(0xFFAED581), Color(0xFFEF9A9A),
