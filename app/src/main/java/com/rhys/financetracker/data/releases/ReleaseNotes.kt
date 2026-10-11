@@ -22,6 +22,18 @@ object ReleaseNotes {
     /** Every release, newest first. */
     val ALL: List<Release> = listOf(
         Release(
+            "1.58.0", LocalDate.of(2026, 10, 11), "Subscriptions that end, and cards on the charts",
+            listOf(
+                "Subscriptions that have stopped or been cancelled are hidden, like Uber One. A line at the bottom shows them if you want.",
+                "Tap a subscription to say when it started and how long it's for. The app works out when it ends and shows how many payments are left. \"I've cancelled it\" hides it straight away.",
+                "Audible on the Zopa card shows as still being paid. A payment read a year ahead had made the card's statements look as if they ran to December.",
+                "Card spending an older version read as money in, like Audible in May and June, is turned back into spending.",
+                "Spending → Month by month splits money out into the bank (red), credit cards (yellow) and subscriptions (purple). Categories over time always has a line for subscriptions.",
+                "Bills & subscriptions shows each subscription as its own colour in the monthly bars.",
+                "A card's page has a Spent and paid off chart: spending in yellow, paying it off in green.",
+            ),
+        ),
+        Release(
             "1.57.0", LocalDate.of(2026, 10, 11), "Credit in yellow, paid off in green",
             listOf(
                 "Anything spent on a credit card is yellow, so it stands apart from spending from your current account, which stays red. That's on the card's page, in Money, on Home and on the payment itself.",

@@ -321,6 +321,7 @@ private fun TilesView(shown: List<CategoryTotal>, onOpen: (CategoryTotal) -> Uni
  * Money in and out month by month, as a line graph, bars or a list.
  * [selected] is the month to pick out; tapping one calls [onMonth].
  */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun MonthTrend(
     points: List<MonthPoint>,
@@ -350,13 +351,29 @@ fun MonthTrend(
                     Spacer(Modifier.width(10.dp))
                     Text("−" + Money.format(point.expenseMinor), color = colors.expense, style = MaterialTheme.typography.bodySmall)
                 }
+                if (point.isSplit) {
+                    Text(
+                        text = listOfNotNull(
+                            "bank ${Money.format(point.bankMinor)}",
+                            point.cardMinor.takeIf { it > 0L }?.let { "cards ${Money.format(it)}" },
+                            point.subscriptionsMinor.takeIf { it > 0L }?.let { "subscriptions ${Money.format(it)}" },
+                        ).joinToString(" · "),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                    )
+                }
             }
         } else if (view == BreakdownView.LINE || view == BreakdownView.RUNNING) {
             TrendLineChart(
                 labels = points.map { DateUtils.monthNameShort(it.yearMonth.monthValue) },
-                series = listOf(
+                series = listOfNotNull(
                     LineSeries("Money in", points.map { it.incomeMinor }, colors.chartIn, dashed = true, marker = MarkerShape.SQUARE),
                     LineSeries("Money out", points.map { it.expenseMinor }, colors.chartOut),
+                    LineSeries("On credit cards", points.map { it.cardMinor }, colors.card).takeIf { points.any { it.cardMinor > 0L } },
+                    LineSeries("Subscriptions", points.map { it.subscriptionsMinor }, colors.subscriptions)
+                        .takeIf { points.any { it.subscriptionsMinor > 0L } },
                 ),
                 selectedIndex = points.indexOfFirst { it.yearMonth == selected }.takeIf { it >= 0 },
                 onPointClick = onMonth?.let { open -> { index: Int -> points.getOrNull(index)?.let { open(it.yearMonth) } } },
@@ -368,7 +385,22 @@ fun MonthTrend(
                         label = DateUtils.monthNameShort(point.yearMonth.monthValue),
                         bars = listOf(
                             ChartEntry("In", point.incomeMinor.toFloat(), colors.chartIn, Money.format(point.incomeMinor)),
-                            ChartEntry("Out", point.expenseMinor.toFloat(), colors.chartOut, Money.format(point.expenseMinor)),
+                            ChartEntry(
+                                label = "Out",
+                                value = point.expenseMinor.toFloat(),
+                                color = colors.chartOut,
+                                displayValue = Money.format(point.expenseMinor),
+                                // From the bank at the bottom, then cards, then subscriptions.
+                                segments = if (point.isSplit) {
+                                    listOf(
+                                        ChartEntry("Bank", point.bankMinor.toFloat(), colors.chartOut, Money.format(point.bankMinor)),
+                                        ChartEntry("Credit cards", point.cardMinor.toFloat(), colors.card, Money.format(point.cardMinor)),
+                                        ChartEntry("Subscriptions", point.subscriptionsMinor.toFloat(), colors.subscriptions, Money.format(point.subscriptionsMinor)),
+                                    ).filter { it.value > 0f }
+                                } else {
+                                    emptyList()
+                                },
+                            ),
                         ),
                     )
                 },
@@ -383,7 +415,7 @@ fun MonthTrend(
                 },
             )
             Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     ColorDot(colors.chartIn)
                     Spacer(Modifier.width(6.dp))
@@ -392,7 +424,21 @@ fun MonthTrend(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     ColorDot(colors.chartOut)
                     Spacer(Modifier.width(6.dp))
-                    Text("Money out", style = MaterialTheme.typography.bodySmall)
+                    Text(if (points.any { it.isSplit }) "Bank" else "Money out", style = MaterialTheme.typography.bodySmall)
+                }
+                if (points.any { it.cardMinor > 0L }) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        ColorDot(colors.card)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Cards", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                if (points.any { it.subscriptionsMinor > 0L }) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        ColorDot(colors.subscriptions)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Subscriptions", style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             }
         }

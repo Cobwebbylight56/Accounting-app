@@ -78,6 +78,7 @@ class SettingsRepository @Inject constructor(
         val LIVE_ALERT_SEEN = stringSetPreferencesKey("live_alert_seen")
         val LIVE_ALERT_LAST = stringPreferencesKey("live_alert_last")
         val LIVE_ALERT_LOG = stringPreferencesKey("live_alert_log")
+        val SUBSCRIPTION_PLANS = stringPreferencesKey("subscription_plans")
         val LIVE_LISTENER_AT = longPreferencesKey("live_listener_at")
         val LIVE_TEST_HEARD = longPreferencesKey("live_test_heard")
         val LAST_SEEN_VERSION = stringPreferencesKey("last_seen_version")
@@ -175,6 +176,7 @@ class SettingsRepository @Inject constructor(
             setupChecklistHidden = prefs[Keys.SETUP_HIDDEN] ?: false,
             needsLookSnoozedUntil = prefs[Keys.NEEDS_LOOK_SNOOZED_UNTIL],
             liveAlertLog = LiveAlertLogEntry.parse(prefs[Keys.LIVE_ALERT_LOG]),
+            subscriptionPlans = com.rhys.financetracker.data.importer.SubscriptionPlan.parse(prefs[Keys.SUBSCRIPTION_PLANS]),
             liveListenerAt = prefs[Keys.LIVE_LISTENER_AT],
             liveTestHeardAt = prefs[Keys.LIVE_TEST_HEARD],
         )
@@ -217,6 +219,14 @@ class SettingsRepository @Inject constructor(
     /** Who the Shared tab on Home covers; see [AppSettings.sharedPeopleIds]. */
     suspend fun setSharedPeople(ids: Set<Long>) =
         put(Keys.SHARED_PEOPLE, ids.sorted().joinToString(","))
+
+    /** Keeps what was said about one subscription, in place of anything said before. */
+    suspend fun saveSubscriptionPlan(plan: com.rhys.financetracker.data.importer.SubscriptionPlan) {
+        context.dataStore.edit { prefs ->
+            val plans = com.rhys.financetracker.data.importer.SubscriptionPlan.parse(prefs[Keys.SUBSCRIPTION_PLANS]) + (plan.key to plan)
+            prefs[Keys.SUBSCRIPTION_PLANS] = com.rhys.financetracker.data.importer.SubscriptionPlan.write(plans.values)
+        }
+    }
 
     /** Forgets the 1.34 list of payees the user filed, once it has been turned into marks. */
     suspend fun clearCategoryPayeesChosen() {
@@ -461,6 +471,8 @@ data class AppSettings(
     val needsLookSnoozedUntil: Long? = null,
     /** What the alert reader heard lately from banking apps and what came of it, newest first. */
     val liveAlertLog: List<LiveAlertLogEntry> = emptyList(),
+    /** When each subscription started, how long it runs or that it was cancelled, by its key. */
+    val subscriptionPlans: Map<String, com.rhys.financetracker.data.importer.SubscriptionPlan> = emptyMap(),
     /** When Android last connected the alert reader (epoch millis). */
     val liveListenerAt: Long? = null,
     /** When the alert reader last heard the test alert (epoch millis). */

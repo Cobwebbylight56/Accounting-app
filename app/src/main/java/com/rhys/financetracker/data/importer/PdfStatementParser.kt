@@ -109,12 +109,12 @@ object PdfStatementParser {
     }
 
     /** Every transaction line found in [lines], in the order they appear. */
-    fun parse(lines: List<String>): List<Row> {
+    fun parse(lines: List<String>, today: LocalDate = LocalDate.now()): List<Row> {
         val documentYear = inferYear(lines)
         // On a card the balance is what is owed: it goes up when money is
         // spent, the other way round from a current account.
         val card = CARD_STATEMENT.containsMatchIn(lines.joinToString(" "))
-        val read = rollBackYearEnd(readLinesHowever(lines, documentYear), documentYear)
+        val read = rollBackYearEnd(readLinesHowever(lines, documentYear), documentYear, today)
         if (read.isEmpty()) return emptyList()
 
         // Where the money columns sit. Right-aligned, so grouping the end
@@ -245,20 +245,27 @@ object PdfStatementParser {
      * belongs to the year before; rows that carried their own year are left
      * exactly as the bank wrote them.
      */
-    private fun rollBackYearEnd(read: List<ReadLine>, fallbackYear: Int?): List<ReadLine> {
-        if (fallbackYear == null || read.size < 2) return read
+    private fun rollBackYearEnd(read: List<ReadLine>, fallbackYear: Int?, today: LocalDate): List<ReadLine> {
+        if (fallbackYear == null) return read
         val wrap = (0 until read.size - 1).firstOrNull { index ->
             read[index].date.toEpochDay() - read[index + 1].date.toEpochDay() > YEAR_WRAP_DAYS
-        } ?: return read
+        } ?: -1
 
         return read.mapIndexed { index, line ->
-            if (index <= wrap && line.date.year == fallbackYear) {
+            // Rows before the year end — and any the guess put in the future:
+            // a statement of only December's rows, printed in January,
+            // names only the new year, so "15 Dec" came out as next December.
+            val guessed = line.date.year == fallbackYear
+            if (guessed && (index <= wrap || line.date.isAfter(today.plusDays(FUTURE_SLACK_DAYS)))) {
                 line.copy(date = line.date.minusYears(1))
             } else {
                 line
             }
         }
     }
+
+    /** A day's grace either side of midnight before a date counts as still to come. */
+    private const val FUTURE_SLACK_DAYS = 1L
 
     /** A step backwards of more than this is a year end rather than a stray row. */
     private const val YEAR_WRAP_DAYS = 180L

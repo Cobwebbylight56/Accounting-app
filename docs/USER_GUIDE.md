@@ -898,7 +898,9 @@ The second tab is all about where the money goes, for one month at a time
 * **How much was spent**, what came in, and how that compares with last month.
 * **Where it went** — every category, tap one to see its payments.
 * **Month by month** — money in against money out over six months; tap a month
-  to look at it.
+  to look at it. Money out is split into three: spending from the bank (red),
+  on credit cards (yellow) and subscriptions (purple), whichever account
+  paid them.
 * **Who it went to** — the ten biggest payees; tap one to see their payments.
 
 More graphs further down the Spending tab:
@@ -907,7 +909,8 @@ More graphs further down the Spending tab:
   before, and whether you're ahead or behind by this day.
 * **Everyone's spending** — a line for each person, month by month, so the
   whole household is on one graph (when the tab is showing Everyone).
-* **Categories over time** — your five biggest categories over six months.
+* **Categories over time** — your five biggest categories over six months,
+  and always a line for subscriptions, however small.
 
 **The button in each card's top corner changes how it's drawn**: a line graph
 (month-by-month cards — tap or slide along it to read a month), a chart, bars
@@ -987,10 +990,21 @@ it was paid in, so a gap stands out, and says which account or card pays it.
 * **Still being paid** — paid on time up to your latest statement.
 * **Missed a payment — may have stopped** — one payment due hasn't appeared.
   Worth checking it was cancelled, and not just moved to another card.
-* **Stopped** — two or more missed.
+
+Ones that have **stopped** (two or more payments missed), been **cancelled**,
+or come to the end of their length are hidden. A line at the bottom says how
+many, and shows them if you tap it.
 
 It's judged against the latest statement you've imported for each account, so
-a card you haven't imported lately doesn't make everything on it look stopped.
+a card you haven't imported lately doesn't make everything on it look stopped,
+and never against a date still to come.
+
+**Tap one to say when it started and how long it's for**: until you cancel
+it, or 1, 3, 6, 12, 18 or 24 months. The app works out when it ends and shows
+"Ends 5 Jan 2027 · 2 more payments" on it. Ones not yet told ask "When did it
+start, and how long is it for?". **I've cancelled it** hides it straight away;
+**It's still going** brings a hidden one back. **See its payments** opens them
+all in Money.
 
 **One payment, one row.** Banks change what they call a payee, for example
 "VIRGIN MEDIA" for a while and then "VIRGIN MEDIA PYMTS", or "SKY UK LTD"
@@ -1006,15 +1020,17 @@ already set up under a slightly different name: it isn't suggested again.
 When a bill's price changes, the copy the app added on its day (at the old
 price) is still matched to the statement's line, which puts in the new
 amount, so the month doesn't count the bill twice.
-The total at the top is what the ones still going cost a month and a year, and
-the graph shows what they came to each month. Tap one to see every payment.
+The total at the top is what the ones still going cost a month and a year. The
+graph shows what they came to each month, each one its own colour in the bar,
+so a new one or a price rise shows.
 
 ### Credit cards
 
 **Accounts → Credit cards** shows each credit card and pay-later account: what's
 owed, how much of the limit that is (amber past three-quarters), what went on
 it this month and last, a graph of what was owed at each month end, and the
-subscriptions it pays. **Import statement** imports that card's statement
+subscriptions it pays. A card's own page has **Spent and paid off**: each
+month's spending on it in yellow beside what paid it off in green. **Import statement** imports that card's statement
 straight into it. If a card's statement reads the wrong way round, use **Copy
 read text** on the import screen and send it in.
 

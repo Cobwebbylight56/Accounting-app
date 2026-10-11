@@ -86,6 +86,24 @@ class CardStatementTest {
     }
 
     @Test
+    fun `a statement of December's rows printed in January dates them last December`() {
+        // Only the new year is written anywhere, so the guess for "15 Dec"
+        // was next December — in the future — and every subscription on the
+        // card looked stopped, judged against a day that hasn't come.
+        val rows = PdfStatementParser.parse(
+            listOf(
+                "Statement date 3 January 2026",
+                "Credit limit £1,000.00",
+                "Date   Description                Amount",
+                "15 Dec AUDIBLE UK                  8.99",
+                "20 Dec AMAZON.CO.UK                24.50",
+            ),
+            today = LocalDate.of(2026, 1, 10),
+        )
+        assertEquals(listOf(LocalDate.of(2025, 12, 15), LocalDate.of(2025, 12, 20)), rows.map { it.date })
+    }
+
+    @Test
     fun `a two-digit year is only read from a whole date`() {
         // "26 Jan 130.89" is a date and an amount, with no year in it.
         assertNull(PdfStatementParser.inferYear(listOf("27 Jan EBAY on 26 Jan 130.89"), thisYear = 2026))

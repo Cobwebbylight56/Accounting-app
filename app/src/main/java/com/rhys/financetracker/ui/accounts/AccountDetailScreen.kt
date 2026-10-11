@@ -65,7 +65,10 @@ import com.rhys.financetracker.data.repository.TransactionRepository
 import com.rhys.financetracker.domain.loan.LoanMaths
 import com.rhys.financetracker.domain.model.AccountType
 import com.rhys.financetracker.domain.model.TransactionType
+import com.rhys.financetracker.ui.components.BarGroup
+import com.rhys.financetracker.ui.components.ChartEntry
 import com.rhys.financetracker.ui.components.ColorDot
+import com.rhys.financetracker.ui.components.GroupedBarChart
 import com.rhys.financetracker.ui.components.LineSeries
 import com.rhys.financetracker.ui.components.SectionCard
 import com.rhys.financetracker.ui.components.TrendLineChart
@@ -83,6 +86,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
@@ -94,6 +100,9 @@ data class MonthCover(val month: YearMonth, val isIn: Boolean)
 /** A month's closing balance. */
 data class MonthEnd(val month: YearMonth, val balanceMinor: Long)
 
+/** A month on a credit card: what went on it, and what paid it off. */
+data class CardMonth(val month: YearMonth, val spentMinor: Long, val paidOffMinor: Long)
+
 data class AccountDetailState(
     val isLoading: Boolean = true,
     val account: AccountWithBalance? = null,
@@ -104,6 +113,8 @@ data class AccountDetailState(
     val monthEnds: List<MonthEnd> = emptyList(),
     /** For a loan or mortgage: what goes into it each month, from its regular payment or lately. */
     val monthlyPaymentMinor: Long? = null,
+    /** For a card: the last year of what was spent on it and paid off, oldest first. */
+    val cardMonths: List<CardMonth> = emptyList(),
     val message: String? = null,
 ) {
     /** True for borrowing that is paid off month by month. */
@@ -168,16 +179,27 @@ class AccountDetailViewModel @Inject constructor(
         (paid.sum() / 3).takeIf { it > 0L }
     }
 
+    /** For a card: each month's spending on it and what paid it off. */
+    private val cardMonths = account.map { it?.isLiability == true }.distinctUntilChanged().flatMapLatest { owed ->
+        if (!owed) return@flatMapLatest flowOf(emptyList<CardMonth>())
+        val thisMonth = DateUtils.currentYearMonth()
+        val first = thisMonth.minusMonths(MONTH_ENDS.toLong() - 1)
+        transactionRepository.search(TransactionFilter(accountIds = setOf(accountId), dateFrom = first.atDay(1)))
+            .map { rows -> cardMonthsOf(rows, accountId, first, thisMonth) }
+    }
+
+    private data class Extras(val months: List<String>, val ends: List<MonthEnd>, val payment: Long?, val card: List<CardMonth>)
+
     val state: StateFlow<AccountDetailState> = combine(
         account,
         transactionRepository.search(TransactionFilter(accountIds = setOf(accountId), limit = RECENT)),
         importHistory.observeForAccount(accountId),
-        combine(transactionDao.observeStatementMonths(accountId), monthEnds, loanPayment) { months, ends, payment ->
-            Triple(months, ends, payment)
+        combine(transactionDao.observeStatementMonths(accountId), monthEnds, loanPayment, cardMonths) { months, ends, payment, card ->
+            Extras(months, ends, payment, card)
         },
         message,
-    ) { current, recent, imports, monthsAndEnds, text ->
-        val (months, ends, payment) = monthsAndEnds
+    ) { current, recent, imports, extras, text ->
+        val (months, ends, payment, card) = extras
         AccountDetailState(
             isLoading = false,
             account = current,
@@ -186,6 +208,7 @@ class AccountDetailViewModel @Inject constructor(
             coverage = coverageOf(months.mapNotNull { DateUtils.parseYearMonthKey(it) }),
             monthEnds = ends,
             monthlyPaymentMinor = payment,
+            cardMonths = card,
             message = text,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AccountDetailState())
@@ -214,6 +237,24 @@ class AccountDetailViewModel @Inject constructor(
         private const val RECENT = 30
         private const val MONTH_ENDS = 12
         private const val COVERAGE_MONTHS = 12L
+
+        /** Each month from [first] to [last]: spent on card [cardId], and paid off — on it or moved into it. */
+        fun cardMonthsOf(rows: List<TransactionWithDetails>, cardId: Long, first: YearMonth, last: YearMonth): List<CardMonth> {
+            val byMonth = rows.filterNot { it.transaction.isArchived }.groupBy { YearMonth.from(it.transaction.date) }
+            return generateSequence(first) { it.plusMonths(1) }.takeWhile { !it.isAfter(last) }.map { month ->
+                val inMonth = byMonth[month].orEmpty()
+                CardMonth(
+                    month = month,
+                    spentMinor = inMonth.filter { it.transaction.accountId == cardId && it.transaction.type == TransactionType.EXPENSE }
+                        .sumOf { it.transaction.amountMinor },
+                    paidOffMinor = inMonth.filter { row ->
+                        val entry = row.transaction
+                        (entry.type == TransactionType.INCOME && entry.accountId == cardId && row.paysOffCredit) ||
+                            (entry.type == TransactionType.TRANSFER && entry.transferAccountId == cardId)
+                    }.sumOf { it.transaction.amountMinor },
+                )
+            }.toList()
+        }
 
         /**
          * The last year of months, each marked in or missing — starting no
@@ -312,6 +353,10 @@ fun AccountDetailScreen(
                         onEdit = { onEdit(account.account.id) },
                     )
                 }
+            }
+
+            if (state.isOwed && state.cardMonths.any { it.spentMinor > 0L || it.paidOffMinor > 0L }) {
+                item { CardMonthsCard(state.cardMonths) }
             }
 
             item { StatementsCard(state = state, onUndo = { undoing = it }) }
@@ -550,6 +595,53 @@ private fun MonthEndsCard(ends: List<MonthEnd>, owed: Boolean) {
 
 /** The graph covers the year; the list under it, the latest few. */
 private const val MONTH_ENDS_LISTED = 6
+
+/**
+ * A card's year, month by month: what went on it, in yellow, beside what
+ * paid it off, in green.
+ */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun CardMonthsCard(months: List<CardMonth>) {
+    val colors = FinanceTheme.colors
+    SectionCard(title = "Spent and paid off", subtitle = "On this card, month by month") {
+        GroupedBarChart(
+            groups = months.map { month ->
+                BarGroup(
+                    label = DateUtils.monthNameShort(month.month.monthValue),
+                    bars = listOf(
+                        ChartEntry("Spent", month.spentMinor.toFloat(), colors.card, Money.format(month.spentMinor)),
+                        ChartEntry("Paid off", month.paidOffMinor.toFloat(), colors.income, Money.format(month.paidOffMinor)),
+                    ),
+                )
+            },
+            height = 170.dp,
+        )
+        Spacer(Modifier.height(8.dp))
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ColorDot(colors.card)
+                Spacer(Modifier.width(6.dp))
+                Text("Spent", style = MaterialTheme.typography.bodySmall)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ColorDot(colors.income)
+                Spacer(Modifier.width(6.dp))
+                Text("Paid off", style = MaterialTheme.typography.bodySmall)
+            }
+        }
+        val latest = months.lastOrNull { it.spentMinor > 0L || it.paidOffMinor > 0L }
+        if (latest != null) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = "${DateUtils.formatMonth(latest.month)}: ${Money.format(latest.spentMinor)} spent, " +
+                    "${Money.format(latest.paidOffMinor)} paid off",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
 
 @Composable
 private fun PaymentRow(item: TransactionWithDetails, accountId: Long, onClick: () -> Unit) {

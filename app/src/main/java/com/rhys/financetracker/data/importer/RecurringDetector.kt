@@ -33,6 +33,8 @@ object RecurringDetector {
         val date: LocalDate,
         val categoryName: String?,
         val accountId: Long,
+        /** The entry it came from, when there is one. */
+        val id: Long = 0L,
     )
 
     /** A bill that is already set up, so it is not suggested again. */

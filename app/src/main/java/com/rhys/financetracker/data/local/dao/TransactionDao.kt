@@ -759,7 +759,7 @@ interface TransactionDao {
     @Query(
         """
         SELECT t.description AS description, t.amount_minor AS amount_minor, t.date AS date,
-               c.name AS category_name, t.account_id AS account_id
+               c.name AS category_name, t.account_id AS account_id, t.id AS id
         FROM transactions t
         LEFT JOIN categories c ON c.id = t.category_id
         WHERE t.is_archived = 0 AND t.type = 'EXPENSE' AND t.recurring_rule_id IS NULL
@@ -1190,6 +1190,10 @@ interface TransactionDao {
 
     @Query("UPDATE transactions SET is_confirmed = 1, updated_at = :updatedAt WHERE id = :id")
     suspend fun confirm(id: Long, updatedAt: Long)
+
+    /** Rows from statements dated after [day]: a statement can't hold a payment still to come. */
+    @Query("SELECT * FROM transactions WHERE is_archived = 0 AND source = 'STATEMENT' AND date > :day")
+    suspend fun statementRowsAfter(day: LocalDate): List<TransactionEntity>
 
     /** Every entry held from [from] on, for finding a card payment held twice. */
     @Query("SELECT * FROM transactions WHERE is_archived = 0 AND date >= :from")

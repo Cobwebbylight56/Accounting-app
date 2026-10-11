@@ -59,6 +59,11 @@ data class ChartEntry(
     val color: Color,
     /** Pre-formatted for the legend and the accessibility description. */
     val displayValue: String,
+    /**
+     * For a bar: the parts it is made of, stacked from the bottom in their own
+     * colours — money out as bank, card and subscriptions. Empty draws it whole.
+     */
+    val segments: List<ChartEntry> = emptyList(),
 )
 
 /**
@@ -320,7 +325,13 @@ fun GroupedBarChart(
     val reveal = rememberReveal(groups.flatMap { group -> group.bars.map { it.value } })
 
     val description = "Bar chart. " + groups.joinToString("; ") { group ->
-        group.label + ": " + group.bars.joinToString(", ") { "${it.label} ${it.displayValue}" }
+        group.label + ": " + group.bars.joinToString(", ") { bar ->
+            "${bar.label} ${bar.displayValue}" + if (bar.segments.isEmpty()) {
+                ""
+            } else {
+                bar.segments.joinToString(", ", prefix = " (", postfix = ")") { "${it.label} ${it.displayValue}" }
+            }
+        }
     } + if (onGroupClick != null) ". Tap a column to open that month." else ""
 
     Column(modifier = modifier.semantics { contentDescription = description }) {
@@ -369,14 +380,31 @@ fun GroupedBarChart(
                     )
                 }
                 val groupStart = groupIndex * groupWidth + (groupWidth - barWidth * barCount) / 2f
+                val alpha = if (selectedIndex == null || isSelected) 1f else 0.5f
                 group.bars.forEachIndexed { barIndex, bar ->
-                    val barHeight = (abs(bar.value) / maxValue) * (bottom - 8f) * reveal
-                    drawRect(
-                        color = bar.color,
-                        topLeft = Offset(groupStart + barIndex * barWidth, bottom - barHeight),
-                        size = Size(barWidth * 0.86f, barHeight),
-                        alpha = if (selectedIndex == null || isSelected) 1f else 0.5f,
-                    )
+                    val left = groupStart + barIndex * barWidth
+                    if (bar.segments.isEmpty()) {
+                        val barHeight = (abs(bar.value) / maxValue) * (bottom - 8f) * reveal
+                        drawRect(
+                            color = bar.color,
+                            topLeft = Offset(left, bottom - barHeight),
+                            size = Size(barWidth * 0.86f, barHeight),
+                            alpha = alpha,
+                        )
+                    } else {
+                        // Each part on top of the one before, from the baseline up.
+                        var top = bottom
+                        bar.segments.forEach { part ->
+                            val partHeight = (abs(part.value) / maxValue) * (bottom - 8f) * reveal
+                            drawRect(
+                                color = part.color,
+                                topLeft = Offset(left, top - partHeight),
+                                size = Size(barWidth * 0.86f, partHeight),
+                                alpha = alpha,
+                            )
+                            top -= partHeight
+                        }
+                    }
                 }
 
                 // Month label under each group, drawn with the platform canvas

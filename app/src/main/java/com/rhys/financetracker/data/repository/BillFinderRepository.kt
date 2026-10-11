@@ -16,6 +16,7 @@ import com.rhys.financetracker.domain.model.RecurrenceMode
 import com.rhys.financetracker.domain.model.TransactionType
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.first
 
 /**
  * Finds the bills in what has been imported, and sets up the ones chosen.
@@ -28,6 +29,7 @@ class BillFinderRepository @Inject constructor(
     private val recurringRuleDao: RecurringRuleDao,
     private val categoryDao: CategoryDao,
     private val accountDao: AccountDao,
+    private val settingsRepository: com.rhys.financetracker.data.prefs.SettingsRepository,
 ) {
 
     /**
@@ -36,7 +38,8 @@ class BillFinderRepository @Inject constructor(
      * [com.rhys.financetracker.data.importer.SubscriptionTracker].
      */
     suspend fun subscriptions(): List<com.rhys.financetracker.data.importer.SubscriptionTracker.Subscription> {
-        val since = DateUtils.today().minusDays(LOOK_BACK_DAYS)
+        val today = DateUtils.today()
+        val since = today.minusDays(LOOK_BACK_DAYS)
         val payments = transactionDao.paymentsOutSince(since, null).map {
             RecurringDetector.Payment(
                 description = it.description,
@@ -44,9 +47,16 @@ class BillFinderRepository @Inject constructor(
                 date = it.date,
                 categoryName = it.categoryName,
                 accountId = it.accountId,
+                id = it.id,
             )
         }
-        return com.rhys.financetracker.data.importer.SubscriptionTracker.track(payments)
+        val plans = settingsRepository.settings.first().subscriptionPlans
+        return com.rhys.financetracker.data.importer.SubscriptionTracker.track(payments, plans, today)
+    }
+
+    /** Remembers when a subscription started, how long it runs, or that it was cancelled. */
+    suspend fun savePlan(plan: com.rhys.financetracker.data.importer.SubscriptionPlan) {
+        settingsRepository.saveSubscriptionPlan(plan)
     }
 
     /** Regular payments on [accountId] (every account when null) not yet set up as bills. */

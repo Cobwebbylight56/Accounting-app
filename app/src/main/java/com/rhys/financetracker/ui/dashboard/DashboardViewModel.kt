@@ -87,6 +87,7 @@ class DashboardViewModel @Inject constructor(
     private val payeeRepository: PayeeRepository,
     private val tidyUp: com.rhys.financetracker.data.repository.TidyUpRepository,
     private val repayments: com.rhys.financetracker.data.repository.RepaymentRepository,
+    private val repairs: com.rhys.financetracker.data.repository.StatementRepairRepository,
 ) : ViewModel() {
 
     /** Which tab is picked; null until somebody picks, meaning the first person. */
@@ -202,7 +203,9 @@ class DashboardViewModel @Inject constructor(
         viewModelScope.launch {
             // Wages found in what was paid in are set up by themselves, and
             // take-home put right from them — nothing to type.
-            // A card paid off from the bank, with both statements in, counts once.
+            // Dates and card spending older versions misread, put right; and a
+            // card paid off from the bank, with both statements in, counts once.
+            runCatching { repairs.putRight() }
             runCatching { repayments.countOnce() }
             val found = runCatching { incomeRepository.findWages() }.getOrDefault(emptyList())
             if (found.isNotEmpty()) message.value = found.joinToString(". ") + "."

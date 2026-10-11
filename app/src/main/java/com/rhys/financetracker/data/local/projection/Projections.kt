@@ -210,6 +210,7 @@ data class PaymentOut(
     @ColumnInfo(name = "date") val date: LocalDate,
     @ColumnInfo(name = "category_name") val categoryName: String?,
     @ColumnInfo(name = "account_id") val accountId: Long,
+    @ColumnInfo(name = "id") val id: Long = 0L,
 )
 
 /** A transfer touching an account, used to learn which payee goes where. */

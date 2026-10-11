@@ -15,7 +15,12 @@ import java.time.temporal.ChronoUnit
  *
  * "Missing" is judged against the latest statement read for that account,
  * not today's date: a card whose statement has not been imported yet would
- * otherwise show every subscription on it as stopped.
+ * otherwise show every subscription on it as stopped. Never later than
+ * today, though: a row dated in the future is a misread date, not a
+ * statement from next year.
+ *
+ * What you told the app — when one started and how long it runs, or that
+ * you cancelled it — decides when it ends; see [SubscriptionPlan].
  */
 object SubscriptionTracker {
 
@@ -23,6 +28,13 @@ object SubscriptionTracker {
         ACTIVE("Still being paid"),
         MISSED("Missed a payment — may have stopped"),
         STOPPED("Stopped"),
+
+        /** Cancelled, or its length has run out. */
+        ENDED("Ended"),
+        ;
+
+        /** Still worth showing: being paid, or a payment missed that may mean it has stopped. */
+        val isGoing: Boolean get() = this == ACTIVE || this == MISSED
     }
 
     data class Subscription(
@@ -40,7 +52,33 @@ object SubscriptionTracker {
         val accountId: Long,
         val categoryName: String?,
         val timesPaid: Int,
+        /** The first payment seen. */
+        val firstDate: LocalDate = lastDate,
+        /** What was paid each month, at the amounts really paid. */
+        val paidByMonth: Map<YearMonth, Long> = emptyMap(),
+        /** The entries that are its payments. */
+        val paymentIds: Set<Long> = emptySet(),
+        /** When it started, how long it runs or that it was cancelled, if you said. */
+        val plan: SubscriptionPlan? = null,
     ) {
+        val key: String get() = SubscriptionPlan.keyOf(name)
+
+        /** The day it ends, if you said when. */
+        val endsOn: LocalDate? get() = plan?.endsOn
+
+        /** How many more payments before it ends; null when it runs until cancelled. */
+        val paymentsLeft: Int?
+            get() {
+                val end = endsOn ?: return null
+                var due = nextDue
+                var count = 0
+                while (due.isBefore(end) && count < MAX_COUNTED) {
+                    count++
+                    due = step(due, frequency)
+                }
+                return count
+            }
+
         /** What it costs over a year at the latest amount. */
         val yearlyMinor: Long get() = amountMinor * paymentsPerYear(frequency)
 
@@ -55,9 +93,14 @@ object SubscriptionTracker {
      * The regular payments among [payments], most expensive first within
      * each status — still being paid, then missed, then stopped.
      */
-    fun track(payments: List<RecurringDetector.Payment>): List<Subscription> {
-        // The latest day each account's statements reach.
-        val coveredTo = payments.groupBy { it.accountId }.mapValues { (_, rows) -> rows.maxOf { it.date } }
+    fun track(
+        payments: List<RecurringDetector.Payment>,
+        plans: Map<String, SubscriptionPlan> = emptyMap(),
+        today: LocalDate = LocalDate.now(),
+    ): List<Subscription> {
+        // The latest day each account's statements reach — never past today.
+        val coveredTo = payments.groupBy { it.accountId }
+            .mapValues { (_, rows) -> minOf(rows.maxOf { it.date }, today) }
         return payments
             .filterNot { it.categoryName in NOT_SUBSCRIPTIONS }
             .filterNot { payment ->
@@ -65,11 +108,15 @@ object SubscriptionTracker {
             }
             .let(RecurringDetector::series)
             .mapNotNull { judge(it.key, it.payments, coveredTo) }
+            .map { found ->
+                val plan = plans[found.key] ?: return@map found
+                found.copy(plan = plan, status = if (plan.hasEnded(today)) Status.ENDED else found.status)
+            }
             .sortedWith(compareBy<Subscription> { it.status.ordinal }.thenByDescending { it.monthlyMinor })
     }
 
     private fun judge(key: String, group: List<RecurringDetector.Payment>, coveredTo: Map<Long, LocalDate>): Subscription? {
-        val sorted = group.sortedBy { it.date }
+        val sorted = group.sortedBy { it.date }.filterNot { it.date.isAfter(coveredTo[it.accountId] ?: it.date) }
         if (sorted.map { it.date }.distinct().size < 2) return null
         val frequency = RecurringDetector.intervalOf(sorted.map { it.date }) ?: return null
 
@@ -113,7 +160,21 @@ object SubscriptionTracker {
             accountId = last.accountId,
             categoryName = last.categoryName,
             timesPaid = sorted.size,
+            firstDate = sorted.first().date,
+            paidByMonth = sorted.groupBy { YearMonth.from(it.date) }.mapValues { (_, rows) -> rows.sumOf { it.amountMinor } },
+            paymentIds = sorted.map { it.id }.filter { it != 0L }.toSet(),
         )
+    }
+
+    /** The next payment after one on [date]. */
+    private fun step(date: LocalDate, frequency: Frequency): LocalDate = when (frequency) {
+        Frequency.WEEKLY -> date.plusWeeks(1)
+        Frequency.FORTNIGHTLY -> date.plusWeeks(2)
+        Frequency.FOUR_WEEKLY -> date.plusWeeks(4)
+        Frequency.QUARTERLY -> date.plusMonths(3)
+        Frequency.HALF_YEARLY -> date.plusMonths(6)
+        Frequency.YEARLY -> date.plusYears(1)
+        else -> date.plusMonths(1)
     }
 
     private fun daysOf(frequency: Frequency): Long = when (frequency) {
@@ -145,4 +206,7 @@ object SubscriptionTracker {
 
     /** How many months of dots each row shows. */
     const val MONTHS_SHOWN = 12
+
+    /** Enough to count a two-year contract's weekly payments. */
+    private const val MAX_COUNTED = 120
 }

@@ -47,6 +47,7 @@ import com.rhys.financetracker.data.repository.PeopleRepository
 import com.rhys.financetracker.data.repository.TransactionRepository
 import com.rhys.financetracker.domain.model.TransactionType
 import com.rhys.financetracker.domain.report.MonthPoint
+import com.rhys.financetracker.domain.report.SpendingSplit
 import com.rhys.financetracker.ui.components.BreakdownView
 import com.rhys.financetracker.ui.components.CATEGORY_VIEWS
 import com.rhys.financetracker.ui.components.CategoryBreakdown
@@ -71,6 +72,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 /** One payee's spending over the month. */
 data class PayeeTotal(val name: String, val totalMinor: Long, val count: Int)
@@ -120,10 +122,40 @@ class SpendingViewModel @Inject constructor(
     private val transactionRepository: TransactionRepository,
     peopleRepository: PeopleRepository,
     private val ledgerRequests: LedgerRequests,
+    private val billFinder: com.rhys.financetracker.data.repository.BillFinderRepository,
 ) : ViewModel() {
 
     private val month = MutableStateFlow(DateUtils.currentYearMonth())
     private val personId = MutableStateFlow<Long?>(null)
+
+    /** The entries that are subscription payments, found once from the statements. */
+    private val subscriptionIds = MutableStateFlow<Set<Long>>(emptySet())
+
+    init {
+        viewModelScope.launch {
+            subscriptionIds.value = runCatching { billFinder.subscriptions() }.getOrDefault(emptyList())
+                .filter { it.isSubscription }
+                .flatMap { it.paymentIds }
+                .toSet()
+        }
+    }
+
+    /**
+     * Each of the trend's months split: what went on credit cards and what
+     * subscriptions came to, as parts of money out.
+     */
+    private val split = combine(month, personId, subscriptionIds) { m, p, ids -> Triple(m, p, ids) }
+        .flatMapLatest { (m, p, ids) ->
+            val months = DateUtils.recentMonths(TREND_MONTHS, m)
+            transactionRepository.search(
+                TransactionFilter(
+                    types = setOf(TransactionType.EXPENSE),
+                    dateFrom = months.first().atDay(1),
+                    dateTo = months.last().atEndOfMonth(),
+                    personIds = p?.let { setOf(it) }.orEmpty(),
+                ),
+            ).map { rows -> SpendingSplit.byMonth(rows, ids) }
+        }
 
     private val people = peopleRepository.observeActive().map { list -> list.filterNot { it.isShared } }
 
@@ -171,8 +203,8 @@ class SpendingViewModel @Inject constructor(
         }
     }
 
-    val state: StateFlow<SpendingState> = combine(figures, people) { current, everyone ->
-        current.copy(people = everyone)
+    val state: StateFlow<SpendingState> = combine(figures, people, split) { current, everyone, parts ->
+        current.copy(people = everyone, trend = SpendingSplit.applied(current.trend, parts))
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SpendingState())
 
     /** Running totals by day, this month against last. */
@@ -241,14 +273,24 @@ class SpendingViewModel @Inject constructor(
             combine(byPerson, byCategory) { lines, categories -> Triple(months, lines, categories) }
         }
 
-    val graphs: StateFlow<SpendingGraphs> = combine(pace, overTime) { (days, now, before), (months, lines, categories) ->
+    val graphs: StateFlow<SpendingGraphs> = combine(pace, overTime, split) { (days, now, before), (months, lines, categories), parts ->
+        // Subscriptions always have a line, however small, whichever
+        // category each is filed under — in place of the category's own.
+        val subscriptions = months.map { parts[it]?.subscriptionsMinor ?: 0L }
+        val withSubscriptions = if (subscriptions.any { it > 0L }) {
+            val filed = categories.firstOrNull { it.name.equals(SUBSCRIPTIONS_LINE, ignoreCase = true) }
+            categories.filterNot { it === filed } +
+                GraphLine(SUBSCRIPTIONS_LINE, filed?.colorHex ?: SUBSCRIPTIONS_COLOUR, subscriptions)
+        } else {
+            categories
+        }
         SpendingGraphs(
             days = days,
             paceThis = now,
             paceLast = before,
             months = months,
             byPerson = lines,
-            byCategory = categories,
+            byCategory = withSubscriptions,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SpendingGraphs())
 
@@ -278,10 +320,14 @@ class SpendingViewModel @Inject constructor(
         ledgerRequests.openSearch(name, month.value)
     }
 
-    private companion object {
-        const val TREND_MONTHS = 6
-        const val TOP_PAYEES = 10
-        const val TOP_CATEGORY_LINES = 5
+    companion object {
+        private const val TREND_MONTHS = 6
+        private const val TOP_PAYEES = 10
+        private const val TOP_CATEGORY_LINES = 5
+
+        /** The line for every subscription together, on Categories over time. */
+        const val SUBSCRIPTIONS_LINE = "Subscriptions"
+        private const val SUBSCRIPTIONS_COLOUR = "#7B1FA2"
     }
 }
 
@@ -410,9 +456,14 @@ fun SpendingScreen(
 
             if (graphs.byCategory.isNotEmpty()) {
                 item {
+                    val withSubscriptions = graphs.byCategory.any { it.name == SpendingViewModel.SUBSCRIPTIONS_LINE }
                     LinesCard(
                         "Categories over time",
-                        "The ${graphs.byCategory.size} biggest, month by month",
+                        if (withSubscriptions) {
+                            "The ${graphs.byCategory.size - 1} biggest, and subscriptions, month by month"
+                        } else {
+                            "The ${graphs.byCategory.size} biggest, month by month"
+                        },
                         "spending_categories_time",
                         graphs.months,
                         graphs.byCategory,

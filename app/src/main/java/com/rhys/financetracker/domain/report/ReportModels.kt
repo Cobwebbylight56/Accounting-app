@@ -109,8 +109,18 @@ data class MonthPoint(
     val yearMonth: YearMonth,
     val incomeMinor: Long,
     val expenseMinor: Long,
+    /** Of [expenseMinor], what was spent on credit cards — besides subscriptions. */
+    val cardMinor: Long = 0L,
+    /** Of [expenseMinor], what subscriptions came to, whichever account paid them. */
+    val subscriptionsMinor: Long = 0L,
 ) {
     val netMinor: Long get() = incomeMinor - expenseMinor
+
+    /** What's left of money out once cards and subscriptions are taken out: spending from the bank. */
+    val bankMinor: Long get() = (expenseMinor - cardMinor - subscriptionsMinor).coerceAtLeast(0L)
+
+    /** True when money out is split into bank, card and subscriptions. */
+    val isSplit: Boolean get() = cardMinor > 0L || subscriptionsMinor > 0L
 }
 
 /** One point on a line chart. */
