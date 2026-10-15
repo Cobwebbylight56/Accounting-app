@@ -16,6 +16,17 @@ number, version code and build date.
 
 ## Finding your way around
 
+### The look: Vision 2
+
+Version 2.0 is **Vision 2**: midnight ink and lavender in dark mode, porcelain
+and lavender in light. Home's four tiles are gradient bubbles — **ocean** for
+what you have, **sunset** for what you owe, **mint** for what's saved and
+**violet** for what's left over. The bar along the bottom floats, with the tab
+you're on lifted into a glowing bubble. Charts draw smooth lines that never pass
+a month's real figure, slim rounded bars, and a ring of rounded pills for where
+the money went; their colours are chosen so they can be told apart by
+colour-blind eyes in both themes.
+
 Along the bottom of the screen are five tabs:
 
 | Tab | What it is for |

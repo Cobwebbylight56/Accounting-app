@@ -6,7 +6,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -31,6 +33,7 @@ import com.rhys.financetracker.ui.theme.FinanceTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
@@ -168,16 +171,18 @@ internal fun SoftBottomBar(
             .navigationBarsPadding()
             .padding(start = 18.dp, end = 18.dp, top = 20.dp, bottom = 12.dp),
     ) {
-        Surface(
-            shape = RoundedCornerShape(32.dp),
-            color = colors.navBar,
-            border = BorderStroke(1.dp, colors.navEdge),
-            shadowElevation = 8.dp,
+        // Drawn without clipping, so the raised bubble can stand above the bar.
+        val bar = RoundedCornerShape(32.dp)
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(64.dp),
+                .height(64.dp)
+                .shadow(elevation = 8.dp, shape = bar, clip = false)
+                .background(colors.navBar, bar)
+                .border(BorderStroke(1.dp, colors.navEdge), bar),
         ) {
             Row(
+                modifier = Modifier.fillMaxSize(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -186,8 +191,10 @@ internal fun SoftBottomBar(
                     Box(
                         modifier = Modifier
                             .size(52.dp)
-                            .clip(CircleShape)
-                            .clickable { onSelect(destination) }
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = androidx.compose.material3.ripple(bounded = false, radius = 26.dp),
+                            ) { onSelect(destination) }
                             .semantics { this.selected = selected },
                         contentAlignment = Alignment.Center,
                     ) {

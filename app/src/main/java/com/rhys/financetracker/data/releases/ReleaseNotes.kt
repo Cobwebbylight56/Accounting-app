@@ -22,6 +22,16 @@ object ReleaseNotes {
     /** Every release, newest first. */
     val ALL: List<Release> = listOf(
         Release(
+            "2.0.0", LocalDate.of(2026, 10, 15), "Vision 2",
+            listOf(
+                "A whole new look. Midnight ink and lavender in dark mode, porcelain and lavender in light, with bolder figures and rounder everything.",
+                "Home's tiles are glowing gradient bubbles — ocean for what you have, sunset for what you owe, mint for what's saved, violet for what's left over — with bubbles drifting off their edges.",
+                "The bar along the bottom floats, and the tab you're on is lifted into a glowing bubble. An account's balance sits in a bubble too.",
+                "Charts redrawn: smooth lines that glow, and never pass a month's real figure; slim rounded bars with a gap between the parts of a stacked bar; a ring of rounded pills for where it went.",
+                "Chart colours checked so they can be told apart by colour-blind eyes, in both light and dark.",
+            ),
+        ),
+        Release(
             "1.59.0", LocalDate.of(2026, 10, 11), "Regular payments right on every card",
             listOf(
                 "A regular payment from a credit card is a Card payment, never a Direct debit or Standing order. Ones already set up are put right by themselves.",

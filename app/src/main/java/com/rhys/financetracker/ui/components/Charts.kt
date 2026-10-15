@@ -450,7 +450,7 @@ fun GroupedBarChart(
                     )
                 }
                 val groupStart = groupIndex * groupWidth + (groupWidth - barWidth * barCount) / 2f
-                val alpha = if (selectedIndex == null || isSelected) 1f else 0.5f
+                val alpha = if (selectedIndex == null || isSelected) 1f else 0.62f
                 group.bars.forEachIndexed { barIndex, entry ->
                     val left = groupStart + barIndex * barWidth + (barWidth - drawn) / 2f
                     val full = (abs(entry.value) / maxValue) * (bottom - plotTop) * reveal

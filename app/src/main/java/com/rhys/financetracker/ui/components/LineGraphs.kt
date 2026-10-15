@@ -111,6 +111,11 @@ fun TrendLineChart(
     val high = ticks.last()
 
     val grid = com.rhys.financetracker.ui.theme.FinanceTheme.colors.chartGrid
+    val wash = when (series.size) {
+        1 -> 0.30f
+        2 -> 0.12f
+        else -> 0f
+    }
     val zero = MaterialTheme.colorScheme.outline
     val ink = MaterialTheme.colorScheme.onSurface
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
@@ -192,12 +197,16 @@ fun TrendLineChart(
             }
             labelPaint.isFakeBoldText = false
 
-            // The month picked from outside, as a soft rounded band.
+            // The month picked from outside, as a soft rounded band kept
+            // inside the plot.
             selectedIndex?.takeIf { it in 0 until points && touched == null }?.let { i ->
+                val half = minOf(stepX / 2f, 22.dp.toPx())
+                val from = maxOf(left, xAt(i) - half)
+                val to = minOf(right, xAt(i) + half)
                 drawRoundRect(
                     color = highlight.copy(alpha = 0.10f),
-                    topLeft = Offset(xAt(i) - stepX / 2f, top),
-                    size = Size(stepX, bottom - top),
+                    topLeft = Offset(from, top),
+                    size = Size(to - from, bottom - top),
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(14.dp.toPx()),
                 )
             }
@@ -207,15 +216,19 @@ fun TrendLineChart(
                 val baseY = yAt(0L.coerceIn(low, high))
                 series.forEach { line ->
                     val dots = line.values.take(points).mapIndexed { i, v -> Offset(xAt(i), yAt(v)) }
-                    // A wash of the line's colour fading to nothing at the bottom.
-                    drawPath(
-                        path = ChartCurves.area(dots, baseY),
-                        brush = Brush.verticalGradient(
-                            colors = listOf(line.color.copy(alpha = 0.30f), line.color.copy(alpha = 0f)),
-                            startY = top,
-                            endY = bottom,
-                        ),
-                    )
+                    // A wash of the line's colour fading to nothing at the bottom —
+                    // fainter with two lines, none with more, so washes never
+                    // pile up into mud.
+                    if (wash > 0f) {
+                        drawPath(
+                            path = ChartCurves.area(dots, baseY),
+                            brush = Brush.verticalGradient(
+                                colors = listOf(line.color.copy(alpha = wash), line.color.copy(alpha = 0f)),
+                                startY = top,
+                                endY = bottom,
+                            ),
+                        )
+                    }
                     val curve = ChartCurves.path(dots)
                     val dash = if (line.dashed) {
                         PathEffect.dashPathEffect(floatArrayOf(8.dp.toPx(), 5.dp.toPx()))
@@ -256,8 +269,9 @@ fun TrendLineChart(
                 }
             }
 
-            // The last figure on each line, written beside it.
-            if (progress.value >= 1f && touched == null && series.size <= 4) {
+            // The last figure on each line, written beside it — with more
+            // than two lines they crowd each other, and tapping reads them.
+            if (progress.value >= 1f && touched == null && series.size <= 2) {
                 // A line may stop early — this month's, so far — so each is
                 // labelled where it ends.
                 val ends = series.filter { it.values.isNotEmpty() }

@@ -99,14 +99,17 @@ class VisionShotsTest {
     private fun shoot(name: String, mode: ThemeMode, content: @Composable () -> Unit) {
         compose.setContent {
             FinanceTrackerTheme(themeMode = mode) {
-                Column(
-                    modifier = Modifier
-                        .testTag(SHOT)
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.background)
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) { content() }
+                // As a screen's Scaffold does: the page colour, and text on it.
+                androidx.compose.material3.Surface(color = MaterialTheme.colorScheme.background) {
+                    Column(
+                        modifier = Modifier
+                            .testTag(SHOT)
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.background)
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) { content() }
+                }
             }
         }
         // Let every chart draw itself in, and every figure count up.
