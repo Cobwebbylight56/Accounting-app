@@ -160,6 +160,8 @@ android {
         unitTests {
             isIncludeAndroidResources = true
             isReturnDefaultValues = true
+            // VISION_SHOTS=1 makes the design screenshots; see VisionShotsTest.
+            all { it.systemProperty("visionShots", System.getenv("VISION_SHOTS") ?: "") }
         }
     }
 }
@@ -222,6 +224,9 @@ dependencies {
     // Runs the real Room migrations against a real SQLite on the JVM, so a
     // migration that would lose or misfile somebody's data fails the build.
     testImplementation(libs.robolectric)
+    // Draws screens on the JVM for the design screenshots (VisionShotsTest).
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.compose.ui.test.junit4)
 
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

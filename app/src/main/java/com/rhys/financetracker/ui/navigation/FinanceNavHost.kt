@@ -23,6 +23,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -151,11 +152,11 @@ fun FinanceNavHost(
 }
 
 /**
- * The bar along the bottom: icons on a soft rounded bar, with the tab you are
- * on lifted into a coloured circle.
+ * The bar along the bottom: a floating pill, with the tab you are on lifted
+ * into a glowing gradient bubble.
  */
 @Composable
-private fun SoftBottomBar(
+internal fun SoftBottomBar(
     currentRoute: String?,
     onSelect: (TopLevelDestination) -> Unit,
 ) {
@@ -165,14 +166,16 @@ private fun SoftBottomBar(
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
             .navigationBarsPadding()
-            .padding(start = 16.dp, end = 16.dp, top = 18.dp, bottom = 10.dp),
+            .padding(start = 18.dp, end = 18.dp, top = 20.dp, bottom = 12.dp),
     ) {
         Surface(
-            shape = RoundedCornerShape(24.dp),
+            shape = RoundedCornerShape(32.dp),
             color = colors.navBar,
+            border = BorderStroke(1.dp, colors.navEdge),
+            shadowElevation = 8.dp,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(60.dp),
+                .height(64.dp),
         ) {
             Row(
                 horizontalArrangement = Arrangement.SpaceEvenly,
@@ -182,29 +185,34 @@ private fun SoftBottomBar(
                     val selected = currentRoute == destination.route
                     Box(
                         modifier = Modifier
-                            .size(48.dp)
+                            .size(52.dp)
                             .clip(CircleShape)
                             .clickable { onSelect(destination) }
                             .semantics { this.selected = selected },
                         contentAlignment = Alignment.Center,
                     ) {
                         if (selected) {
-                            Surface(
-                                shape = CircleShape,
-                                color = colors.navSelected,
-                                shadowElevation = 6.dp,
-                                border = BorderStroke(3.dp, MaterialTheme.colorScheme.background),
+                            // Lifted out of the bar, glowing in its own colours.
+                            Box(
                                 modifier = Modifier
-                                    .size(48.dp)
-                                    .offset(y = (-14).dp),
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        destination.icon,
-                                        contentDescription = destination.label,
-                                        tint = colors.onNavSelected,
+                                    .offset(y = (-16).dp)
+                                    .size(52.dp)
+                                    .shadow(
+                                        elevation = 14.dp,
+                                        shape = CircleShape,
+                                        ambientColor = colors.navSelected.start,
+                                        spotColor = colors.navSelected.end,
                                     )
-                                }
+                                    .background(MaterialTheme.colorScheme.background, CircleShape)
+                                    .padding(3.dp)
+                                    .background(colors.navSelected.brush, CircleShape),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    destination.icon,
+                                    contentDescription = destination.label,
+                                    tint = colors.onNavSelected,
+                                )
                             }
                         } else {
                             Icon(

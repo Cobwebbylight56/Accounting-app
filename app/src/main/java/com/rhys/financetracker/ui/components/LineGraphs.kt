@@ -67,9 +67,10 @@ data class LineSeries(
 )
 
 /**
- * A line graph over time, after the graph-paper style: light gridlines with
- * the amounts up the side, a dot on every month, a soft fill under each line,
- * and the months along the bottom.
+ * A line graph over time: faint gridlines with the amounts up the side,
+ * smooth glowing lines that never pass a month's real figure, a gradient
+ * fading down from each, a dot where each ends, and the months along the
+ * bottom.
  *
  * It draws itself in from left to right. Tap or slide along it to read every
  * line's figure for that month; [onPointClick] hears the tap too. A second
@@ -109,7 +110,7 @@ fun TrendLineChart(
     val low = ticks.first()
     val high = ticks.last()
 
-    val grid = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+    val grid = com.rhys.financetracker.ui.theme.FinanceTheme.colors.chartGrid
     val zero = MaterialTheme.colorScheme.outline
     val ink = MaterialTheme.colorScheme.onSurface
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
@@ -169,6 +170,7 @@ fun TrendLineChart(
                     start = Offset(left, y),
                     end = Offset(right, y),
                     strokeWidth = if (tick == 0L && low < 0L) 1.5.dp.toPx() else 1.dp.toPx(),
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round,
                 )
                 labelPaint.textAlign = Paint.Align.RIGHT
                 drawContext.canvas.nativeCanvas.drawText(
@@ -190,12 +192,13 @@ fun TrendLineChart(
             }
             labelPaint.isFakeBoldText = false
 
-            // The month picked from outside, as a soft band.
+            // The month picked from outside, as a soft rounded band.
             selectedIndex?.takeIf { it in 0 until points && touched == null }?.let { i ->
-                drawRect(
-                    color = highlight.copy(alpha = 0.08f),
+                drawRoundRect(
+                    color = highlight.copy(alpha = 0.10f),
                     topLeft = Offset(xAt(i) - stepX / 2f, top),
                     size = Size(stepX, bottom - top),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(14.dp.toPx()),
                 )
             }
 
@@ -203,47 +206,51 @@ fun TrendLineChart(
             clipRect(left = 0f, top = 0f, right = left + plotWidth * progress.value + 8.dp.toPx(), bottom = size.height) {
                 val baseY = yAt(0L.coerceIn(low, high))
                 series.forEach { line ->
-                    val path = Path()
-                    val fill = Path()
-                    line.values.take(points).forEachIndexed { i, v ->
-                        val x = xAt(i)
-                        val y = yAt(v)
-                        if (i == 0) {
-                            path.moveTo(x, y)
-                            fill.moveTo(x, baseY)
-                            fill.lineTo(x, y)
-                        } else {
-                            path.lineTo(x, y)
-                            fill.lineTo(x, y)
-                        }
-                    }
-                    fill.lineTo(xAt(line.values.take(points).size - 1), baseY)
-                    fill.close()
+                    val dots = line.values.take(points).mapIndexed { i, v -> Offset(xAt(i), yAt(v)) }
+                    // A wash of the line's colour fading to nothing at the bottom.
                     drawPath(
-                        path = fill,
+                        path = ChartCurves.area(dots, baseY),
                         brush = Brush.verticalGradient(
-                            colors = listOf(line.color.copy(alpha = 0.20f), line.color.copy(alpha = 0f)),
+                            colors = listOf(line.color.copy(alpha = 0.30f), line.color.copy(alpha = 0f)),
                             startY = top,
                             endY = bottom,
                         ),
                     )
+                    val curve = ChartCurves.path(dots)
+                    val dash = if (line.dashed) {
+                        PathEffect.dashPathEffect(floatArrayOf(8.dp.toPx(), 5.dp.toPx()))
+                    } else {
+                        null
+                    }
+                    // A soft glow under the line, then the line itself.
                     drawPath(
-                        path = path,
+                        path = curve,
+                        color = line.color.copy(alpha = 0.18f),
+                        style = Stroke(
+                            width = 8.dp.toPx(),
+                            cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                            join = androidx.compose.ui.graphics.StrokeJoin.Round,
+                            pathEffect = dash,
+                        ),
+                    )
+                    drawPath(
+                        path = curve,
                         color = line.color,
                         style = Stroke(
                             width = 2.5.dp.toPx(),
-                            pathEffect = if (line.dashed) {
-                                PathEffect.dashPathEffect(floatArrayOf(8.dp.toPx(), 5.dp.toPx()))
-                            } else {
-                                null
-                            },
+                            cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                            join = androidx.compose.ui.graphics.StrokeJoin.Round,
+                            pathEffect = dash,
                         ),
                     )
                 }
-                if (points <= MAX_MARKED_POINTS) {
-                    series.forEach { line ->
-                        line.values.take(points).forEachIndexed { i, v ->
-                            marker(line, Offset(xAt(i), yAt(v)), surface, big = i == touched)
+                // A dot where each line ends, and on the month being read.
+                series.forEach { line ->
+                    val shown = line.values.take(points)
+                    shown.forEachIndexed { i, v ->
+                        val picked = i == (touched ?: selectedIndex)
+                        if (i == shown.lastIndex || picked || points <= FEW_POINTS) {
+                            marker(line, Offset(xAt(i), yAt(v)), surface, big = picked || i == shown.lastIndex)
                         }
                     }
                 }
@@ -340,6 +347,8 @@ private fun DrawScope.marker(line: LineSeries, at: Offset, surface: Color, big: 
     val ring = 2.dp.toPx()
     when (line.marker) {
         MarkerShape.CIRCLE -> {
+            // A halo in the line's colour round the big ones.
+            if (big) drawCircle(color = line.color.copy(alpha = 0.22f), radius = r + ring + 5.dp.toPx(), center = at)
             drawCircle(color = surface, radius = r + ring, center = at)
             drawCircle(color = line.color, radius = r, center = at)
         }
@@ -378,8 +387,8 @@ private fun DrawScope.tooltip(
     val box = Rect(boxLeft.coerceAtLeast(left), top, boxLeft.coerceAtLeast(left) + width, top + height)
     drawContext.canvas.nativeCanvas.drawRoundRect(
         RectF(box.left, box.top, box.right, box.bottom),
-        8.dp.toPx(),
-        8.dp.toPx(),
+        12.dp.toPx(),
+        12.dp.toPx(),
         Paint().apply { isAntiAlias = true; color = back.toArgb() },
     )
     paint.isFakeBoldText = true
@@ -398,8 +407,8 @@ private fun indexAt(x: Float, width: Float, points: Int, left: Float, rightPad: 
     return (((x - left) / plot) * (points - 1)).roundToInt().coerceIn(0, points - 1)
 }
 
-/** Above this many points the dots crowd the line, so only the line is drawn. */
-private const val MAX_MARKED_POINTS = 24
+/** With this few months every one has its dot; with more, only the ends and the month being read. */
+private const val FEW_POINTS = 3
 
 /**
  * Round gridline values, in pence, covering [min] to [max]: steps of 1, 2,

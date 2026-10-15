@@ -107,6 +107,7 @@ fun DonutChart(
 
     // The ring sweeps round once when it first appears or its figures change.
     val reveal = rememberReveal(visible.map { it.value })
+    val track = FinanceTheme.colors.chartGrid
 
     val description = "Donut chart. " + visible.joinToString(", ") {
         "${it.label} ${it.displayValue}, ${percent(it.value, total)}"
@@ -144,26 +145,48 @@ fun DonutChart(
                 x = (size.width - diameter) / 2f,
                 y = (size.height - diameter) / 2f,
             )
+            // The faint track the ring runs round.
+            drawArc(
+                color = track,
+                startAngle = 0f,
+                sweepAngle = 360f,
+                useCenter = false,
+                topLeft = topLeft,
+                size = Size(diameter, diameter),
+                style = Stroke(width = strokeWidth),
+            )
             val shownTo = -90f + 360f * reveal
+            // Round ends reach past a slice by half the ring's width; leave
+            // room for them and a clear gap, so slices read as separate pills.
+            val radius = diameter / 2f
+            val capAngle = Math.toDegrees((strokeWidth / 2f / radius).toDouble()).toFloat()
+            val gapAngle = Math.toDegrees((3.dp.toPx() / radius).toDouble()).toFloat()
             sweeps.forEachIndexed { index, (startAngle, fullSweep) ->
                 if (startAngle >= shownTo) return@forEachIndexed
                 val sweep = minOf(fullSweep, shownTo - startAngle)
                 val isSelected = index == selectedIndex
-                val width = if (isSelected) strokeWidth * 1.28f else strokeWidth
+                val width = if (isSelected) strokeWidth * 1.22f else strokeWidth
+                val rounded = sweeps.size > 1 && sweep > capAngle * 2f + gapAngle
+                val (from, length) = when {
+                    sweeps.size == 1 -> startAngle to sweep
+                    rounded -> (startAngle + capAngle + gapAngle / 2f) to (sweep - capAngle * 2f - gapAngle)
+                    else -> (startAngle + gapAngle / 2f) to (sweep - gapAngle).coerceAtLeast(0.5f)
+                }
                 drawArc(
                     color = visible[index].color,
-                    startAngle = startAngle,
-                    // A hairline gap makes adjacent slices distinguishable
-                    // without relying on colour alone.
-                    sweepAngle = (sweep - 1f).coerceAtLeast(0.5f),
+                    startAngle = from,
+                    sweepAngle = length,
                     useCenter = false,
                     topLeft = Offset(
                         topLeft.x - (width - strokeWidth) / 2f,
                         topLeft.y - (width - strokeWidth) / 2f,
                     ),
                     size = Size(diameter + (width - strokeWidth), diameter + (width - strokeWidth)),
-                    style = Stroke(width = width),
-                    alpha = if (selectedIndex == null || isSelected) 1f else 0.45f,
+                    style = Stroke(
+                        width = width,
+                        cap = if (rounded) androidx.compose.ui.graphics.StrokeCap.Round else androidx.compose.ui.graphics.StrokeCap.Butt,
+                    ),
+                    alpha = if (selectedIndex == null || isSelected) 1f else 0.4f,
                 )
             }
         }
@@ -318,7 +341,7 @@ fun GroupedBarChart(
         groups.maxOf { group -> group.bars.maxOfOrNull { abs(it.value) } ?: 0f },
         1f,
     )
-    val axisColor = MaterialTheme.colorScheme.outlineVariant
+    val axisColor = FinanceTheme.colors.chartGrid
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
     val highlightColor = MaterialTheme.colorScheme.primary
 
@@ -357,52 +380,92 @@ fun GroupedBarChart(
                     },
                 ),
         ) {
-            val bottom = size.height - 22f
+            val bottom = size.height - 22.dp.toPx()
             val groupWidth = size.width / groups.size
             val barCount = groups.first().bars.size.coerceAtLeast(1)
-            val barWidth = (groupWidth * 0.62f) / barCount
+            // Bars are slim and leave air between them; never wider than 22dp.
+            val barWidth = minOf((groupWidth * 0.62f) / barCount, 22.dp.toPx() + 4.dp.toPx())
+            val drawn = barWidth - 4.dp.toPx().coerceAtMost(barWidth * 0.25f)
+            val corner = minOf(7.dp.toPx(), drawn / 2f)
+            val gap = 2.dp.toPx()
+            val plotTop = 8.dp.toPx()
 
-            // Baseline.
+            // Faint gridlines at thirds, and the baseline.
+            (1..3).forEach { step ->
+                val y = bottom - (bottom - plotTop) * step / 3f
+                drawLine(
+                    color = axisColor,
+                    start = Offset(0f, y),
+                    end = Offset(size.width, y),
+                    strokeWidth = 1.dp.toPx(),
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                )
+            }
             drawLine(
                 color = axisColor,
                 start = Offset(0f, bottom),
                 end = Offset(size.width, bottom),
-                strokeWidth = 1.5f,
+                strokeWidth = 1.5.dp.toPx(),
+                cap = androidx.compose.ui.graphics.StrokeCap.Round,
             )
+
+            /** A bar from [top] down to [base], rounded on top when it is the top of the bar. */
+            fun bar(left: Float, top: Float, base: Float, color: Color, roundTop: Boolean, alpha: Float) {
+                if (base - top <= 0.5f) return
+                val r = if (roundTop) minOf(corner, (base - top) / 2f) else 0f
+                val path = Path().apply {
+                    addRoundRect(
+                        androidx.compose.ui.geometry.RoundRect(
+                            left = left,
+                            top = top,
+                            right = left + drawn,
+                            bottom = base,
+                            topLeftCornerRadius = androidx.compose.ui.geometry.CornerRadius(r),
+                            topRightCornerRadius = androidx.compose.ui.geometry.CornerRadius(r),
+                            bottomLeftCornerRadius = androidx.compose.ui.geometry.CornerRadius.Zero,
+                            bottomRightCornerRadius = androidx.compose.ui.geometry.CornerRadius.Zero,
+                        ),
+                    )
+                }
+                // Full colour at the top, a little softer towards the baseline.
+                drawPath(
+                    path = path,
+                    brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                        listOf(color, color.copy(alpha = 0.72f)),
+                        startY = top,
+                        endY = base,
+                    ),
+                    alpha = alpha,
+                )
+            }
 
             groups.forEachIndexed { groupIndex, group ->
                 val isSelected = groupIndex == selectedIndex
                 if (isSelected) {
-                    drawRect(
-                        color = highlightColor.copy(alpha = 0.10f),
-                        topLeft = Offset(groupIndex * groupWidth, 0f),
-                        size = Size(groupWidth, bottom),
+                    drawRoundRect(
+                        color = highlightColor.copy(alpha = 0.12f),
+                        topLeft = Offset(groupIndex * groupWidth + 3.dp.toPx(), 0f),
+                        size = Size(groupWidth - 6.dp.toPx(), bottom),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(14.dp.toPx()),
                     )
                 }
                 val groupStart = groupIndex * groupWidth + (groupWidth - barWidth * barCount) / 2f
                 val alpha = if (selectedIndex == null || isSelected) 1f else 0.5f
-                group.bars.forEachIndexed { barIndex, bar ->
-                    val left = groupStart + barIndex * barWidth
-                    if (bar.segments.isEmpty()) {
-                        val barHeight = (abs(bar.value) / maxValue) * (bottom - 8f) * reveal
-                        drawRect(
-                            color = bar.color,
-                            topLeft = Offset(left, bottom - barHeight),
-                            size = Size(barWidth * 0.86f, barHeight),
-                            alpha = alpha,
-                        )
+                group.bars.forEachIndexed { barIndex, entry ->
+                    val left = groupStart + barIndex * barWidth + (barWidth - drawn) / 2f
+                    val full = (abs(entry.value) / maxValue) * (bottom - plotTop) * reveal
+                    if (entry.segments.isEmpty()) {
+                        bar(left, bottom - full, bottom, entry.color, roundTop = true, alpha = alpha)
                     } else {
-                        // Each part on top of the one before, from the baseline up.
-                        var top = bottom
-                        bar.segments.forEach { part ->
-                            val partHeight = (abs(part.value) / maxValue) * (bottom - 8f) * reveal
-                            drawRect(
-                                color = part.color,
-                                topLeft = Offset(left, top - partHeight),
-                                size = Size(barWidth * 0.86f, partHeight),
-                                alpha = alpha,
-                            )
-                            top -= partHeight
+                        // Each part on top of the one before, from the baseline
+                        // up, with a sliver of the card between them.
+                        val parts = entry.segments.filter { it.value > 0f }
+                        var base = bottom
+                        parts.forEachIndexed { index, part ->
+                            val height = (abs(part.value) / maxValue) * (bottom - plotTop) * reveal
+                            val top = base - height
+                            bar(left, top, if (index == 0) base else base - gap, part.color, roundTop = index == parts.lastIndex, alpha = alpha)
+                            base = top
                         }
                     }
                 }
@@ -412,14 +475,15 @@ fun GroupedBarChart(
                 drawContext.canvas.nativeCanvas.apply {
                     val paint = Paint().apply {
                         color = if (isSelected) highlightColor.toArgb() else labelColor.toArgb()
-                        textSize = 26f
+                        textSize = 11.dp.toPx()
                         textAlign = Paint.Align.CENTER
                         isAntiAlias = true
+                        isFakeBoldText = isSelected
                     }
                     drawText(
                         group.label,
                         groupIndex * groupWidth + groupWidth / 2f,
-                        size.height - 4f,
+                        size.height - 5.dp.toPx(),
                         paint,
                     )
                 }
@@ -458,8 +522,10 @@ fun LineChart(
     val minValue = values.min()
     val range = (maxValue - minValue).coerceAtLeast(1L)
     val zeroColor = MaterialTheme.colorScheme.outlineVariant
-    val fillColor = lineColor.copy(alpha = 0.14f)
+    // The glow under the line.
+    val fillColor = lineColor.copy(alpha = 0.18f)
     val markerColor = MaterialTheme.colorScheme.primary
+    val surface = MaterialTheme.colorScheme.surfaceContainerLow
 
     val description = "Line chart from ${points.first().first} to ${points.last().first}. " +
         "Lowest ${Money.format(minValue)}, highest ${Money.format(maxValue)}, " +
@@ -487,26 +553,10 @@ fun LineChart(
             ),
     ) {
         fun yFor(value: Long): Float =
-            size.height - ((value - minValue).toFloat() / range) * (size.height - 12f) - 6f
+            size.height - ((value - minValue).toFloat() / range) * (size.height - 24f) - 12f
 
         val stepX = size.width / (points.size - 1)
-
-        val linePath = Path()
-        val fillPath = Path()
-        points.forEachIndexed { index, (_, value) ->
-            val x = index * stepX
-            val y = yFor(value)
-            if (index == 0) {
-                linePath.moveTo(x, y)
-                fillPath.moveTo(x, size.height)
-                fillPath.lineTo(x, y)
-            } else {
-                linePath.lineTo(x, y)
-                fillPath.lineTo(x, y)
-            }
-        }
-        fillPath.lineTo(size.width, size.height)
-        fillPath.close()
+        val dots = points.mapIndexed { index, (_, value) -> Offset(index * stepX, yFor(value)) }
 
         // Zero line, only when the series actually crosses it.
         if (minValue < 0L && maxValue > 0L) {
@@ -519,20 +569,30 @@ fun LineChart(
             )
         }
 
-        drawPath(fillPath, color = fillColor)
-        drawPath(linePath, color = lineColor, style = Stroke(width = 4f))
+        drawPath(
+            ChartCurves.area(dots, size.height),
+            brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                listOf(lineColor.copy(alpha = 0.32f), lineColor.copy(alpha = 0f)),
+            ),
+        )
+        val curve = ChartCurves.path(dots)
+        drawPath(curve, color = fillColor, style = Stroke(width = 9.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round))
+        drawPath(curve, color = lineColor, style = Stroke(width = 2.5.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round))
 
-        selectedIndex?.takeIf { it in points.indices }?.let { index ->
-            val x = index * stepX
-            val y = yFor(points[index].second)
+        val endAt = selectedIndex?.takeIf { it in points.indices } ?: points.lastIndex
+        val x = endAt * stepX
+        val y = yFor(points[endAt].second)
+        if (selectedIndex != null) {
             drawLine(
                 color = markerColor.copy(alpha = 0.35f),
                 start = Offset(x, 0f),
                 end = Offset(x, size.height),
                 strokeWidth = 2f,
             )
-            drawCircle(color = markerColor, radius = 9f, center = Offset(x, y))
         }
+        drawCircle(color = lineColor.copy(alpha = 0.22f), radius = 11.dp.toPx(), center = Offset(x, y))
+        drawCircle(color = surface, radius = 6.5.dp.toPx(), center = Offset(x, y))
+        drawCircle(color = lineColor, radius = 4.5.dp.toPx(), center = Offset(x, y))
     }
 }
 
@@ -558,17 +618,21 @@ fun ProgressBarRow(
             Text(text = value, style = MaterialTheme.typography.bodyMedium)
         }
         Spacer(Modifier.height(4.dp))
-        Canvas(modifier = Modifier.fillMaxWidth().height(8.dp)) {
-            drawRoundRect(
-                color = color.copy(alpha = 0.18f),
-                size = size,
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(8f, 8f),
-            )
-            drawRoundRect(
-                color = color,
-                size = Size(size.width * fraction.coerceIn(0f, 1f), size.height),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(8f, 8f),
-            )
+        Canvas(modifier = Modifier.fillMaxWidth().height(10.dp)) {
+            val round = androidx.compose.ui.geometry.CornerRadius(size.height / 2f)
+            drawRoundRect(color = color.copy(alpha = 0.16f), size = size, cornerRadius = round)
+            val filled = size.width * fraction.coerceIn(0f, 1f)
+            if (filled > 0f) {
+                drawRoundRect(
+                    brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
+                        listOf(color.copy(alpha = 0.75f), color),
+                        startX = 0f,
+                        endX = filled,
+                    ),
+                    size = Size(filled.coerceAtLeast(size.height), size.height),
+                    cornerRadius = round,
+                )
+            }
         }
         secondary?.let {
             Spacer(Modifier.height(2.dp))

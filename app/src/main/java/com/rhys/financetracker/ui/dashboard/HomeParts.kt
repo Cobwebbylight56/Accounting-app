@@ -194,11 +194,13 @@ private fun TabPill(label: String, selected: Boolean, colorHex: String?, onClick
     val colors = FinanceTheme.colors
     Surface(
         shape = RoundedCornerShape(50),
-        color = if (selected) colors.tileBlue else MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = if (selected) Color.Transparent else MaterialTheme.colorScheme.surfaceContainerHigh,
         onClick = onClick,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            modifier = Modifier
+                .then(if (selected) Modifier.background(colors.navSelected.brush) else Modifier)
+                .padding(horizontal = 16.dp, vertical = 9.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (colorHex != null) {
@@ -298,7 +300,7 @@ internal fun HomeTiles(state: DashboardState, onOpenAccounts: () -> Unit) {
                     icon = Icons.Outlined.AccountBalanceWallet,
                     value = com.rhys.financetracker.ui.components.animatedMoney(summary.totalBalanceMinor),
                     label = "Available",
-                    color = colors.tileBlue,
+                    bubble = colors.bubbleOcean,
                     height = SHORT_TILE,
                     onClick = onOpenAccounts,
                 )
@@ -306,7 +308,7 @@ internal fun HomeTiles(state: DashboardState, onOpenAccounts: () -> Unit) {
                     icon = Icons.Outlined.CreditCard,
                     value = com.rhys.financetracker.ui.components.animatedMoney(owed.coerceAtLeast(0L)),
                     label = if (owed > 0L) "Owed on loans and cards" else "Nothing owed",
-                    color = colors.tileBlush,
+                    bubble = colors.bubbleSunset,
                     height = TALL_TILE,
                     onClick = onOpenAccounts,
                 )
@@ -323,7 +325,7 @@ internal fun HomeTiles(state: DashboardState, onOpenAccounts: () -> Unit) {
                             "Saved · ${Money.formatCompact(summary.savingsNetMinor)} put aside this month"
                         else -> "Saved"
                     },
-                    color = colors.tileSage,
+                    bubble = colors.bubbleMint,
                     height = TALL_TILE,
                     onClick = onOpenAccounts,
                 )
@@ -341,7 +343,7 @@ internal fun HomeTiles(state: DashboardState, onOpenAccounts: () -> Unit) {
                         monthly != null -> "Take-home a month"
                         else -> "Money in this month"
                     },
-                    color = colors.tileMist,
+                    bubble = colors.bubbleViolet,
                     height = SHORT_TILE,
                     onClick = null,
                 )
@@ -361,56 +363,55 @@ private fun HomeTile(
     icon: ImageVector,
     value: String,
     label: String,
-    color: Color,
+    bubble: com.rhys.financetracker.ui.theme.Bubble,
     height: Dp,
     onClick: (() -> Unit)?,
 ) {
     val onTile = FinanceTheme.colors.onTile
-    Surface(
+    com.rhys.financetracker.ui.components.BubbleSurface(
+        bubble = bubble,
         modifier = Modifier
             .fillMaxWidth()
             .height(height),
-        shape = RoundedCornerShape(20.dp),
-        color = color,
-        onClick = onClick ?: {},
-        enabled = onClick != null,
+        onClick = onClick,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(14.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
+                .padding(16.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
         ) {
+            // A frosted bubble round the icon.
             Box(
                 modifier = Modifier
-                    .size(36.dp)
-                    .border(1.5.dp, onTile.copy(alpha = 0.7f), CircleShape),
+                    .size(38.dp)
+                    .background(onTile.copy(alpha = 0.2f), CircleShape)
+                    .border(1.dp, onTile.copy(alpha = 0.35f), CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(icon, contentDescription = null, tint = onTile, modifier = Modifier.size(20.dp))
             }
-            Spacer(Modifier.height(10.dp))
-            // Exact to the penny: a balance is the one figure people check
-            // against their banking app. Long ones step down a size to fit.
-            Text(
-                text = value,
-                style = if (value.length > TILE_FULL_SIZE_CHARS) {
-                    MaterialTheme.typography.titleMedium
-                } else {
-                    MaterialTheme.typography.titleLarge
-                },
-                color = onTile,
-                maxLines = 1,
-            )
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodySmall,
-                color = onTile.copy(alpha = 0.8f),
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Column {
+                // Exact to the penny: a balance is the one figure people check
+                // against their banking app. Long ones step down a size to fit.
+                Text(
+                    text = value,
+                    style = if (value.length > TILE_FULL_SIZE_CHARS) {
+                        MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                    } else {
+                        MaterialTheme.typography.titleLarge
+                    },
+                    color = onTile,
+                    maxLines = 1,
+                )
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = onTile.copy(alpha = 0.88f),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
@@ -513,13 +514,19 @@ private fun MonthRow(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // A little bubble, lit from the top left.
         Box(
             modifier = Modifier
                 .size(44.dp)
-                .background(color, RoundedCornerShape(12.dp)),
+                .background(
+                    androidx.compose.ui.graphics.Brush.linearGradient(
+                        listOf(androidx.compose.ui.graphics.lerp(color, Color.White, 0.18f), color),
+                    ),
+                    CircleShape,
+                ),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(icon, contentDescription = null, tint = FinanceTheme.colors.onTile)
+            Icon(icon, contentDescription = null, tint = FinanceTheme.colors.onTile, modifier = Modifier.size(22.dp))
         }
         Spacer(Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
@@ -577,7 +584,7 @@ internal fun LoansCard(state: DashboardState, onOpenAccounts: () -> Unit) {
                 }
                 Surface(
                     shape = RoundedCornerShape(16.dp),
-                    color = FinanceTheme.colors.tileBlush.copy(alpha = 0.45f),
+                    color = FinanceTheme.colors.tileBlush.copy(alpha = 0.16f),
                     onClick = onOpenAccounts,
                 ) {
                     Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {

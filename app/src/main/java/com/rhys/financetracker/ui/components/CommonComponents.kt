@@ -1,5 +1,8 @@
 package com.rhys.financetracker.ui.components
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +34,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
@@ -46,7 +52,12 @@ import com.rhys.financetracker.ui.theme.FinanceTheme
  * enough to read in one sitting.
  */
 
-/** A titled card. The standard container for a block of related information. */
+/**
+ * A titled card. The standard container for a block of related information.
+ *
+ * Vision 2: a very round card with a hairline edge, and a small bubble in
+ * the bottom bar's colours beside its title.
+ */
 @Composable
 fun SectionCard(
     title: String,
@@ -57,13 +68,20 @@ fun SectionCard(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(CARD_RADIUS),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         ),
+        border = BorderStroke(1.dp, FinanceTheme.colors.cardEdge),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier
+                        .padding(end = 10.dp)
+                        .size(10.dp)
+                        .background(FinanceTheme.colors.navSelected.brush, CircleShape),
+                )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(text = title, style = MaterialTheme.typography.titleMedium)
                     subtitle?.let {
@@ -76,10 +94,57 @@ fun SectionCard(
                 }
                 action?.invoke()
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(14.dp))
             content()
         }
     }
+}
+
+/** How round a card is: a bubble, not a box. */
+val CARD_RADIUS = 26.dp
+
+/**
+ * A bubble: a gradient in [bubble]'s two colours, glowing softly in them,
+ * with two translucent circles drifting off its edges — the Home tiles, a
+ * card's balance. Text on it is [com.rhys.financetracker.ui.theme.FinanceColors.onTile].
+ */
+@Composable
+fun BubbleSurface(
+    bubble: com.rhys.financetracker.ui.theme.Bubble,
+    modifier: Modifier = Modifier,
+    radius: androidx.compose.ui.unit.Dp = 28.dp,
+    onClick: (() -> Unit)? = null,
+    content: @Composable androidx.compose.foundation.layout.BoxScope.() -> Unit,
+) {
+    val shape = RoundedCornerShape(radius)
+    Box(
+        modifier = modifier
+            // A soft glow in the bubble's own colours, not a grey shadow.
+            .shadow(elevation = 14.dp, shape = shape, ambientColor = bubble.start, spotColor = bubble.end)
+            .clip(shape)
+            .background(bubble.brush)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .drawBehind {
+                // Two bubbles drifting off the edges, and light across the top.
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.13f),
+                    radius = size.minDimension * 0.62f,
+                    center = androidx.compose.ui.geometry.Offset(size.width * 0.98f, size.height * 0.02f),
+                )
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.08f),
+                    radius = size.minDimension * 0.34f,
+                    center = androidx.compose.ui.geometry.Offset(size.width * 0.08f, size.height * 1.02f),
+                )
+                drawRect(
+                    brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                        listOf(Color.White.copy(alpha = 0.16f), Color.Transparent),
+                        endY = size.height * 0.55f,
+                    ),
+                )
+            },
+        content = content,
+    )
 }
 
 /**
@@ -176,11 +241,12 @@ fun StatTile(
         modifier = modifier.fillMaxWidth(),
         onClick = onClick ?: {},
         enabled = onClick != null,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
             disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         ),
+        border = BorderStroke(1.dp, FinanceTheme.colors.cardEdge),
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Text(

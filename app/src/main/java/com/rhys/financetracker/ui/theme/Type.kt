@@ -12,35 +12,42 @@ import androidx.compose.ui.unit.sp
  * Sizes are a little larger than the Material defaults throughout, because this
  * is an app for reading numbers at a glance, often one-handed.  Nothing on a
  * primary screen is smaller than 12sp.
+ *
+ * Vision 2: the big figures bold and drawn a touch tighter, so a balance reads
+ * as one confident shape; headings semi-bold.
  */
 val FinanceTypography = Typography(
     displaySmall = TextStyle(
         fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.Normal,
-        fontSize = 36.sp,
+        fontWeight = FontWeight.Bold,
+        fontSize = 38.sp,
         lineHeight = 44.sp,
+        letterSpacing = (-0.5).sp,
     ),
     headlineMedium = TextStyle(
         fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 28.sp,
+        fontWeight = FontWeight.Bold,
+        fontSize = 30.sp,
         lineHeight = 36.sp,
+        letterSpacing = (-0.4).sp,
     ),
     headlineSmall = TextStyle(
         fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.SemiBold,
+        fontWeight = FontWeight.Bold,
         fontSize = 24.sp,
         lineHeight = 32.sp,
+        letterSpacing = (-0.2).sp,
     ),
     titleLarge = TextStyle(
         fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.SemiBold,
+        fontWeight = FontWeight.Bold,
         fontSize = 21.sp,
         lineHeight = 28.sp,
+        letterSpacing = (-0.2).sp,
     ),
     titleMedium = TextStyle(
         fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.Medium,
+        fontWeight = FontWeight.SemiBold,
         fontSize = 17.sp,
         lineHeight = 24.sp,
     ),

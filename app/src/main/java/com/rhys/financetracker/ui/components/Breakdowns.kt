@@ -371,9 +371,9 @@ fun MonthTrend(
                 series = listOfNotNull(
                     LineSeries("Money in", points.map { it.incomeMinor }, colors.chartIn, dashed = true, marker = MarkerShape.SQUARE),
                     LineSeries("Money out", points.map { it.expenseMinor }, colors.chartOut),
-                    LineSeries("On credit cards", points.map { it.cardMinor }, colors.card).takeIf { points.any { it.cardMinor > 0L } },
                     LineSeries("Subscriptions", points.map { it.subscriptionsMinor }, colors.subscriptions)
                         .takeIf { points.any { it.subscriptionsMinor > 0L } },
+                    LineSeries("On credit cards", points.map { it.cardMinor }, colors.chartCard).takeIf { points.any { it.cardMinor > 0L } },
                 ),
                 selectedIndex = points.indexOfFirst { it.yearMonth == selected }.takeIf { it >= 0 },
                 onPointClick = onMonth?.let { open -> { index: Int -> points.getOrNull(index)?.let { open(it.yearMonth) } } },
@@ -390,12 +390,13 @@ fun MonthTrend(
                                 value = point.expenseMinor.toFloat(),
                                 color = colors.chartOut,
                                 displayValue = Money.format(point.expenseMinor),
-                                // From the bank at the bottom, then cards, then subscriptions.
+                                // From the bank at the bottom, then subscriptions, then cards:
+                                // the order that keeps neighbours apart for colour-blind eyes.
                                 segments = if (point.isSplit) {
                                     listOf(
                                         ChartEntry("Bank", point.bankMinor.toFloat(), colors.chartOut, Money.format(point.bankMinor)),
-                                        ChartEntry("Credit cards", point.cardMinor.toFloat(), colors.card, Money.format(point.cardMinor)),
                                         ChartEntry("Subscriptions", point.subscriptionsMinor.toFloat(), colors.subscriptions, Money.format(point.subscriptionsMinor)),
+                                        ChartEntry("Credit cards", point.cardMinor.toFloat(), colors.chartCard, Money.format(point.cardMinor)),
                                     ).filter { it.value > 0f }
                                 } else {
                                     emptyList()
@@ -426,18 +427,18 @@ fun MonthTrend(
                     Spacer(Modifier.width(6.dp))
                     Text(if (points.any { it.isSplit }) "Bank" else "Money out", style = MaterialTheme.typography.bodySmall)
                 }
-                if (points.any { it.cardMinor > 0L }) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        ColorDot(colors.card)
-                        Spacer(Modifier.width(6.dp))
-                        Text("Cards", style = MaterialTheme.typography.bodySmall)
-                    }
-                }
                 if (points.any { it.subscriptionsMinor > 0L }) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         ColorDot(colors.subscriptions)
                         Spacer(Modifier.width(6.dp))
                         Text("Subscriptions", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                if (points.any { it.cardMinor > 0L }) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        ColorDot(colors.chartCard)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Cards", style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }

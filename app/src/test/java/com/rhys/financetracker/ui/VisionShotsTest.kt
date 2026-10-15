@@ -1,0 +1,237 @@
+package com.rhys.financetracker.ui
+
+import android.app.Application
+import android.graphics.Bitmap
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.unit.dp
+import com.rhys.financetracker.core.money.Money
+import com.rhys.financetracker.data.local.entity.PersonEntity
+import com.rhys.financetracker.domain.model.ThemeMode
+import com.rhys.financetracker.domain.report.FinancialSummary
+import com.rhys.financetracker.domain.report.MonthPoint
+import com.rhys.financetracker.ui.components.BarGroup
+import com.rhys.financetracker.ui.components.BreakdownView
+import com.rhys.financetracker.ui.components.ChartEntry
+import com.rhys.financetracker.ui.components.ChartLegend
+import com.rhys.financetracker.ui.components.DonutChart
+import com.rhys.financetracker.ui.components.GroupedBarChart
+import com.rhys.financetracker.ui.components.LineChart
+import com.rhys.financetracker.ui.components.LineSeries
+import com.rhys.financetracker.ui.components.MarkerShape
+import com.rhys.financetracker.ui.components.MonthTrend
+import com.rhys.financetracker.ui.components.ProgressBarRow
+import com.rhys.financetracker.ui.components.SectionCard
+import com.rhys.financetracker.ui.components.StatTile
+import com.rhys.financetracker.ui.components.TrendLineChart
+import com.rhys.financetracker.ui.dashboard.DashboardScope
+import com.rhys.financetracker.ui.dashboard.DashboardState
+import com.rhys.financetracker.ui.dashboard.HomeHeader
+import com.rhys.financetracker.ui.dashboard.HomeTiles
+import com.rhys.financetracker.ui.dashboard.IncomeVsExpenseCard
+import com.rhys.financetracker.ui.dashboard.MonthList
+import com.rhys.financetracker.ui.dashboard.PersonTabs
+import com.rhys.financetracker.ui.navigation.Routes
+import com.rhys.financetracker.ui.navigation.SoftBottomBar
+import com.rhys.financetracker.ui.theme.FinanceTheme
+import com.rhys.financetracker.ui.theme.FinanceTrackerTheme
+import java.io.File
+import java.io.FileOutputStream
+import java.time.YearMonth
+import org.junit.Assume.assumeTrue
+import org.junit.Before
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+
+/**
+ * Pictures of how the app looks, made on the build server so the design can
+ * be checked without a phone: Home and the charts, dark and light, with
+ * made-up figures. Only made when asked (VISION_SHOTS=1); otherwise skipped.
+ */
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [33], application = Application::class, qualifiers = "w400dp-h1500dp-xxhdpi")
+class VisionShotsTest {
+
+    @get:Rule
+    val compose = createComposeRule()
+
+    @Before
+    fun onlyWhenAsked() {
+        assumeTrue(System.getProperty("visionShots") == "1" || System.getenv("VISION_SHOTS") == "1")
+    }
+
+    @Test fun homeDark() = shoot("1-home-dark", ThemeMode.DARK) { Home() }
+
+    @Test fun homeLight() = shoot("2-home-light", ThemeMode.LIGHT) { Home() }
+
+    @Test fun chartsDark() = shoot("3-charts-dark", ThemeMode.DARK) { Charts() }
+
+    @Test fun chartsLight() = shoot("4-charts-light", ThemeMode.LIGHT) { Charts() }
+
+    @Test fun moreDark() = shoot("5-more-dark", ThemeMode.DARK) { More() }
+
+    @Test fun moreLight() = shoot("6-more-light", ThemeMode.LIGHT) { More() }
+
+    private fun shoot(name: String, mode: ThemeMode, content: @Composable () -> Unit) {
+        compose.setContent {
+            FinanceTrackerTheme(themeMode = mode) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.background)
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) { content() }
+            }
+        }
+        // Let every chart draw itself in, and every figure count up.
+        compose.mainClock.advanceTimeBy(3_000)
+        compose.waitForIdle()
+        val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
+        val dir = File("build/vision-shots").apply { mkdirs() }
+        FileOutputStream(File(dir, "$name.png")).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+
+    private val month = YearMonth.of(2026, 10)
+    private val months = (5 downTo 0).map { month.minusMonths(it.toLong()) }
+
+    private val state = DashboardState(
+        isLoading = false,
+        month = month,
+        scope = DashboardScope(personIds = setOf(1L), label = "Rhys"),
+        people = listOf(
+            PersonEntity(id = 1L, name = "Rhys Evans", colorHex = "#7B61FF"),
+            PersonEntity(id = 2L, name = "Hannah", colorHex = "#E0457A"),
+        ),
+        summary = FinancialSummary(
+            totalBalanceMinor = 1_284_37,
+            totalSavingsMinor = 6_420_00,
+            totalLiabilitiesMinor = -1_309_89,
+            netWorthMinor = 6_394_48,
+            monthIncomeMinor = 2_186_23,
+            monthExpenseMinor = 1_642_18,
+            committedRecurringMinor = 412_00,
+            savingsInMinor = 200_00,
+        ),
+        monthlyTrend = months.mapIndexed { i, m ->
+            MonthPoint(
+                yearMonth = m,
+                incomeMinor = listOf(2_150_00L, 2_186_23L, 2_420_00L, 2_186_23L, 2_300_00L, 2_186_23L)[i],
+                expenseMinor = listOf(1_980_00L, 2_310_00L, 1_640_00L, 1_890_00L, 2_050_00L, 1_642_18L)[i],
+                cardMinor = listOf(240_00L, 410_00L, 180_00L, 320_00L, 290_00L, 210_00L)[i],
+                subscriptionsMinor = listOf(38_97L, 38_97L, 43_96L, 43_96L, 43_96L, 43_96L)[i],
+            )
+        },
+    )
+
+    @Composable
+    private fun Home() {
+        HomeHeader(state, onMenu = {}, onAvatar = {}, onCustomise = {})
+        PersonTabs(
+            individuals = state.people,
+            scope = state.scope,
+            onPerson = {},
+            onShared = {},
+            onChooseShared = {},
+        )
+        HomeTiles(state, onOpenAccounts = {})
+        MonthList(state)
+        IncomeVsExpenseCard(state, onMonthClick = {})
+        SoftBottomBar(currentRoute = Routes.DASHBOARD, onSelect = {})
+    }
+
+    @Composable
+    private fun Charts() {
+        SectionCard(title = "Month by month", subtitle = "Money in against money out") {
+            MonthTrend(points = state.monthlyTrend, view = BreakdownView.BARS, selected = month)
+        }
+        val labels = months.map { com.rhys.financetracker.core.time.DateUtils.monthNameShort(it.monthValue) }
+        val colors = FinanceTheme.colors
+        SectionCard(title = "Categories over time", subtitle = "The 3 biggest, and subscriptions") {
+            TrendLineChart(
+                labels = labels,
+                series = listOf(
+                    LineSeries("Groceries", listOf(330_00L, 360_00L, 650_00L, 140_00L, 330_00L, 210_00L), colors.chartSeries[0]),
+                    LineSeries("Fuel", listOf(120_00L, 230_00L, 140_00L, 140_00L, 160_00L, 195_00L), colors.chartSeries[1], dashed = true, marker = MarkerShape.SQUARE),
+                    LineSeries("Shopping", listOf(85_00L, 10_00L, 380_00L, 30_00L, 115_00L, 85_00L), colors.chartSeries[2]),
+                    LineSeries("Subscriptions", listOf(38_97L, 38_97L, 43_96L, 43_96L, 43_96L, 43_96L), colors.subscriptions),
+                ),
+            )
+        }
+        SectionCard(title = "Where it went", subtitle = "October") {
+            val slices = listOf(
+                ChartEntry("Groceries", 412f, colors.chartSeries[0], "£412.00"),
+                ChartEntry("Bills", 380f, colors.chartSeries[1], "£380.00"),
+                ChartEntry("Fuel", 195f, colors.chartSeries[2], "£195.00"),
+                ChartEntry("Eating out", 142f, colors.chartSeries[3], "£142.00"),
+                ChartEntry("Shopping", 85f, colors.chartSeries[4], "£85.00"),
+                ChartEntry("Subscriptions", 44f, colors.chartSeries[6], "£44.00"),
+            )
+            DonutChart(entries = slices, centreValue = "£1,258.00", centreLabel = "spent")
+            ChartLegend(entries = slices)
+        }
+    }
+
+    @Composable
+    private fun More() {
+        val colors = FinanceTheme.colors
+        SectionCard(title = "Each month", subtitle = "What each subscription came to") {
+            val audible = listOf(899L, 899L, 899L, 899L, 899L, 899L)
+            val spotify = listOf(1_199L, 1_199L, 1_199L, 1_199L, 1_199L, 1_199L)
+            val uber = listOf(499L, 499L, 499L, 0L, 0L, 0L)
+            val claude = listOf(0L, 0L, 1_800L, 1_800L, 1_800L, 1_800L)
+            GroupedBarChart(
+                groups = months.indices.map { i ->
+                    val parts = listOf(
+                        ChartEntry("Spotify", spotify[i].toFloat(), colors.chartSeries[0], Money.format(spotify[i])),
+                        ChartEntry("Audible", audible[i].toFloat(), colors.chartSeries[1], Money.format(audible[i])),
+                        ChartEntry("Claude", claude[i].toFloat(), colors.chartSeries[2], Money.format(claude[i])),
+                        ChartEntry("Uber One", uber[i].toFloat(), colors.chartSeries[3], Money.format(uber[i])),
+                    )
+                    val total = parts.sumOf { it.value.toDouble() }.toFloat()
+                    BarGroup(
+                        com.rhys.financetracker.core.time.DateUtils.monthNameShort(months[i].monthValue),
+                        listOf(ChartEntry("Total", total, colors.chartSeries[0], Money.format(total.toLong()), segments = parts.filter { it.value > 0f })),
+                    )
+                },
+                height = 170.dp,
+            )
+        }
+        SectionCard(title = "Owed at each month end") {
+            LineChart(
+                points = months.mapIndexed { i, m -> m.toString() to listOf(0L, 130_89L, 180_00L, 96_40L, 241_10L, 130_89L)[i] },
+                lineColor = colors.chartCard,
+                height = 150.dp,
+            )
+        }
+        SectionCard(title = "Budgets") {
+            ProgressBarRow("Groceries", "£412 of £500", 0.82f, colors.chartSeries[0])
+            ProgressBarRow("Eating out", "£142 of £120", 1f, colors.chartOut, secondary = "£22 over")
+            ProgressBarRow("Fuel", "£195 of £250", 0.78f, colors.chartIn)
+        }
+        androidx.compose.foundation.layout.Row {
+            StatTile(label = "Spent this month", value = "£1,642.18", caption = "£230 less than last month", modifier = Modifier.weight(1f))
+            Spacer(Modifier.width(12.dp))
+            StatTile(label = "Saved", value = "£200.00", caption = "Put aside", modifier = Modifier.weight(1f))
+        }
+        Spacer(Modifier.height(4.dp))
+    }
+}

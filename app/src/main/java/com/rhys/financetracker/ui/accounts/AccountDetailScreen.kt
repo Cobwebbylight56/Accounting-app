@@ -417,12 +417,18 @@ fun AccountDetailScreen(
 @Composable
 private fun BalanceHeader(item: AccountWithBalance) {
     val account = item.account
-    Surface(
-        shape = RoundedCornerShape(20.dp),
-        color = FinanceTheme.colors.tileBlue,
+    val colors = FinanceTheme.colors
+    // A bubble in the account's own colours: owed, put aside, or to spend.
+    val bubble = when {
+        item.isLiability -> colors.bubbleSunset
+        item.isSavings -> colors.bubbleMint
+        else -> colors.bubbleOcean
+    }
+    com.rhys.financetracker.ui.components.BubbleSurface(
+        bubble = bubble,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(modifier = Modifier.padding(18.dp)) {
+        Column(modifier = Modifier.padding(20.dp)) {
             Text(
                 text = listOfNotNull(item.personName, account.type.displayName, account.holding.displayName)
                     .joinToString(" · "),
@@ -437,7 +443,6 @@ private fun BalanceHeader(item: AccountWithBalance) {
                     text = com.rhys.financetracker.ui.components.animatedMoney(if (owed >= 0L) owed else -owed) +
                         if (owed >= 0L) " owed" else " in credit",
                     style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.SemiBold,
                     color = FinanceTheme.colors.onTile,
                 )
                 val limit = account.creditLimitMinor?.takeIf { it > 0L }
@@ -452,7 +457,6 @@ private fun BalanceHeader(item: AccountWithBalance) {
                 Text(
                     text = com.rhys.financetracker.ui.components.animatedMoney(item.balanceMinor),
                     style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.SemiBold,
                     color = FinanceTheme.colors.onTile,
                 )
             }
@@ -460,7 +464,7 @@ private fun BalanceHeader(item: AccountWithBalance) {
                 text = "Counted from ${Money.format(account.openingBalanceMinor)} on " +
                     DateUtils.format(account.openingBalanceDate) + ", plus everything since",
                 style = MaterialTheme.typography.bodySmall,
-                color = FinanceTheme.colors.onTile.copy(alpha = 0.8f),
+                color = FinanceTheme.colors.onTile.copy(alpha = 0.9f),
             )
         }
     }
@@ -561,7 +565,7 @@ private fun MonthEndsCard(ends: List<MonthEnd>, owed: Boolean) {
                 LineSeries(
                     name = if (owed) "Owed" else "Balance",
                     values = oldestFirst.map { shown(it) },
-                    color = if (owed) colors.card else MaterialTheme.colorScheme.primary,
+                    color = if (owed) colors.chartCard else MaterialTheme.colorScheme.primary,
                 ),
             ),
             height = 180.dp,
@@ -610,8 +614,8 @@ private fun CardMonthsCard(months: List<CardMonth>) {
                 BarGroup(
                     label = DateUtils.monthNameShort(month.month.monthValue),
                     bars = listOf(
-                        ChartEntry("Spent", month.spentMinor.toFloat(), colors.card, Money.format(month.spentMinor)),
-                        ChartEntry("Paid off", month.paidOffMinor.toFloat(), colors.income, Money.format(month.paidOffMinor)),
+                        ChartEntry("Spent", month.spentMinor.toFloat(), colors.chartCard, Money.format(month.spentMinor)),
+                        ChartEntry("Paid off", month.paidOffMinor.toFloat(), colors.chartIn, Money.format(month.paidOffMinor)),
                     ),
                 )
             },
@@ -620,12 +624,12 @@ private fun CardMonthsCard(months: List<CardMonth>) {
         Spacer(Modifier.height(8.dp))
         androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                ColorDot(colors.card)
+                ColorDot(colors.chartCard)
                 Spacer(Modifier.width(6.dp))
                 Text("Spent", style = MaterialTheme.typography.bodySmall)
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                ColorDot(colors.income)
+                ColorDot(colors.chartIn)
                 Spacer(Modifier.width(6.dp))
                 Text("Paid off", style = MaterialTheme.typography.bodySmall)
             }

@@ -84,6 +84,27 @@ jobs:
           BUILD_NUMBER: ${{ github.run_number }}
         run: ./gradlew testDebugUnitTest --stacktrace
 
+      - name: Draw the design screenshots
+        # Only for a commit that asks, with "[shots]" in its message: Home and
+        # the charts drawn dark and light, to check the look without a phone.
+        if: ${{ contains(github.event.head_commit.message, '[shots]') }}
+        env:
+          VISION_SHOTS: '1'
+        run: |
+          ./gradlew testDebugUnitTest --tests '*VisionShotsTest*' --stacktrace
+          ls -la app/build/vision-shots
+
+      - name: Put the screenshots on a hidden pre-release
+        if: ${{ contains(github.event.head_commit.message, '[shots]') }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: design-screenshots
+          name: Design screenshots (not an app release)
+          prerelease: true
+          make_latest: false
+          body: Pictures of the app's look, drawn on the build server. Not an app release; nothing to install.
+          files: app/build/vision-shots/*.png
+
       - name: Restore the signing key
         # Only when a real key has been configured; otherwise the build falls
         # back to the committed debug key, which is still installable.

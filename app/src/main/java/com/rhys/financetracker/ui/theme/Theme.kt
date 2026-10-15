@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import com.rhys.financetracker.domain.model.ThemeMode
 
 private val LightScheme = lightColorScheme(
@@ -37,6 +38,7 @@ private val LightScheme = lightColorScheme(
     surfaceVariant = LightSurfaceVariant,
     onSurfaceVariant = LightOnSurfaceVariant,
     outline = LightOutline,
+    outlineVariant = LightOutlineVariant,
     surfaceContainerLowest = LightSurfaceContainerLowest,
     surfaceContainerLow = LightSurfaceContainerLow,
     surfaceContainer = LightSurfaceContainer,
@@ -68,11 +70,24 @@ private val DarkScheme = darkColorScheme(
     surfaceVariant = DarkSurfaceVariant,
     onSurfaceVariant = DarkOnSurfaceVariant,
     outline = DarkOutline,
+    outlineVariant = DarkOutlineVariant,
     surfaceContainerLowest = DarkSurfaceContainerLowest,
     surfaceContainerLow = DarkSurfaceContainerLow,
     surfaceContainer = DarkSurfaceContainer,
     surfaceContainerHigh = DarkSurfaceContainerHigh,
     surfaceContainerHighest = DarkSurfaceContainerHighest,
+)
+
+/**
+ * Vision 2's shapes: everything a little rounder, the big cards and sheets
+ * very round — bubbles rather than boxes.
+ */
+val FinanceShapes = androidx.compose.material3.Shapes(
+    extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+    small = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+    medium = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+    large = androidx.compose.foundation.shape.RoundedCornerShape(26.dp),
+    extraLarge = androidx.compose.foundation.shape.RoundedCornerShape(32.dp),
 )
 
 /** Makes the semantic finance colours available anywhere in the tree. */
@@ -113,6 +128,7 @@ fun FinanceTrackerTheme(
         MaterialTheme(
             colorScheme = colorScheme,
             typography = FinanceTypography,
+            shapes = FinanceShapes,
             content = content,
         )
     }
