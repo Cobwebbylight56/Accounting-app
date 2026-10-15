@@ -13,10 +13,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asAndroidBitmap
-import androidx.compose.ui.test.captureToImage
-import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onRoot
+import android.graphics.Canvas
+import android.view.ViewGroup
+import androidx.activity.ComponentActivity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import kotlin.math.ceil
 import androidx.compose.ui.unit.dp
 import com.rhys.financetracker.core.money.Money
 import com.rhys.financetracker.data.local.entity.PersonEntity
@@ -41,7 +44,6 @@ import com.rhys.financetracker.ui.dashboard.DashboardScope
 import com.rhys.financetracker.ui.dashboard.DashboardState
 import com.rhys.financetracker.ui.dashboard.HomeHeader
 import com.rhys.financetracker.ui.dashboard.HomeTiles
-import com.rhys.financetracker.ui.dashboard.IncomeVsExpenseCard
 import com.rhys.financetracker.ui.dashboard.MonthList
 import com.rhys.financetracker.ui.dashboard.PersonTabs
 import com.rhys.financetracker.ui.navigation.Routes
@@ -67,11 +69,15 @@ import org.robolectric.annotation.GraphicsMode
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [33], application = Application::class, qualifiers = "w400dp-h1500dp-xxhdpi")
+@Config(sdk = [33], application = Application::class, qualifiers = "w400dp-h2000dp-xxhdpi")
 class VisionShotsTest {
 
+    private companion object {
+        const val SHOT = "shot"
+    }
+
     @get:Rule
-    val compose = createComposeRule()
+    val compose = createAndroidComposeRule<ComponentActivity>()
 
     @Before
     fun onlyWhenAsked() {
@@ -95,6 +101,7 @@ class VisionShotsTest {
             FinanceTrackerTheme(themeMode = mode) {
                 Column(
                     modifier = Modifier
+                        .testTag(SHOT)
                         .fillMaxWidth()
                         .background(MaterialTheme.colorScheme.background)
                         .padding(16.dp),
@@ -105,9 +112,14 @@ class VisionShotsTest {
         // Let every chart draw itself in, and every figure count up.
         compose.mainClock.advanceTimeBy(3_000)
         compose.waitForIdle()
-        val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
+        // Drawn straight into a picture, then cut to what was drawn.
+        val bottom = compose.onNodeWithTag(SHOT).fetchSemanticsNode().boundsInRoot.bottom
+        val root = compose.activity.findViewById<ViewGroup>(android.R.id.content)
+        val full = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
+        root.draw(Canvas(full))
+        val shot = Bitmap.createBitmap(full, 0, 0, root.width, minOf(root.height, ceil(bottom).toInt()))
         val dir = File("build/vision-shots").apply { mkdirs() }
-        FileOutputStream(File(dir, "$name.png")).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        FileOutputStream(File(dir, "$name.png")).use { shot.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
     private val month = YearMonth.of(2026, 10)
@@ -154,7 +166,9 @@ class VisionShotsTest {
         )
         HomeTiles(state, onOpenAccounts = {})
         MonthList(state)
-        IncomeVsExpenseCard(state, onMonthClick = {})
+        SectionCard(title = "Income against spending", subtitle = "The last 6 months") {
+            MonthTrend(points = state.monthlyTrend, view = BreakdownView.LINE, selected = month)
+        }
         SoftBottomBar(currentRoute = Routes.DASHBOARD, onSelect = {})
     }
 
