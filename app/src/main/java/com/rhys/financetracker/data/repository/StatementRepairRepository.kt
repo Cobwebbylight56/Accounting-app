@@ -7,6 +7,7 @@ import com.rhys.financetracker.data.importer.CardStatementJunk
 import com.rhys.financetracker.data.importer.MerchantCategoriser
 import com.rhys.financetracker.data.importer.PdfStatementParser
 import com.rhys.financetracker.data.importer.RepaymentPairing
+import com.rhys.financetracker.data.importer.RepeatedHeadingsReader
 import com.rhys.financetracker.data.importer.TransactionFingerprint
 import com.rhys.financetracker.data.local.AppDatabase
 import com.rhys.financetracker.data.local.dao.AccountDao
@@ -38,6 +39,10 @@ import javax.inject.Singleton
  *   transactions", "Dear Mr …" — put away; see [CardStatementJunk].
  * * **Paying a card off read as spending on it** — "Direct Debit Payment -
  *   Thank You" as money out — turned round to money in.
+ * * **A Lloyds statement with its headings over every payment** — the
+ *   summary at the top ("Money In. . Balance on . .") put away, and the
+ *   jumbled heading scraps taken out of a payee, so the same payment
+ *   imported again is known to be there already. See [RepeatedHeadingsReader].
  *
  * Run after every import and whenever Home opens.
  */
@@ -52,7 +57,7 @@ class StatementRepairRepository @Inject constructor(
 
     /** Puts right whatever needs it; returns how many entries changed. */
     suspend fun putRight(today: LocalDate = DateUtils.today()): Int =
-        backFromTheFuture(today) + cardStatementText(today) + cardSpendingReadAsIn(today) +
+        backFromTheFuture(today) + cardStatementText(today) + cardSpendingReadAsIn(today) + repeatedHeadings(today) +
             recurringRuleDao.cardPaymentsAsCard(Instant.now().toEpochMilli())
 
     /** On cards: the statement's own lines put away, and paying it off turned to money in. */
@@ -88,6 +93,33 @@ class StatementRepairRepository @Inject constructor(
             }
         }
         return junk.size + paidOff.size
+    }
+
+    private suspend fun repeatedHeadings(today: LocalDate): Int {
+        val rows = transactionDao.liveSince(today.minusDays(LOOK_BACK_DAYS)).filter { it.source == RecordSource.STATEMENT }
+        val summary = rows.filter { RepeatedHeadingsReader.isSummary(it.description) }
+        val jumbled = rows.filter { it !in summary }.mapNotNull { row ->
+            RepeatedHeadingsReader.tidy(row.description)?.takeIf { it != row.description }?.let { row to it }
+        }
+        if (summary.isEmpty() && jumbled.isEmpty()) return 0
+        val now = Instant.now().toEpochMilli()
+        database.withTransaction {
+            summary.forEach { row ->
+                transactionDao.update(row.copy(isArchived = true, notes = noted(row.notes, NOT_A_PAYMENT), updatedAt = now))
+            }
+            jumbled.forEach { (row, description) ->
+                transactionDao.update(
+                    row.copy(
+                        description = description,
+                        importHash = row.importHash?.let {
+                            TransactionFingerprint.of(row.accountId, row.date, row.amountMinor, row.type, description)
+                        },
+                        updatedAt = now,
+                    ),
+                )
+            }
+        }
+        return summary.size + jumbled.size
     }
 
     private suspend fun backFromTheFuture(today: LocalDate): Int {

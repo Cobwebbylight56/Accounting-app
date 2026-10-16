@@ -635,6 +635,10 @@ whenever Home opens:
 * Spending on a card read as money in (a subscription at its usual amount, on
   its usual day) becomes spending again.
 * A regular payment from a card called a direct debit becomes a card payment.
+* On a Lloyds statement downloaded from the app, the summary at the top taken
+  for payments ("Money In… Balance on…") is put away, and jumbled heading
+  words in a payee are taken out — so importing the statement again adds what
+  was missed without doubling what was already there.
 
 Each one changed has a note saying why.
 
@@ -646,6 +650,17 @@ turns them the right way round before reading, so the running balance still
 proves which way each payment went, and a row that the PDF splits over two
 lines (the description on one, the date and balance on the next) is put back
 together.
+
+Statements downloaded from the Lloyds app print the column headings again
+above every payment — "Date Description Type Money In (£) Balance (£)" — and
+the heading says which way that payment went, so the app reads it from there
+and checks it against the balance. The bank's codes are turned into words the
+app understands: **DD** stays a Direct debit, **SO** a standing order, **FPO**
+and **FPI** read as a faster payment, **BGC** as a bank credit (a wage, often).
+
+A statement for a stretch when nothing went in or out ("You have no
+transactions to display for this period") says just that — there's nothing to
+add — rather than that the layout can't be read.
 
 ### Statements with a side panel (Nationwide and others)
 

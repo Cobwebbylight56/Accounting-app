@@ -66,6 +66,9 @@ object PdfStatementParser {
      * be imported rather than producing nonsense.
      */
     fun toSheet(lines: List<String>, sheetName: String): SheetData? {
+        // Headings printed again over every payment — Lloyds' downloaded
+        // statements — say which way each went; nothing else reads them.
+        RepeatedHeadingsReader.parse(lines)?.takeIf { it.isNotEmpty() }?.let { return sheetOf(it, sheetName) }
         val usual = parse(lines)
         // Two rows is the ordinary bar, and it is there so that a letter or a
         // payslip with a couple of dated figures on it is not offered as a
@@ -93,8 +96,11 @@ object PdfStatementParser {
                 if (flexible.size >= MIN_ROWS || (flexible.isNotEmpty() && statementSaysSo)) flexible else return null
             }
         }
+        return sheetOf(rows, sheetName)
+    }
 
-        return SheetData(
+    private fun sheetOf(rows: List<Row>, sheetName: String): SheetData =
+        SheetData(
             name = sheetName,
             rows = listOf(HEADINGS) + rows.map { row ->
                 listOf(
@@ -106,7 +112,6 @@ object PdfStatementParser {
                 )
             },
         )
-    }
 
     /** Every transaction line found in [lines], in the order they appear. */
     fun parse(lines: List<String>, today: LocalDate = LocalDate.now()): List<Row> {

@@ -347,7 +347,7 @@ object FlexibleStatementReader {
 
     /** What a statement says about itself, rather than a transaction. */
     private val SUMMARY = Regex(
-        """\b(balance (brought|carried) forward|(previous|opening|closing|new|current|available|statement|account) balance|your (new )?balance|available (to spend|credit|funds)|credit limit|minimum (payments?|repayments?)|new transactions|payments received|payments and credits|payment due|due (date|on|by)|repayment due|statement (date|period|for|number)|interest rate|estimated interest|annual rate|apr|aer|page \d+|issued on|date of birth|sort code|account (number|no)|iban|bic|period|summary|overdraft limit|arranged overdraft)\b""",
+        """\b(balance (brought|carried) forward|(previous|opening|closing|new|current|available|statement|account) balance|your (new )?balance|available (to spend|credit|funds)|credit limit|minimum (payments?|repayments?)|new transactions|payments received|payments and credits|payment due|due (date|on|by)|repayment due|statement (date|period|for|number)|interest rate|estimated interest|annual rate|apr|aer|page \d+|issued on|date of birth|sort code|account (number|no)|iban|bic|period|summary|overdraft limit|arranged overdraft|balance on)\b""",
     )
 
     /** A line that is only a column's total. */

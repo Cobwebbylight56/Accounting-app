@@ -35,17 +35,7 @@ object PdfStatementReader {
         val lines = text.split('\n').map { it.trimEnd() }
 
         val sheet = PdfStatementParser.toSheet(lines, fileName.removeSuffix(".pdf"))
-            ?: error(
-                if (text.isBlank()) {
-                    "There is no text in that PDF to read. It is a scan or a photograph " +
-                        "of a statement rather than one downloaded from the bank, so the " +
-                        "figures are a picture. Download the statement from online banking."
-                } else {
-                    "That PDF has text in it, but none of it looks like transaction rows " +
-                        "— so the layout is one this app does not recognise yet. Tap " +
-                        "\"Show what was read\" to see it."
-                },
-            )
+            ?: error(unreadable(text))
 
         return WorkbookData(fileName = fileName, sheets = listOf(sheet))
     }
@@ -59,6 +49,31 @@ object PdfStatementReader {
      * on and the reader taught the layout.
      */
     fun extractTextForDiagnostics(input: InputStream): String = extractText(input)
+
+    /** What to tell the user when nothing in [text] reads as a payment. */
+    internal fun unreadable(text: String): String =
+        if (NO_PAYMENTS.containsMatchIn(text)) {
+            // A real statement, for a stretch the account wasn't used.
+            val period = PERIOD.find(text)?.let { " (${it.groupValues[1]} to ${it.groupValues[2]})" }.orEmpty()
+            "That statement$period has no payments in it, so there's nothing to add. " +
+                "Nothing is wrong with it — the account just wasn't used in that time."
+        } else if (text.isBlank()) {
+            "There is no text in that PDF to read. It is a scan or a photograph " +
+                "of a statement rather than one downloaded from the bank, so the " +
+                "figures are a picture. Download the statement from online banking."
+        } else {
+            "That PDF has text in it, but none of it looks like transaction rows " +
+                "— so the layout is one this app does not recognise yet. Tap " +
+                "\"Show what was read\" to see it."
+        }
+
+    /** How a statement says it has nothing in it. */
+    private val NO_PAYMENTS = Regex(
+        """(?i)\b(you have no transactions|no transactions (to display|to show|for this period|in this period|during this period)|there are no transactions)""",
+    )
+
+    /** "01 October 2026 to 16 October 2026". */
+    private val PERIOD = Regex("""(?i)\b(\d{1,2} [a-z]+ \d{4}) (?:to|-|–) (\d{1,2} [a-z]+ \d{4})\b""")
 
     private fun extractText(input: InputStream): String =
         try {

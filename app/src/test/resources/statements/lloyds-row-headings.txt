@@ -1,0 +1,34 @@
+logo, Lloyds Bank.
+16 October 2026 Page 1 of 1
+Document requested by: Your Account
+Sort Code 00-00-00
+Account Number
+CLASSIC. 01 February 2026 to 28 February 2026.
+Money In. £1,862.23. Balance on 01 February 2026. £110.00.
+Money Out. £1,862.23. Balance on 28 February 2026. £110.00.
+Your Transactions
+Column Column Column Column Column Column
+Date. Description. Type. Money In (£). Money Out (£). Balance (£).
+Date Description Type Money In (£) Balance (£)
+05 Feb 26 .
+. ACME INDUSTRIAL ey Obulat n(£k)
+. BGC. 1,862.23 Mon
+. 1,972.23.
+Date Description Type Money Out (£) Balance (£)
+06 Feb 26 Moneyb Ilna n(k£.)
+. A CUSTOMER. FPO. 0.01. 1,972.22.
+Date Description Type Money Out (£) Balance (£)
+06 Feb 26. A CUSTOMER. FPO Moneyb Ilna n(k£.)
+. 1,862.22. 110.00.
+Transaction types blank.
+.
+BGC. Bank Giro Credit. BP. Bill Payments. CHG. Charge. CHQ. Cheque.
+COR. Correction. CPT. Cashpoint. DD. Direct Debit. DEB. Debit Card.
+DEP. Deposit. FEE. Fixed Service FPI. Faster Payment In. FPO. Faster Payment Out.
+MPI. Mobile Payment In. MPO. Mobile Payment Out. PAY. Payment. SO. Standing Order.
+TFR blank. blank. blank. blank. blank. blank.
+. Transfer.
+If you think something is incorrect, please contact us on 0345 300 0000
+Lloyds Bank plc. Registered Office: 25 Gresham Street, London EC2V 7HN. Registered in England and Wales no. 2065 Lloyds Bank plc
+is authorised by the Prudential Regulation Authority and regulated by the Financial Conduct Authority and the Prudential Regulation
+Authority under registration number 119278.

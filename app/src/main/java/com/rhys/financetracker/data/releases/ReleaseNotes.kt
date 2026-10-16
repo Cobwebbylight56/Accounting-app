@@ -22,6 +22,14 @@ object ReleaseNotes {
     /** Every release, newest first. */
     val ALL: List<Release> = listOf(
         Release(
+            "2.1.1", LocalDate.of(2026, 10, 16), "Lloyds statements from the app",
+            listOf(
+                "Statements downloaded from the Lloyds app are read properly: they print the headings again above every payment, and every payment is now read, with which way it went taken from its heading and checked against the balance.",
+                "The summary at the top of one (\"Money In… Balance on…\") is no longer taken for payments. Where an earlier version did, those are put away by themselves, and the payment it read with jumbled words in its name is tidied — import the statement again and the wage and anything else it missed are added, without doubling the rest.",
+                "A statement with no payments in it says so, instead of saying the layout can't be read.",
+            ),
+        ),
+        Release(
             "2.1.0", LocalDate.of(2026, 10, 16), "How you're doing",
             listOf(
                 "At the start of every month, and again halfway through, a pop-up says how it's going against the month before — for the two of you together and for each of you: doing better, much the same, or needs improving.",
