@@ -251,6 +251,25 @@ class VisionShotsTest {
             before = com.rhys.financetracker.domain.report.ProgressFigures(186_000, 139_000, 10_000, 0, mapOf("Shopping" to 14_000)),
             madeOn = java.time.LocalDate.of(2026, 10, 2),
         )!!
+        // The receipt screen's "Paid from": whose, then which account.
+        val rhys = PersonEntity(id = 1, name = "Rhys Evans", colorHex = "#1F5FD0")
+        val hannah = PersonEntity(id = 2, name = "Hannah", colorHex = "#B4307A")
+        val jointPerson = PersonEntity(id = 3, name = "Joint", colorHex = "#888888", isShared = true)
+        fun account(id: Long, name: String, type: com.rhys.financetracker.domain.model.AccountType, personId: Long) =
+            com.rhys.financetracker.data.local.entity.AccountEntity(id = id, name = name, type = type, personId = personId, colorHex = "#000000")
+        com.rhys.financetracker.ui.components.PersonAccountPicker(
+            label = "Paid from",
+            people = listOf(rhys, hannah, jointPerson),
+            accounts = listOf(
+                account(1, "Lloyds Current Account", com.rhys.financetracker.domain.model.AccountType.CURRENT, 1),
+                account(3, "Zopa", com.rhys.financetracker.domain.model.AccountType.CREDIT_CARD, 1),
+                account(5, "car", com.rhys.financetracker.domain.model.AccountType.LOAN, 1),
+                account(2, "Lloyds Current Account", com.rhys.financetracker.domain.model.AccountType.CURRENT, 2),
+                account(6, "Nationwide Current Account", com.rhys.financetracker.domain.model.AccountType.CURRENT, 3),
+            ),
+            selectedId = 1,
+            onSelect = {},
+        )
         SectionCard(title = together.title, subtitle = "Made 2 Oct") {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 com.rhys.financetracker.ui.progress.ReportSummary(together, showTips = true)

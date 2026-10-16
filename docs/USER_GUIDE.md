@@ -701,6 +701,14 @@ paid by card, even when a creased receipt puts the amount a line away from
 add up to. When the date has been torn off or wasn't printed, it is today's
 date — change it if you're scanning an older receipt.
 
+**Paid from.** When a receipt is added as a new payment, choose whose money it
+was — the people are tabs along the top, then **Joint** — and then the account.
+Only that person's current accounts and cards are offered, so two accounts with
+the same name ("Lloyds Current Account") are never confused; tap **Show savings
+and loans too** for the rest. Choosing a person picks their account to pay from
+straight away. Payments that might be the receipt's say whose account they're in
+when two share a name.
+
 **A screenshot of a list of payments.** Take a screenshot of Google Wallet's
 payments on a card (or a banking app's list) and scan or share it: each row is
 read as its own payment — shop, amount and date (the year worked out when the

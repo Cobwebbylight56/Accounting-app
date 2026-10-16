@@ -22,6 +22,14 @@ object ReleaseNotes {
     /** Every release, newest first. */
     val ALL: List<Release> = listOf(
         Release(
+            "2.2.1", LocalDate.of(2026, 10, 16), "Whose money, then which account",
+            listOf(
+                "Adding a receipt now asks whose money it was first — a tab for each of you, then Joint — and then offers only that person's accounts. Two accounts both called \"Lloyds Current Account\" can no longer be mixed up.",
+                "Only accounts a payment comes out of are offered — current accounts and cards — with savings, ISAs and loans behind \"Show savings and loans too\". Choosing a person picks their account straight away.",
+                "The same for a screenshot of a list of payments, and payments offered as a match say whose account they're in when two share a name.",
+            ),
+        ),
+        Release(
             "2.2.0", LocalDate.of(2026, 10, 16), "Receipts from emails and websites",
             listOf(
                 "Select a receipt's words in an email or on a website, tap Share and choose Add as a receipt: the shop, total and date are read exactly, then matched to the bank's payment or added as a new one.",

@@ -89,7 +89,6 @@ import com.rhys.financetracker.data.repository.AccountRepository
 import com.rhys.financetracker.domain.model.Holding
 import com.rhys.financetracker.ui.components.AmountField
 import com.rhys.financetracker.ui.components.DateField
-import com.rhys.financetracker.ui.components.DropdownField
 import com.rhys.financetracker.ui.components.LabelledTextField
 import com.rhys.financetracker.ui.navigation.Routes
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -150,6 +149,7 @@ class ReceiptScanViewModel @Inject constructor(
     private val receipts: ReceiptRepository,
     private val settingsRepository: SettingsRepository,
     accountRepository: AccountRepository,
+    peopleRepository: com.rhys.financetracker.data.repository.PeopleRepository,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -161,6 +161,10 @@ class ReceiptScanViewModel @Inject constructor(
     val state: StateFlow<ScanState> = _state
 
     val accounts: StateFlow<List<AccountEntity>> = accountRepository.observeActive()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Whose accounts are whose, for choosing the person and then the account that paid. */
+    val people: StateFlow<List<com.rhys.financetracker.data.local.entity.PersonEntity>> = peopleRepository.observeActive()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private var kept = false
@@ -335,6 +339,7 @@ fun ReceiptScanScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val accounts by viewModel.accounts.collectAsStateWithLifecycle()
+    val people by viewModel.people.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var enlarged by remember { mutableStateOf(false) }
 
@@ -452,6 +457,7 @@ fun ReceiptScanScreen(
                     ListedPayments(
                         state = state,
                         accounts = accounts,
+                        people = people,
                         onToggle = viewModel::toggleListed,
                         onAccount = viewModel::setAccount,
                         onAdd = viewModel::addListed,
@@ -489,7 +495,12 @@ fun ReceiptScanScreen(
                             state.matches.forEach { payment ->
                                 MatchCard(
                                     payment = payment,
-                                    accountName = accounts.firstOrNull { it.id == payment.accountId }?.name,
+                                    accountName = accounts.firstOrNull { it.id == payment.accountId }?.let { account ->
+                                        // Whose, when two accounts share a name: "Hannah · Lloyds Current Account".
+                                        val owner = people.firstOrNull { it.id == account.personId }
+                                            ?.takeIf { accounts.count { other -> other.name.equals(account.name, true) } > 1 }
+                                        listOfNotNull(owner?.name?.substringBefore(' '), account.name).joinToString(" · ")
+                                    },
                                     onClick = { viewModel.attach(payment.id) },
                                 )
                             }
@@ -506,12 +517,12 @@ fun ReceiptScanScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        DropdownField(
+                        com.rhys.financetracker.ui.components.PersonAccountPicker(
                             label = "Paid from",
-                            options = accounts,
-                            selected = accounts.firstOrNull { it.id == state.accountId },
-                            onSelect = { viewModel.setAccount(it.id) },
-                            optionLabel = { it.name },
+                            people = people,
+                            accounts = accounts,
+                            selectedId = state.accountId,
+                            onSelect = viewModel::setAccount,
                         )
                         Button(onClick = viewModel::addNew, modifier = Modifier.fillMaxWidth().height(52.dp)) {
                             Text("Add as a new payment")
@@ -533,6 +544,7 @@ fun ReceiptScanScreen(
 private fun ListedPayments(
     state: ScanState,
     accounts: List<AccountEntity>,
+    people: List<com.rhys.financetracker.data.local.entity.PersonEntity>,
     onToggle: (Int) -> Unit,
     onAccount: (Long) -> Unit,
     onAdd: () -> Unit,
@@ -578,12 +590,12 @@ private fun ListedPayments(
             }
         }
     }
-    DropdownField(
+    com.rhys.financetracker.ui.components.PersonAccountPicker(
         label = "Paid from",
-        options = accounts,
-        selected = accounts.firstOrNull { it.id == state.accountId },
-        onSelect = { onAccount(it.id) },
-        optionLabel = { it.name },
+        people = people,
+        accounts = accounts,
+        selectedId = state.accountId,
+        onSelect = onAccount,
     )
     Button(onClick = onAdd, enabled = chosen > 0, modifier = Modifier.fillMaxWidth().height(52.dp)) {
         Text(if (chosen == 1) "Add 1 payment" else "Add $chosen payments")
