@@ -288,7 +288,8 @@ private fun FigureRow(line: ProgressReport.Line) {
             else -> "no change"
         }
     } else {
-        money(line.nowMinor)
+        // Taken out of savings, or more spent than came in.
+        (if (line.nowMinor < 0) "−" else "") + money(line.nowMinor)
     }
     val change = when {
         owed -> null
