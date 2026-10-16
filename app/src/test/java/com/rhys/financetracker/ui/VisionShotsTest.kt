@@ -96,7 +96,18 @@ class VisionShotsTest {
 
     @Test fun moreLight() = shoot("6-more-light", ThemeMode.LIGHT) { More() }
 
-    private fun shoot(name: String, mode: ThemeMode, content: @Composable () -> Unit) {
+    // The finished picture, after the light has swept across and before the fade.
+    @Test fun intro() = shoot("7-intro", ThemeMode.DARK, advanceMs = 3_700) {
+        androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth().height(760.dp)) {
+            com.rhys.financetracker.ui.intro.IntroScreen(onFinished = {})
+        }
+    }
+
+    @Test fun progressDark() = shoot("8-progress-dark", ThemeMode.DARK) { Progress() }
+
+    @Test fun progressLight() = shoot("9-progress-light", ThemeMode.LIGHT) { Progress() }
+
+    private fun shoot(name: String, mode: ThemeMode, advanceMs: Long = 3_000, content: @Composable () -> Unit) {
         compose.setContent {
             FinanceTrackerTheme(themeMode = mode) {
                 // As a screen's Scaffold does: the page colour, and text on it.
@@ -113,7 +124,7 @@ class VisionShotsTest {
             }
         }
         // Let every chart draw itself in, and every figure count up.
-        compose.mainClock.advanceTimeBy(3_000)
+        compose.mainClock.advanceTimeBy(advanceMs)
         compose.waitForIdle()
         // Drawn straight into a picture, then cut to what was drawn.
         val bottom = compose.onNodeWithTag(SHOT).fetchSemanticsNode().boundsInRoot.bottom
@@ -205,6 +216,38 @@ class VisionShotsTest {
             DonutChart(entries = slices, centreValue = "£1,258.00", centreLabel = "spent")
             ChartLegend(entries = slices)
         }
+    }
+
+    @Composable
+    private fun Progress() {
+        // The tabs along the top of Payments.
+        androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            com.rhys.financetracker.ui.components.PillTab("Everyone", selected = false, onClick = {})
+            com.rhys.financetracker.ui.components.PillTab("Rhys", selected = true, onClick = {}, dot = FinanceTheme.colors.tileBlue)
+            com.rhys.financetracker.ui.components.PillTab("Hannah", selected = false, onClick = {}, dot = FinanceTheme.colors.tileBlush)
+            com.rhys.financetracker.ui.components.PillTab("Joint", selected = false, onClick = {})
+        }
+        val period = com.rhys.financetracker.domain.report.ProgressSchedule.current(java.time.LocalDate.of(2026, 10, 2))
+        val together = com.rhys.financetracker.domain.report.ProgressReporter.build(
+            period, "Together", "all",
+            now = com.rhys.financetracker.domain.report.ProgressFigures(452_000, 301_500, 40_000, -12_000, mapOf("Eating out" to 9_000, "Groceries" to 52_000)),
+            before = com.rhys.financetracker.domain.report.ProgressFigures(452_000, 338_000, 20_000, 6_000, mapOf("Eating out" to 24_000, "Groceries" to 55_000)),
+            madeOn = java.time.LocalDate.of(2026, 10, 2),
+        )!!
+        val hannah = com.rhys.financetracker.domain.report.ProgressReporter.build(
+            period, "Hannah", "2",
+            now = com.rhys.financetracker.domain.report.ProgressFigures(186_000, 171_000, 0, 9_000, mapOf("Shopping" to 46_000)),
+            before = com.rhys.financetracker.domain.report.ProgressFigures(186_000, 139_000, 10_000, 0, mapOf("Shopping" to 14_000)),
+            madeOn = java.time.LocalDate.of(2026, 10, 2),
+        )!!
+        SectionCard(title = together.title, subtitle = "Made 2 Oct") {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                com.rhys.financetracker.ui.progress.ReportSummary(together, showTips = true)
+                androidx.compose.material3.HorizontalDivider(color = FinanceTheme.colors.cardEdge)
+                com.rhys.financetracker.ui.progress.ReportSummary(hannah, showTips = true)
+            }
+        }
+        Spacer(Modifier.height(4.dp))
     }
 
     @Composable

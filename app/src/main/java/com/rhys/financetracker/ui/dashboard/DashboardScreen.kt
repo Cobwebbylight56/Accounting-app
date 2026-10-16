@@ -83,6 +83,7 @@ fun DashboardScreen(
     onOpenSentToPeople: () -> Unit = {},
     onOpenPeopleMoneyFor: (Long) -> Unit = {},
     onOpenBackup: () -> Unit = {},
+    onOpenProgress: () -> Unit = {},
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -121,6 +122,10 @@ fun DashboardScreen(
     // Needs a look, popping up when the app opens (unless hidden for the week).
     if (inboxRoutes != null) {
         com.rhys.financetracker.ui.inbox.NeedsALookPopup(routes = inboxRoutes, onOpenInbox = onOpenInbox)
+    }
+    // How the month went, at its start and halfway through — after Needs a look, never on top of it.
+    if (individuals.isNotEmpty()) {
+        com.rhys.financetracker.ui.progress.ProgressPopup(onOpenReports = onOpenProgress)
     }
 
     // When the app learned new shops and re-sorted what it had filed itself:
@@ -235,6 +240,7 @@ fun DashboardScreen(
                         onPerson = viewModel::showPerson,
                         onShared = viewModel::showShared,
                         onChooseShared = { choosingShared = true },
+                        onAddPerson = onOpenSetup,
                     )
                 }
 

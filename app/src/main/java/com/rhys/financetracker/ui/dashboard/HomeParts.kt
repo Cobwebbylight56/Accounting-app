@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Groups
@@ -146,10 +147,11 @@ internal fun HomeHeader(
 }
 
 /**
- * One tab per person, then Shared.
+ * One tab per person, then Shared, then a + to add someone — a partner, a
+ * child — straight from Home.
  *
- * Only shown with two or more people: with one there is nothing to choose
- * between. The pencil beside Shared picks who it covers.
+ * With fewer than two people there is nothing to choose between, so only
+ * the + shows. The pencil beside Shared picks who it covers.
  */
 @Composable
 internal fun PersonTabs(
@@ -158,8 +160,12 @@ internal fun PersonTabs(
     onPerson: (Long) -> Unit,
     onShared: () -> Unit,
     onChooseShared: () -> Unit,
+    onAddPerson: () -> Unit = {},
 ) {
-    if (individuals.size < 2) return
+    if (individuals.size < 2) {
+        AddPersonPill(onAddPerson, label = "Add someone")
+        return
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -186,38 +192,52 @@ internal fun PersonTabs(
                 Icon(Icons.Outlined.Edit, contentDescription = "Choose who Shared covers")
             }
         }
+        AddPersonPill(onAddPerson, label = null)
+    }
+}
+
+/** A + in a little bubble that starts adding a person: their name, then their accounts. */
+@Composable
+private fun AddPersonPill(onClick: () -> Unit, label: String?) {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = BorderStroke(1.dp, FinanceTheme.colors.cardEdge),
+        onClick = onClick,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = if (label == null) 10.dp else 16.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(22.dp)
+                    .background(FinanceTheme.colors.navSelected.brush, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Outlined.Add,
+                    contentDescription = if (label == null) "Add someone" else null,
+                    tint = FinanceTheme.colors.onNavSelected,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
+            if (label != null) {
+                Spacer(Modifier.width(8.dp))
+                Text(label, style = MaterialTheme.typography.labelLarge)
+            }
+        }
     }
 }
 
 @Composable
 private fun TabPill(label: String, selected: Boolean, colorHex: String?, onClick: () -> Unit) {
-    val colors = FinanceTheme.colors
-    Surface(
-        shape = RoundedCornerShape(50),
-        color = if (selected) Color.Transparent else MaterialTheme.colorScheme.surfaceContainerHigh,
+    com.rhys.financetracker.ui.components.PillTab(
+        label = label,
+        selected = selected,
         onClick = onClick,
-    ) {
-        Row(
-            modifier = Modifier
-                .then(if (selected) Modifier.background(colors.navSelected.brush) else Modifier)
-                .padding(horizontal = 16.dp, vertical = 9.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (colorHex != null) {
-                Box(
-                    Modifier
-                        .size(10.dp)
-                        .background(colorFromHex(colorHex), CircleShape),
-                )
-                Spacer(Modifier.width(8.dp))
-            }
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelLarge,
-                color = if (selected) colors.onTile else MaterialTheme.colorScheme.onSurface,
-            )
-        }
-    }
+        dot = colorHex?.let { colorFromHex(it) },
+    )
 }
 
 /** Picks the people the Shared tab covers. */
@@ -609,9 +629,10 @@ internal fun LoansCard(state: DashboardState, onOpenAccounts: () -> Unit) {
                             } else {
                                 (total - left).toFloat() / total
                             }
+                            val grow = com.rhys.financetracker.ui.components.rememberReveal(listOf(share))
                             Spacer(Modifier.height(8.dp))
                             LinearProgressIndicator(
-                                progress = { share.coerceIn(0f, 1f) },
+                                progress = { share.coerceIn(0f, 1f) * grow },
                                 modifier = Modifier.fillMaxWidth().height(6.dp),
                                 color = FinanceTheme.colors.tileBlue,
                                 trackColor = MaterialTheme.colorScheme.surface,

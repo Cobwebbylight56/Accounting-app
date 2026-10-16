@@ -22,6 +22,18 @@ object ReleaseNotes {
     /** Every release, newest first. */
     val ALL: List<Release> = listOf(
         Release(
+            "2.1.0", LocalDate.of(2026, 10, 16), "How you're doing",
+            listOf(
+                "At the start of every month, and again halfway through, a pop-up says how it's going against the month before — for the two of you together and for each of you: doing better, much the same, or needs improving.",
+                "Each report compares spending, what was put aside, money in, what was left over and what's owed on cards and loans, names the categories that rose or fell most, and says what would help. Halfway through, it says where the month is heading.",
+                "Every report is kept under More → Progress reports.",
+                "A + after the tabs on Home adds someone straight away. With one person set up, it says \"Add someone\".",
+                "Payments has tabs along the top: Everyone, each person, and Joint.",
+                "A new icon and opening animation in Vision 2's colours: a glowing bubble whose line climbs into a little bubble of its own.",
+                "Charts and bars draw themselves in: lines from the left, bars growing to their length, and again whenever the figures change. The tabs spring between choices, and the bubble in the bar along the bottom pops up out of the tab you tap.",
+            ),
+        ),
+        Release(
             "2.0.0", LocalDate.of(2026, 10, 15), "Vision 2",
             listOf(
                 "A whole new look. Midnight ink and lavender in dark mode, porcelain and lavender in light, with bolder figures and rounder everything.",

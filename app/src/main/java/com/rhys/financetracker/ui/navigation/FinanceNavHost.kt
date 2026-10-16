@@ -26,6 +26,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -188,6 +190,14 @@ internal fun SoftBottomBar(
             ) {
                 TopLevelDestination.entries.forEach { destination ->
                     val selected = currentRoute == destination.route
+                    // The bubble springs up out of the bar for the tab chosen,
+                    // overshooting a little, and sinks back into the last one.
+                    val lift by androidx.compose.animation.core.animateFloatAsState(
+                        targetValue = if (selected) 1f else 0f,
+                        animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.5f, stiffness = 380f),
+                        label = "tab bubble",
+                    )
+                    val shown = lift.coerceIn(0f, 1f)
                     Box(
                         modifier = Modifier
                             .size(52.dp)
@@ -195,14 +205,31 @@ internal fun SoftBottomBar(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = androidx.compose.material3.ripple(bounded = false, radius = 26.dp),
                             ) { onSelect(destination) }
-                            .semantics { this.selected = selected },
+                            .semantics {
+                                this.selected = selected
+                                contentDescription = destination.label
+                            },
                         contentAlignment = Alignment.Center,
                     ) {
-                        if (selected) {
+                        if (shown < 1f) {
+                            Icon(
+                                destination.icon,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.graphicsLayer { alpha = 1f - shown },
+                            )
+                        }
+                        if (shown > 0f) {
                             // Lifted out of the bar, glowing in its own colours.
                             Box(
                                 modifier = Modifier
-                                    .offset(y = (-16).dp)
+                                    .graphicsLayer {
+                                        translationY = (-16).dp.toPx() * lift
+                                        val scale = 0.4f + 0.6f * lift
+                                        scaleX = scale
+                                        scaleY = scale
+                                        alpha = shown
+                                    }
                                     .size(52.dp)
                                     .shadow(
                                         elevation = 14.dp,
@@ -217,16 +244,10 @@ internal fun SoftBottomBar(
                             ) {
                                 Icon(
                                     destination.icon,
-                                    contentDescription = destination.label,
+                                    contentDescription = null,
                                     tint = colors.onNavSelected,
                                 )
                             }
-                        } else {
-                            Icon(
-                                destination.icon,
-                                contentDescription = destination.label,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
                         }
                     }
                 }
@@ -268,6 +289,7 @@ private fun NavGraphBuilder.topLevelDestinations(
             onOpenSentToPeople = { navController.navigate(Routes.SENT_TO_PEOPLE) },
             onOpenPeopleMoneyFor = { navController.navigate(Routes.sentToPeople(it)) },
             onOpenBackup = { navController.navigate(Routes.SETTINGS_BACKUP) },
+            onOpenProgress = { navController.navigate(Routes.PROGRESS) },
         )
     }
 
@@ -343,7 +365,12 @@ private fun NavGraphBuilder.topLevelDestinations(
             onScanReceipt = { navController.navigate(Routes.receiptScan()) },
             onOpenInbox = { navController.navigate(Routes.INBOX) },
             onOpenReports = { navController.navigate(Routes.REPORTS) },
+            onOpenProgress = { navController.navigate(Routes.PROGRESS) },
         )
+    }
+
+    composable(Routes.PROGRESS) {
+        com.rhys.financetracker.ui.progress.ProgressScreen(onBack = { navController.popBackStack() })
     }
 
     composable(Routes.SUBSCRIPTIONS) {

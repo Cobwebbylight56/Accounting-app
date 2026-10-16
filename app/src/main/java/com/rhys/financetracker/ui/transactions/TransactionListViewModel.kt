@@ -154,6 +154,21 @@ class TransactionListViewModel @Inject constructor(
         )
     }
 
+    /** The tabs along the top: everyone's payments. */
+    fun showEveryone() {
+        filter.value = filter.value.copy(personIds = emptySet(), onlyJoint = false)
+    }
+
+    /** One person's payments: their own accounts, and anything marked as theirs. */
+    fun showPerson(id: Long) {
+        filter.value = filter.value.copy(personIds = setOf(id), onlyJoint = false)
+    }
+
+    /** What's held jointly. */
+    fun showJoint() {
+        filter.value = filter.value.copy(personIds = emptySet(), onlyJoint = true)
+    }
+
     fun setDateRange(from: LocalDate?, to: LocalDate?) {
         filter.value = filter.value.copy(dateFrom = from, dateTo = to)
     }

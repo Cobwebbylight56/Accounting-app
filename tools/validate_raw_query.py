@@ -38,6 +38,7 @@ conditions = [
     "t.category_id IS NULL",
     f"(t.category_id IN ({ph}) OR t.id IN (SELECT sp.transaction_id FROM transaction_splits sp WHERE sp.category_id IN ({ph})))",
     f"COALESCE(t.person_id, a.person_id) IN ({ph})",
+    "(a.is_shared = 1 OR IFNULL(p.is_shared, 0) = 1)",
     f"t.type IN ({ph})",
     "t.amount_minor >= ?", "t.amount_minor <= ?",
     "t.savings_goal_id = ?", "t.recurring_rule_id = ?",

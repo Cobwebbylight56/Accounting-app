@@ -24,6 +24,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -32,21 +34,24 @@ import androidx.compose.ui.graphics.PathMeasure
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.rhys.financetracker.ui.components.ChartCurves
 import kotlin.math.PI
 import kotlin.math.sin
 import kotlinx.coroutines.launch
 
 /**
- * The opening animation, about four and a half seconds long: a badge springs up, its
- * bars rise one after another, a line climbs across their tops to a glowing
- * point, and the name slides in under it while sparks drift upward. Then it
- * fades into the app.
+ * The opening animation, about four and a half seconds long, in Vision 2's
+ * colours: the bubble from the app's icon springs up, its bars rise one after
+ * another, a smooth line climbs across their tops into a little glowing
+ * bubble, and the name slides in under it while bubbles float up the screen.
+ * Then it fades into the app.
  *
  * Tap anywhere to skip. It is not shown at all when the phone's animations
  * are switched off, or when "Opening animation" is off in Settings.
@@ -72,6 +77,11 @@ fun IntroScreen(onFinished: () -> Unit) {
     /** The same on the real clock, for the hold and the fade. */
     fun clock(start: Float, end: Float): Float =
         FastOutSlowInEasing.transform(((t - start) / (end - start)).coerceIn(0f, 1f))
+    /** A pop with a little overshoot, so a bubble lands rather than appears. */
+    fun pop(start: Float, end: Float): Float {
+        val p = phase(start, end)
+        return p + 0.18f * sin(p * PI.toFloat())
+    }
 
     val fadeOut = 1f - clock(FADE_START_MS, TOTAL_MS)
 
@@ -79,7 +89,7 @@ fun IntroScreen(onFinished: () -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             .graphicsLayer { alpha = fadeOut }
-            .background(Brush.verticalGradient(listOf(Navy, DeepTeal)))
+            .background(Brush.linearGradient(listOf(Night, Indigo)))
             .semantics { contentDescription = "Finance Tracker. Tap to skip." }
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
@@ -91,126 +101,169 @@ fun IntroScreen(onFinished: () -> Unit) {
             },
         contentAlignment = Alignment.Center,
     ) {
-        // Sparks drifting up the whole screen.
         Canvas(modifier = Modifier.fillMaxSize()) {
-            SPARKS.forEach { spark ->
-                val life = ((t + spark.delay) % SPARK_LIFE_MS) / SPARK_LIFE_MS
-                val x = size.width * spark.x + sin(life * 2 * PI.toFloat() + spark.x * 9f) * 14.dp.toPx()
-                val y = size.height * (1.05f - life * 0.9f)
-                val alpha = sin(life * PI.toFloat()) * 0.55f * phase(0f, 500f)
-                drawCircle(
-                    color = Mint.copy(alpha = alpha),
-                    radius = spark.radius.dp.toPx(),
-                    center = Offset(x, y),
-                )
-            }
-            // A soft glow behind the badge, breathing gently.
-            val glow = 0.20f + 0.08f * sin(t / 380f)
+            // Two great soft glows, violet above and pink below, drifting slowly.
+            val drift = sin(t / 900f)
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(Mint.copy(alpha = glow * phase(0f, 600f)), Color.Transparent),
-                    center = Offset(size.width / 2f, size.height / 2f - 40.dp.toPx()),
-                    radius = 190.dp.toPx(),
+                    colors = listOf(Violet.copy(alpha = 0.42f * phase(0f, 700f)), Color.Transparent),
+                    center = Offset(size.width * (0.30f + 0.04f * drift), size.height * 0.30f),
+                    radius = size.width * 0.85f,
                 ),
-                radius = 190.dp.toPx(),
-                center = Offset(size.width / 2f, size.height / 2f - 40.dp.toPx()),
+                radius = size.width * 0.85f,
+                center = Offset(size.width * (0.30f + 0.04f * drift), size.height * 0.30f),
             )
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Pink.copy(alpha = 0.26f * phase(0f, 900f)), Color.Transparent),
+                    center = Offset(size.width * (0.78f - 0.04f * drift), size.height * 0.80f),
+                    radius = size.width * 0.75f,
+                ),
+                radius = size.width * 0.75f,
+                center = Offset(size.width * (0.78f - 0.04f * drift), size.height * 0.80f),
+            )
+            // Bubbles floating up the whole screen.
+            FLOATERS.forEach { b ->
+                val life = ((t + b.delay) % FLOAT_LIFE_MS) / FLOAT_LIFE_MS
+                val r = b.radius.dp.toPx()
+                val x = size.width * b.x + sin(life * 2 * PI.toFloat() + b.x * 9f) * 16.dp.toPx()
+                val y = size.height * (1.08f - life * 1.16f)
+                val alpha = sin(life * PI.toFloat()) * 0.55f * phase(0f, 600f)
+                val colours = BUBBLES[b.colour]
+                drawCircle(
+                    brush = Brush.linearGradient(
+                        colours.map { it.copy(alpha = alpha) },
+                        start = Offset(x - r, y - r),
+                        end = Offset(x + r, y + r),
+                    ),
+                    radius = r,
+                    center = Offset(x, y),
+                )
+                drawCircle(Color.White.copy(alpha = alpha * 0.7f), radius = r * 0.28f, center = Offset(x - r * 0.35f, y - r * 0.38f))
+            }
         }
 
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            val pop = phase(0f, 650f)
+            val arrive = pop(0f, 650f)
             Canvas(
                 modifier = Modifier
-                    .size(132.dp)
+                    .size(140.dp)
                     .graphicsLayer {
-                        // A little overshoot, so it lands rather than appears.
-                        val scale = 0.55f + 0.45f * pop + 0.06f * sin(pop * PI.toFloat())
+                        val scale = 0.55f + 0.45f * arrive
                         scaleX = scale
                         scaleY = scale
-                        alpha = pop
+                        alpha = phase(0f, 400f)
                     },
             ) {
-                val corner = 34.dp.toPx()
-                drawRoundRect(
-                    brush = Brush.linearGradient(listOf(Teal, Sea), start = Offset.Zero, end = Offset(size.width, size.height)),
-                    cornerRadius = CornerRadius(corner, corner),
-                )
-                // A sheen across the top half.
-                drawRoundRect(
-                    brush = Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.18f), Color.Transparent), endY = size.height * 0.6f),
-                    cornerRadius = CornerRadius(corner, corner),
-                )
-                // Once it is all built, a band of light sweeps across the badge.
-                val shine = clock(SHINE_START_MS, SHINE_START_MS + 900f)
-                if (shine > 0f && shine < 1f) {
-                    val band = size.width * 0.45f
-                    val x = -band + (size.width + band * 2) * shine
-                    drawRoundRect(
-                        brush = Brush.linearGradient(
-                            colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.32f), Color.Transparent),
-                            start = Offset(x - band / 2f, 0f),
-                            end = Offset(x + band / 2f, size.height),
-                        ),
-                        cornerRadius = CornerRadius(corner, corner),
-                    )
-                }
+                val w = size.width
+                fun at(x: Float, y: Float) = Offset(w * x, w * y)
+                val corner = CornerRadius(w * 0.34f, w * 0.34f)
+                val badge = Path().apply { addRoundRect(RoundRect(Rect(Offset.Zero, size), corner)) }
 
-                val inset = size.width * 0.2f
-                val floor = size.height * 0.78f
-                val barWidth = (size.width - inset * 2) / (BARS.size * 1.6f)
-                val gap = barWidth * 0.6f
-                val tops = BARS.mapIndexed { i, height ->
-                    val grow = phase(250f + i * 110f, 650f + i * 110f)
-                    val left = inset + i * (barWidth + gap)
-                    val top = floor - (floor - size.height * 0.24f) * height * grow
-                    drawRoundRect(
-                        color = Color.White.copy(alpha = 0.9f),
-                        topLeft = Offset(left, top),
-                        size = Size(barWidth, floor - top),
-                        cornerRadius = CornerRadius(barWidth / 3f, barWidth / 3f),
-                    )
-                    Offset(left + barWidth / 2f, floor - (floor - size.height * 0.24f) * height - 9.dp.toPx())
-                }
-
-                // The line climbing across the bar tops, drawn as it goes.
-                val draw = phase(950f, 1450f)
-                if (draw > 0f) {
-                    val path = Path().apply {
-                        moveTo(tops.first().x - barWidth, tops.first().y + 8.dp.toPx())
-                        tops.forEach { lineTo(it.x, it.y) }
+                // Its glow, breathing gently.
+                val breathe = 0.85f + 0.15f * sin(t / 420f)
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        listOf(Glow.copy(alpha = 0.55f * breathe), Color.Transparent),
+                        center = center,
+                        radius = w * 0.85f,
+                    ),
+                    radius = w * 0.85f,
+                    center = center,
+                )
+                drawPath(badge, Brush.linearGradient(listOf(Blue, Violet, Pink), start = Offset.Zero, end = Offset(w, w)))
+                clipPath(badge) {
+                    // As on Home's bubbles: two circles drifting off the edges, and light across the top.
+                    drawCircle(Color.White.copy(alpha = 0.13f), radius = w * 0.54f, center = at(0.98f, 0.02f))
+                    drawCircle(Color.White.copy(alpha = 0.08f), radius = w * 0.30f, center = at(0.08f, 1.02f))
+                    drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.18f), Color.Transparent), endY = w * 0.56f))
+                    // Once it is all built, a band of light sweeps across.
+                    val shine = clock(SHINE_START_MS, SHINE_START_MS + 900f)
+                    if (shine > 0f && shine < 1f) {
+                        val band = w * 0.45f
+                        val x = -band + (w + band * 2) * shine
+                        drawRect(
+                            Brush.linearGradient(
+                                listOf(Color.Transparent, Color.White.copy(alpha = 0.30f), Color.Transparent),
+                                start = Offset(x - band / 2f, 0f),
+                                end = Offset(x + band / 2f, w),
+                            ),
+                        )
                     }
+                }
+
+                // The bars, rising one after another.
+                val floor = w * FLOOR
+                BAR_X.forEachIndexed { i, x ->
+                    val grow = phase(250f + i * 110f, 650f + i * 110f)
+                    val top = floor - (floor - w * BAR_TOP[i]) * grow
+                    drawRoundRect(
+                        color = Color.White.copy(alpha = 0.28f),
+                        topLeft = Offset(w * (x - BAR_W / 2f), top),
+                        size = Size(w * BAR_W, floor - top),
+                        cornerRadius = CornerRadius(w * 0.04f, w * 0.04f),
+                    )
+                }
+
+                // The line climbing over them, drawn as it goes, with a wash under it.
+                val points = LINE.map { (x, y) -> at(x, y) }
+                val line = ChartCurves.path(points)
+                val draw = phase(950f, 1450f)
+                val wash = phase(1250f, 1700f)
+                if (wash > 0f) {
+                    clipPath(badge) {
+                        drawPath(
+                            ChartCurves.area(points, floor),
+                            Brush.verticalGradient(
+                                listOf(Color.White.copy(alpha = 0.35f * wash), Color.Transparent),
+                                startY = w * 0.3f,
+                                endY = floor,
+                            ),
+                        )
+                    }
+                }
+                val measure = PathMeasure().apply { setPath(line, false) }
+                if (draw > 0f) {
                     val partial = Path()
-                    val measure = PathMeasure().apply { setPath(path, false) }
                     measure.getSegment(0f, measure.length * draw, partial, true)
                     drawPath(
                         path = partial,
-                        color = Gold,
-                        style = Stroke(width = 3.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
+                        color = Color.White,
+                        style = Stroke(width = w * 0.052f, cap = StrokeCap.Round, join = StrokeJoin.Round),
                     )
-                    // The glowing point at the end.
-                    val end = measure.getPosition(measure.length * draw)
-                    val burst = phase(1400f, 1700f)
-                    drawCircle(Gold.copy(alpha = 0.35f * (1f - burst * 0.6f)), radius = (6f + 10f * burst).dp.toPx(), center = end)
-                    // While it holds, the point keeps glowing gently.
-                    if (burst >= 1f) {
-                        val pulse = (sin(t / 220f) + 1f) / 2f
-                        drawCircle(Gold.copy(alpha = 0.18f + 0.14f * pulse), radius = (12f + 6f * pulse).dp.toPx(), center = end)
-                    }
-                    drawCircle(Gold, radius = 4.5.dp.toPx(), center = end)
+                }
+
+                // The little bubble at the top of the line, landing as the line reaches it.
+                val sun = pop(1380f, 1750f)
+                if (sun > 0f) {
+                    val c = points.last()
+                    val r = w * SUN_R * sun
+                    val pulse = if (phase(1380f, 1750f) >= 1f) (sin(t / 240f) + 1f) / 2f else 0f
+                    drawCircle(Color.White.copy(alpha = 0.20f + 0.10f * pulse), radius = r + w * (0.06f + 0.02f * pulse), center = c)
+                    drawCircle(Brush.linearGradient(listOf(SunStart, SunEnd), start = c - Offset(r, r), end = c + Offset(r, r)), radius = r, center = c)
+                    drawCircle(Color.White.copy(alpha = 0.5f), radius = r * 0.27f, center = c - Offset(r * 0.31f, r * 0.34f))
+                }
+                // And one below, a moment later.
+                val mint = pop(1550f, 1900f)
+                if (mint > 0f) {
+                    val c = at(MINT_X, MINT_Y)
+                    val r = w * MINT_R * mint
+                    drawCircle(Brush.linearGradient(listOf(MintStart, MintEnd), start = c - Offset(r, r), end = c + Offset(r, r)), radius = r, center = c)
+                    drawCircle(Color.White.copy(alpha = 0.5f), radius = r * 0.3f, center = c - Offset(r * 0.35f, r * 0.37f))
                 }
             }
 
-            Spacer(Modifier.height(28.dp))
+            Spacer(Modifier.height(30.dp))
             val title = phase(1050f, 1550f)
             Text(
                 text = "Finance Tracker",
                 color = Color.White,
-                fontSize = 30.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.5.sp,
+                fontSize = 31.sp,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 0.3.sp,
                 modifier = Modifier.graphicsLayer {
                     alpha = title
                     translationY = (1f - title) * 24.dp.toPx()
@@ -220,7 +273,7 @@ fun IntroScreen(onFinished: () -> Unit) {
             val tagline = phase(1350f, 1850f)
             Text(
                 text = "Every penny, in its place",
-                color = Mint.copy(alpha = 0.85f),
+                color = Lilac.copy(alpha = 0.9f),
                 fontSize = 15.sp,
                 letterSpacing = 1.sp,
                 modifier = Modifier.graphicsLayer {
@@ -232,33 +285,61 @@ fun IntroScreen(onFinished: () -> Unit) {
     }
 }
 
-private class Spark(val x: Float, val delay: Float, val radius: Float)
+private class Floater(val x: Float, val delay: Float, val radius: Float, val colour: Int)
 
 /** Fixed, so the intro looks the same every time. */
-private val SPARKS = listOf(
-    Spark(0.08f, 0f, 2.5f), Spark(0.19f, 900f, 1.8f), Spark(0.31f, 1700f, 3f),
-    Spark(0.44f, 400f, 2f), Spark(0.57f, 1300f, 2.6f), Spark(0.66f, 200f, 1.6f),
-    Spark(0.74f, 2100f, 2.2f), Spark(0.86f, 600f, 3f), Spark(0.93f, 1500f, 1.8f),
-    Spark(0.25f, 2500f, 2.2f), Spark(0.51f, 2900f, 1.6f), Spark(0.80f, 3300f, 2.4f),
+private val FLOATERS = listOf(
+    Floater(0.08f, 0f, 9f, 0), Floater(0.20f, 1100f, 5f, 2), Floater(0.31f, 2100f, 13f, 1),
+    Floater(0.45f, 500f, 6f, 3), Floater(0.58f, 1600f, 10f, 0), Floater(0.67f, 300f, 4f, 2),
+    Floater(0.76f, 2600f, 8f, 1), Floater(0.88f, 800f, 12f, 3), Floater(0.94f, 1900f, 5f, 0),
+    Floater(0.25f, 3200f, 7f, 3), Floater(0.52f, 3700f, 4f, 1), Floater(0.82f, 4300f, 9f, 2),
 )
 
-/** Bar heights inside the badge, as a share of the room: a rising month. */
-private val BARS = listOf(0.38f, 0.58f, 0.47f, 0.86f)
+/**
+ * The mark, the same as the app's icon, as shares of the bubble's width:
+ * where the bars stand and how tall they grow, the points the line runs
+ * through, and the two little bubbles.
+ */
+private const val FLOOR = 0.84f
+private const val BAR_W = 0.112f
+private val BAR_X = listOf(0.24f, 0.404f, 0.568f, 0.732f)
+private val BAR_TOP = listOf(0.65f, 0.53f, 0.59f, 0.39f)
+private val LINE = listOf(
+    0.11f to 0.67f, 0.24f to 0.56f, 0.404f to 0.44f, 0.568f to 0.50f, 0.732f to 0.30f, 0.852f to 0.148f,
+)
+private const val SUN_R = 0.128f
+private const val MINT_X = 0.088f
+private const val MINT_Y = 0.88f
+private const val MINT_R = 0.08f
 
 /**
  * Four and a half seconds in all: the build-up, slowed by [PACE] so each
  * step can be seen, then a moment holding the finished picture — the light
- * sweeps across the badge and the point glows — before it fades.
+ * sweeps across the bubble and the little one glows — before it fades.
  */
 private const val PACE = 1.4f
 private const val SHINE_START_MS = 2750f
 private const val TOTAL_MS = 4400f
 private const val FADE_START_MS = 3900f
-private const val SPARK_LIFE_MS = 3600f
+private const val FLOAT_LIFE_MS = 5200f
 
-private val Navy = Color(0xFF0E1A2B)
-private val DeepTeal = Color(0xFF0F3B3A)
-private val Teal = Color(0xFF1B9A94)
-private val Sea = Color(0xFF1F5F8B)
-private val Mint = Color(0xFF9FF2D9)
-private val Gold = Color(0xFFFFD27A)
+/** The icon's colours: its night sky, its bubble, and the two little ones. */
+private val Night = Color(0xFF1A1240)
+private val Indigo = Color(0xFF0B1E3C)
+private val Blue = Color(0xFF4F6BF5)
+private val Violet = Color(0xFF6A4CF5)
+private val Pink = Color(0xFFC2366F)
+private val Glow = Color(0xFF7B4CF5)
+private val SunStart = Color(0xFFFFA552)
+private val SunEnd = Color(0xFFE0446A)
+private val MintStart = Color(0xFF3DDBB4)
+private val MintEnd = Color(0xFF0E9F7E)
+private val Lilac = Color(0xFFD2C9FF)
+
+/** The floating bubbles' colours, as on Home. */
+private val BUBBLES = listOf(
+    listOf(Blue, Violet),
+    listOf(Violet, Pink),
+    listOf(SunStart, SunEnd),
+    listOf(MintStart, MintEnd),
+)

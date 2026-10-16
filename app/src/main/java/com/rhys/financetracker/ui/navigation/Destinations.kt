@@ -54,6 +54,9 @@ object Routes {
     const val WHATS_NEW = "settings/whats-new"
     const val RECEIPT_SCAN = "receipts/scan"
     const val INBOX = "inbox"
+
+    /** How each month went, and each half-month, against the one before. */
+    const val PROGRESS = "progress"
     const val IMPORT = "import"
 
     /** Subscriptions and regular payments, and whether each is still being paid. */

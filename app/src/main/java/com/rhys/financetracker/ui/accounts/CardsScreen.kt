@@ -215,9 +215,10 @@ private fun CardCard(summary: CardSummary, onOpen: () -> Unit, onImport: () -> U
         )
         summary.limitMinor?.let { limit ->
             val used = summary.used ?: 0f
+            val grow = com.rhys.financetracker.ui.components.rememberReveal(listOf(used))
             Spacer(Modifier.height(6.dp))
             LinearProgressIndicator(
-                progress = { used },
+                progress = { used * grow },
                 modifier = Modifier.fillMaxWidth(),
                 color = if (used >= HIGH_USE) colors.warning else MaterialTheme.colorScheme.primary,
             )

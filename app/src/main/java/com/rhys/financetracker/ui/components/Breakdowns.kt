@@ -221,6 +221,7 @@ private fun ChartView(
 private fun BarRow(item: CategoryTotal, index: Int, total: Long, before: Long?, onOpen: (CategoryTotal) -> Unit) {
     val color = colorFromHex(item.categoryColor, index)
     val share = item.totalMinor.toFloat() / total
+    val grow = rememberReveal(listOf(share))
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -242,7 +243,7 @@ private fun BarRow(item: CategoryTotal, index: Int, total: Long, before: Long?, 
         ) {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(share.coerceIn(0.02f, 1f))
+                    .fillMaxWidth((share * grow).coerceIn(0.02f, 1f))
                     .fillMaxHeight()
                     .background(color, RoundedCornerShape(5.dp)),
             )

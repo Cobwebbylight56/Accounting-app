@@ -27,6 +27,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
@@ -521,6 +522,8 @@ fun LineChart(
     val maxValue = values.max()
     val minValue = values.min()
     val range = (maxValue - minValue).coerceAtLeast(1L)
+    // Drawn in from the left, and again whenever the figures change.
+    val reveal = rememberReveal(values.map { it.toFloat() })
     val zeroColor = MaterialTheme.colorScheme.outlineVariant
     // The glow under the line.
     val fillColor = lineColor.copy(alpha = 0.18f)
@@ -569,15 +572,20 @@ fun LineChart(
             )
         }
 
-        drawPath(
-            ChartCurves.area(dots, size.height),
-            brush = androidx.compose.ui.graphics.Brush.verticalGradient(
-                listOf(lineColor.copy(alpha = 0.32f), lineColor.copy(alpha = 0f)),
-            ),
-        )
-        val curve = ChartCurves.path(dots)
-        drawPath(curve, color = fillColor, style = Stroke(width = 9.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round))
-        drawPath(curve, color = lineColor, style = Stroke(width = 2.5.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round))
+        clipRect(right = size.width * reveal + 6.dp.toPx()) {
+            drawPath(
+                ChartCurves.area(dots, size.height),
+                brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                    listOf(lineColor.copy(alpha = 0.32f), lineColor.copy(alpha = 0f)),
+                ),
+            )
+            val curve = ChartCurves.path(dots)
+            drawPath(curve, color = fillColor, style = Stroke(width = 9.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round))
+            drawPath(curve, color = lineColor, style = Stroke(width = 2.5.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round))
+        }
+        // The marker lands once the line has reached it.
+        val landed = ((reveal - 0.8f) / 0.2f).coerceIn(0f, 1f)
+        if (landed == 0f) return@Canvas
 
         val endAt = selectedIndex?.takeIf { it in points.indices } ?: points.lastIndex
         val x = endAt * stepX
@@ -590,9 +598,9 @@ fun LineChart(
                 strokeWidth = 2f,
             )
         }
-        drawCircle(color = lineColor.copy(alpha = 0.22f), radius = 11.dp.toPx(), center = Offset(x, y))
-        drawCircle(color = surface, radius = 6.5.dp.toPx(), center = Offset(x, y))
-        drawCircle(color = lineColor, radius = 4.5.dp.toPx(), center = Offset(x, y))
+        drawCircle(color = lineColor.copy(alpha = 0.22f * landed), radius = 11.dp.toPx() * landed, center = Offset(x, y))
+        drawCircle(color = surface.copy(alpha = landed), radius = 6.5.dp.toPx(), center = Offset(x, y))
+        drawCircle(color = lineColor.copy(alpha = landed), radius = 4.5.dp.toPx(), center = Offset(x, y))
     }
 }
 
@@ -606,6 +614,8 @@ fun ProgressBarRow(
     modifier: Modifier = Modifier,
     secondary: String? = null,
 ) {
+    // Grows from nothing when it appears, and to its new length when it changes.
+    val grow = rememberReveal(listOf(fraction))
     Column(modifier = modifier.fillMaxWidth().padding(vertical = 6.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -621,7 +631,7 @@ fun ProgressBarRow(
         Canvas(modifier = Modifier.fillMaxWidth().height(10.dp)) {
             val round = androidx.compose.ui.geometry.CornerRadius(size.height / 2f)
             drawRoundRect(color = color.copy(alpha = 0.16f), size = size, cornerRadius = round)
-            val filled = size.width * fraction.coerceIn(0f, 1f)
+            val filled = size.width * fraction.coerceIn(0f, 1f) * grow
             if (filled > 0f) {
                 drawRoundRect(
                     brush = androidx.compose.ui.graphics.Brush.horizontalGradient(

@@ -312,15 +312,19 @@ fun NeedsALookPopup(
     val allowed by viewModel.popupAllowed.collectAsStateWithLifecycle()
     val introShowing = com.rhys.financetracker.ui.components.LocalIntroShowing.current
     var open by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-    androidx.compose.runtime.LaunchedEffect(items.isNotEmpty(), allowed, introShowing) {
-        if (!PopupShown.thisRun && items.isNotEmpty() && allowed && !introShowing) {
+    val turns = com.rhys.financetracker.ui.components.PopupTurns
+    androidx.compose.runtime.LaunchedEffect(items.isNotEmpty(), allowed, introShowing, turns.open) {
+        if (!PopupShown.thisRun && items.isNotEmpty() && allowed && !introShowing && !turns.open) {
             // A moment for Home to settle before anything pops over it.
             kotlinx.coroutines.delay(POPUP_DELAY_MS)
+            if (turns.open) return@LaunchedEffect
             PopupShown.thisRun = true
+            turns.open = true
             open = true
         }
     }
     if (!open) return
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { turns.open = false } }
     androidx.compose.material3.AlertDialog(
         onDismissRequest = { open = false },
         title = { Text(if (items.size == 1) "1 thing needs a look" else "${items.size} things need a look") },

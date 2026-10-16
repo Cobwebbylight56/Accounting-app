@@ -13,6 +13,7 @@ import androidx.compose.material.icons.outlined.AutoFixHigh
 import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.EventRepeat
+import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.People
 import androidx.compose.material.icons.outlined.Settings
@@ -51,6 +52,7 @@ fun MoreScreen(
     onScanReceipt: () -> Unit = {},
     onOpenInbox: () -> Unit = {},
     onOpenReports: () -> Unit = {},
+    onOpenProgress: () -> Unit = {},
 ) {
     Scaffold(
         topBar = { TopAppBar(title = { Text("More") }) },
@@ -81,6 +83,12 @@ fun MoreScreen(
                 subtitle = "Payments to sort or check, missing statements, tidying up",
                 icon = Icons.Outlined.AutoFixHigh,
                 onClick = onOpenInbox,
+            )
+            SettingsItem(
+                title = "Progress reports",
+                subtitle = "Each month and halfway through: doing better, or what needs improving",
+                icon = Icons.Outlined.Insights,
+                onClick = onOpenProgress,
             )
             SettingsItem(
                 title = "Reports & exports",

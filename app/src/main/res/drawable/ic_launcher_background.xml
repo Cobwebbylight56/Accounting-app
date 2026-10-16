@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The opening animation's night-sky gradient, with a soft glow behind the badge. -->
+<!-- Vision 2: a night sky in violet and indigo, glowing where the bubble sits. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
@@ -8,23 +8,25 @@
     android:viewportHeight="108">
     <path android:pathData="M0,0h108v108h-108z">
         <aapt:attr name="android:fillColor">
-            <gradient
-                android:type="linear"
-                android:startX="54" android:startY="0"
-                android:endX="54" android:endY="108">
-                <item android:offset="0" android:color="#FF0E1A2B" />
-                <item android:offset="1" android:color="#FF0F3B3A" />
+            <gradient android:type="linear" android:startX="0" android:startY="0" android:endX="108" android:endY="108">
+                <item android:offset="0" android:color="#FF1A1240" />
+                <item android:offset="1" android:color="#FF0B1E3C" />
             </gradient>
         </aapt:attr>
     </path>
     <path android:pathData="M0,0h108v108h-108z">
         <aapt:attr name="android:fillColor">
-            <gradient
-                android:type="radial"
-                android:centerX="54" android:centerY="52"
-                android:gradientRadius="44">
-                <item android:offset="0" android:color="#409FF2D9" />
-                <item android:offset="1" android:color="#009FF2D9" />
+            <gradient android:type="radial" android:centerX="40" android:centerY="38" android:gradientRadius="50">
+                <item android:offset="0" android:color="#737B4CF5" />
+                <item android:offset="1" android:color="#007B4CF5" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="radial" android:centerX="82" android:centerY="84" android:gradientRadius="42">
+                <item android:offset="0" android:color="#40C2366F" />
+                <item android:offset="1" android:color="#00C2366F" />
             </gradient>
         </aapt:attr>
     </path>

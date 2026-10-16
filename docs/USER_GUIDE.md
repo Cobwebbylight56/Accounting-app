@@ -27,15 +27,22 @@ a month's real figure, slim rounded bars, and a ring of rounded pills for where
 the money went; their colours are chosen so they can be told apart by
 colour-blind eyes in both themes.
 
+Since 2.1 the icon and the opening animation match: a glowing violet-to-pink
+bubble whose line climbs into a little bubble of its own. Charts and bars draw
+themselves in — lines from the left, bars growing to their length — and again
+whenever the figures change. The tabs spring between choices, and the bubble in
+the bar along the bottom pops up out of the tab you tap. With the phone's
+animations switched off, everything simply appears.
+
 Along the bottom of the screen are five tabs:
 
 | Tab | What it is for |
 |---|---|
 | **Home** | This month at a glance: what you have, what came in and went out, what needs a look, who you sent money to, what is coming up |
 | **Spending** | Where the money went — by category (split payments counted part by part), month by month, who it went to — with shortcuts to **Bills & subscriptions**, **Money with people** and **Ideas to save** |
-| **Payments** | Every payment, searchable and filterable |
+| **Payments** | Every payment, searchable and filterable. Tabs along the top show **Everyone**, one person, or **Joint** (what's held jointly) |
 | **Accounts** | Where the money is kept: current accounts, savings, cards, loans and the mortgage, with shortcuts to **Savings goals** and **Credit cards** |
-| **More** | People, Bills & subscriptions, Needs a look, Reports & exports, Settings |
+| **More** | People, Bills & subscriptions, Needs a look, Progress reports, Reports & exports, Settings |
 
 **The + button** on Home, Spending and Payments opens one **Add** sheet with
 every way to add money: **A payment**, **Scan a receipt or screenshot**,
@@ -351,6 +358,10 @@ With two or more people there is a **tab for each person** and a **Shared**
 tab. Shared adds together **only the people you choose** — tap the pencil
 beside it — plus anything held jointly. Everybody keeps their own tab whoever
 Shared covers. The cash pot counts on Shared, never on one person's tab.
+
+**Adding someone.** The **+** after the tabs starts adding a person — their
+name, then their accounts. With only one person set up, Home shows an **Add
+someone** button in its place.
 
 The ≡ button opens Settings; the sliders button chooses which cards appear.
 The colours are the app's own; to use your wallpaper's instead, turn on dynamic
@@ -1286,6 +1297,27 @@ whole household, one person, or one account. Every figure and chart below
 follows.
 
 ---
+
+## How you're doing: progress reports
+
+At the **start of every month**, and again **halfway through** (from the 15th),
+a pop-up says how it's going against the month before — for the two of you
+**Together**, and for **each of you** on your own money:
+
+- **Doing better**, **Much the same** or **Needs improving**, with one line
+  saying why — "Better than August: £300 less spent and £200 more put aside."
+- Each figure against before: **Spent**, **Put aside**, **Money in**, **Left
+  over**, and whether what's **owed on cards and loans** went up or came down.
+  A move of less than £10, or 5%, counts as much the same.
+- What moved most — "Eating out (down £120)", or "Shopping up £400" — and what
+  would help.
+- Halfway through, the first fortnight is compared with the same days of last
+  month, and it says where the month is heading at this rate.
+
+The start-of-month report waits until the month's last few days of payments are
+in — import the statement and it appears the next time Home opens. It shows
+after **Needs a look**, never on top of it. **See the details** opens every
+report kept, newest first, under **More → Progress reports**.
 
 ## Advice and what is coming
 

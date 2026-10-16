@@ -88,6 +88,7 @@ class DashboardViewModel @Inject constructor(
     private val tidyUp: com.rhys.financetracker.data.repository.TidyUpRepository,
     private val repayments: com.rhys.financetracker.data.repository.RepaymentRepository,
     private val repairs: com.rhys.financetracker.data.repository.StatementRepairRepository,
+    private val progress: com.rhys.financetracker.data.repository.ProgressRepository,
 ) : ViewModel() {
 
     /** Which tab is picked; null until somebody picks, meaning the first person. */
@@ -207,6 +208,9 @@ class DashboardViewModel @Inject constructor(
             // card paid off from the bank, with both statements in, counts once.
             runCatching { repairs.putRight() }
             runCatching { repayments.countOnce() }
+            // At the start of the month and halfway: how it's going, once
+            // the figures are right.
+            runCatching { progress.makeDue() }
             val found = runCatching { incomeRepository.findWages() }.getOrDefault(emptyList())
             if (found.isNotEmpty()) message.value = found.joinToString(". ") + "."
         }

@@ -79,6 +79,9 @@ class SettingsRepository @Inject constructor(
         val LIVE_ALERT_LAST = stringPreferencesKey("live_alert_last")
         val LIVE_ALERT_LOG = stringPreferencesKey("live_alert_log")
         val SUBSCRIPTION_PLANS = stringPreferencesKey("subscription_plans")
+        val PROGRESS_REPORTS = stringPreferencesKey("progress_reports")
+        val PROGRESS_UNSEEN = stringSetPreferencesKey("progress_unseen")
+        val PROGRESS_CHECKED = stringPreferencesKey("progress_checked")
         val LIVE_LISTENER_AT = longPreferencesKey("live_listener_at")
         val LIVE_TEST_HEARD = longPreferencesKey("live_test_heard")
         val LAST_SEEN_VERSION = stringPreferencesKey("last_seen_version")
@@ -109,6 +112,9 @@ class SettingsRepository @Inject constructor(
         const val SHOW_ARCHIVED = false
         const val LARGE_TEXT = false
     }
+
+    /** Three years of reports: two a month, for the household and two people. */
+    private val PROGRESS_REPORTS_KEPT = 216
 
     /**
      * A read that survives a corrupted preferences file: rather than crashing
@@ -177,6 +183,9 @@ class SettingsRepository @Inject constructor(
             needsLookSnoozedUntil = prefs[Keys.NEEDS_LOOK_SNOOZED_UNTIL],
             liveAlertLog = LiveAlertLogEntry.parse(prefs[Keys.LIVE_ALERT_LOG]),
             subscriptionPlans = com.rhys.financetracker.data.importer.SubscriptionPlan.parse(prefs[Keys.SUBSCRIPTION_PLANS]),
+            progressReports = com.rhys.financetracker.domain.report.ProgressReportCodec.read(prefs[Keys.PROGRESS_REPORTS]),
+            progressUnseen = prefs[Keys.PROGRESS_UNSEEN].orEmpty(),
+            progressChecked = prefs[Keys.PROGRESS_CHECKED],
             liveListenerAt = prefs[Keys.LIVE_LISTENER_AT],
             liveTestHeardAt = prefs[Keys.LIVE_TEST_HEARD],
         )
@@ -226,6 +235,28 @@ class SettingsRepository @Inject constructor(
             val plans = com.rhys.financetracker.data.importer.SubscriptionPlan.parse(prefs[Keys.SUBSCRIPTION_PLANS]) + (plan.key to plan)
             prefs[Keys.SUBSCRIPTION_PLANS] = com.rhys.financetracker.data.importer.SubscriptionPlan.write(plans.values)
         }
+    }
+
+    /**
+     * Keeps a period's progress reports, newest first, and marks them to be
+     * shown; the period is done with even when there was nothing to compare.
+     */
+    suspend fun addProgressReports(periodKey: String, reports: List<com.rhys.financetracker.domain.report.ProgressReport>) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.PROGRESS_CHECKED] = periodKey
+            if (reports.isEmpty()) return@edit
+            val kept = com.rhys.financetracker.domain.report.ProgressReportCodec.read(prefs[Keys.PROGRESS_REPORTS])
+            val keys = reports.map { it.key }.toSet()
+            prefs[Keys.PROGRESS_REPORTS] = com.rhys.financetracker.domain.report.ProgressReportCodec.write(
+                (reports + kept.filterNot { it.key in keys }).take(PROGRESS_REPORTS_KEPT),
+            )
+            prefs[Keys.PROGRESS_UNSEEN] = prefs[Keys.PROGRESS_UNSEEN].orEmpty() + keys
+        }
+    }
+
+    /** The progress pop-up was seen: it doesn't come back for these. */
+    suspend fun markProgressSeen() {
+        context.dataStore.edit { it.remove(Keys.PROGRESS_UNSEEN) }
     }
 
     /** Forgets the 1.34 list of payees the user filed, once it has been turned into marks. */
@@ -473,6 +504,12 @@ data class AppSettings(
     val liveAlertLog: List<LiveAlertLogEntry> = emptyList(),
     /** When each subscription started, how long it runs or that it was cancelled, by its key. */
     val subscriptionPlans: Map<String, com.rhys.financetracker.data.importer.SubscriptionPlan> = emptyMap(),
+    /** How each month went, and each half-month, newest first. */
+    val progressReports: List<com.rhys.financetracker.domain.report.ProgressReport> = emptyList(),
+    /** The keys of progress reports not yet shown in the pop-up. */
+    val progressUnseen: Set<String> = emptySet(),
+    /** The last period reports were made for. */
+    val progressChecked: String? = null,
     /** When Android last connected the alert reader (epoch millis). */
     val liveListenerAt: Long? = null,
     /** When the alert reader last heard the test alert (epoch millis). */

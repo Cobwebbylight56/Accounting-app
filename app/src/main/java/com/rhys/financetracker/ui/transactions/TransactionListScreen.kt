@@ -1,6 +1,8 @@
 package com.rhys.financetracker.ui.transactions
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -67,6 +69,7 @@ import com.rhys.financetracker.ui.components.ColorDot
 import com.rhys.financetracker.ui.components.ConfirmDialog
 import com.rhys.financetracker.ui.components.EmptyState
 import com.rhys.financetracker.ui.components.LoadingState
+import com.rhys.financetracker.ui.components.PillTab
 import com.rhys.financetracker.ui.components.amountOf
 import com.rhys.financetracker.ui.components.colorFromHex
 import com.rhys.financetracker.ui.theme.FinanceTheme
@@ -218,6 +221,37 @@ fun TransactionListScreen(
         },
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            // Whose payments: everyone's, each person's, or what's joint.
+            val individuals = state.people.filterNot { it.isShared }
+            if (individuals.isNotEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    val filter = state.filter
+                    PillTab(
+                        label = "Everyone",
+                        selected = filter.personIds.isEmpty() && !filter.onlyJoint,
+                        onClick = viewModel::showEveryone,
+                    )
+                    individuals.forEach { person ->
+                        PillTab(
+                            label = person.name.substringBefore(' '),
+                            selected = filter.personIds == setOf(person.id) && !filter.onlyJoint,
+                            onClick = { viewModel.showPerson(person.id) },
+                            dot = colorFromHex(person.colorHex),
+                        )
+                    }
+                    PillTab(
+                        label = "Joint",
+                        selected = filter.onlyJoint,
+                        onClick = viewModel::showJoint,
+                    )
+                }
+            }
             SearchBar(
                 value = state.searchText,
                 onValueChange = viewModel::setSearchText,

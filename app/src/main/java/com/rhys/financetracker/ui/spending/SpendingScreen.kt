@@ -541,6 +541,7 @@ private fun SpentHeadline(state: SpendingState) {
 
 @Composable
 private fun PayeeRow(payee: PayeeTotal, index: Int, asBar: Boolean, share: Float, onClick: () -> Unit) {
+    val grow = com.rhys.financetracker.ui.components.rememberReveal(listOf(share))
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -572,7 +573,7 @@ private fun PayeeRow(payee: PayeeTotal, index: Int, asBar: Boolean, share: Float
             ) {
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth(share.coerceIn(0.02f, 1f))
+                        .fillMaxWidth((share * grow).coerceIn(0.02f, 1f))
                         .fillMaxHeight()
                         .background(chartColorAt(index), RoundedCornerShape(4.dp)),
                 )

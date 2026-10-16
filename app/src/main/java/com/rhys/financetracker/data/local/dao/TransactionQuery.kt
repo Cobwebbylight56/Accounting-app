@@ -17,6 +17,8 @@ data class TransactionFilter(
     val accountIds: Set<Long> = emptySet(),
     val categoryIds: Set<Long> = emptySet(),
     val personIds: Set<Long> = emptySet(),
+    /** Only what's held jointly: joint accounts, and the shared household person's. */
+    val onlyJoint: Boolean = false,
     val types: Set<TransactionType> = emptySet(),
     val minAmountMinor: Long? = null,
     val maxAmountMinor: Long? = null,
@@ -34,7 +36,7 @@ data class TransactionFilter(
     /** True when nothing is being filtered, so the UI can hide the "clear" action. */
     val isEmpty: Boolean
         get() = text.isNullOrBlank() && dateFrom == null && dateTo == null &&
-            accountIds.isEmpty() && categoryIds.isEmpty() && personIds.isEmpty() &&
+            accountIds.isEmpty() && categoryIds.isEmpty() && personIds.isEmpty() && !onlyJoint &&
             !onlyUncategorised &&
             types.isEmpty() && minAmountMinor == null && maxAmountMinor == null &&
             savingsGoalId == null && recurringRuleId == null &&
@@ -47,7 +49,7 @@ data class TransactionFilter(
             dateFrom != null || dateTo != null,
             accountIds.isNotEmpty(),
             categoryIds.isNotEmpty() || onlyUncategorised,
-            personIds.isNotEmpty(),
+            personIds.isNotEmpty() || onlyJoint,
             types.isNotEmpty(),
             minAmountMinor != null || maxAmountMinor != null,
             savingsGoalId != null,
@@ -128,6 +130,10 @@ object TransactionQuery {
             conditions += "COALESCE(t.person_id, a.person_id) IN " +
                 "(${filter.personIds.joinToString(", ") { "?" }})"
             args.addAll(filter.personIds)
+        }
+
+        if (filter.onlyJoint) {
+            conditions += "(a.is_shared = 1 OR IFNULL(p.is_shared, 0) = 1)"
         }
 
         if (filter.types.isNotEmpty()) {

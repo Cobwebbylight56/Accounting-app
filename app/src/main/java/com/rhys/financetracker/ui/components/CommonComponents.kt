@@ -32,12 +32,14 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -96,6 +98,54 @@ fun SectionCard(
             }
             Spacer(Modifier.height(14.dp))
             content()
+        }
+    }
+}
+
+/**
+ * A tab drawn as a pill: the chosen one a little gradient bubble, the rest
+ * quiet. [dot] is a person's colour, when the tab is a person. Choosing one
+ * fades its bubble in, with a little bounce, as the last one's fades out.
+ */
+@Composable
+fun PillTab(label: String, selected: Boolean, onClick: () -> Unit, dot: Color? = null) {
+    val colors = FinanceTheme.colors
+    val on by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (selected) 1f else 0f,
+        animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.55f, stiffness = 420f),
+        label = "pill tab",
+    )
+    val shown = on.coerceIn(0f, 1f)
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        onClick = onClick,
+        modifier = Modifier.graphicsLayer {
+            // The spring overshoots: a touch bigger as it's chosen, smaller as it's left.
+            val scale = 1f + 0.5f * (on - shown)
+            scaleX = scale
+            scaleY = scale
+        },
+    ) {
+        Row(
+            modifier = Modifier
+                .background(colors.navSelected.brush, alpha = shown)
+                .padding(horizontal = 16.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (dot != null) {
+                Box(
+                    Modifier
+                        .size(10.dp)
+                        .background(dot, CircleShape),
+                )
+                Spacer(Modifier.width(8.dp))
+            }
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                color = androidx.compose.ui.graphics.lerp(MaterialTheme.colorScheme.onSurface, colors.onNavSelected, shown),
+            )
         }
     }
 }
