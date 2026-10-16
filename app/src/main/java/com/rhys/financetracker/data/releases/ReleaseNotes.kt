@@ -22,6 +22,15 @@ object ReleaseNotes {
     /** Every release, newest first. */
     val ALL: List<Release> = listOf(
         Release(
+            "2.2.0", LocalDate.of(2026, 10, 16), "Receipts from emails and websites",
+            listOf(
+                "Select a receipt's words in an email or on a website, tap Share and choose Add as a receipt: the shop, total and date are read exactly, then matched to the bank's payment or added as a new one.",
+                "PDF receipts and invoices — an Amazon invoice, an emailed receipt, an order saved as a PDF — can be shared or opened with the app, or chosen on the receipt screen. One that reads like a receipt goes straight there; one that isn't a statement offers Keep it as a receipt.",
+                "Online receipts are read properly: the total including VAT, \"Order Total (2 items)\", dates like \"October 14, 2026\", a greeting at the top, and who a PayPal payment went to. Dozens of online shops are known by name.",
+                "A receipt matched to a payment the bank named vaguely, like \"PAYPAL *4029357733\", files the payment by the receipt's shop.",
+            ),
+        ),
+        Release(
             "2.1.1", LocalDate.of(2026, 10, 16), "Lloyds statements from the app",
             listOf(
                 "Statements downloaded from the Lloyds app are read properly: they print the headings again above every payment, and every payment is now read, with which way it went taken from its heading and checked against the balance.",

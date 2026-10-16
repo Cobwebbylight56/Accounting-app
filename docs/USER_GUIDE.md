@@ -713,6 +713,32 @@ replaced by it, so nothing is counted twice.
 **Share a screenshot in.** From the gallery or any app, share a picture and
 choose **Add as a receipt**.
 
+**Receipts from emails and websites.** An order confirmation, a takeaway
+receipt, an invoice: they come in the same way as a paper one, read exactly
+rather than from a picture.
+
+* **From an email or a web page:** select the receipt's words (press and hold,
+  then drag, or **Select all**), tap **Share**, and choose **Add as a
+  receipt**. Include the shop's name and the total.
+* **A PDF** — an Amazon invoice, an emailed receipt, an order saved with
+  **Print → Save as PDF**: share it or open it with Finance Tracker, or choose
+  **+ → Scan a receipt or screenshot → Choose a PDF receipt or invoice**. A PDF
+  that reads like a receipt goes straight to the receipt screen; one that turns
+  out not to be a statement offers **Keep it as a receipt**.
+* **A screenshot** of the order page works too, as ever.
+
+The shop, the total (the one **including VAT**, the **order total**) and the
+day it was placed are read off it — for online shops too: Amazon, eBay,
+Deliveroo, Just Eat, Uber, Apple, Google Play, Netflix, Spotify, Audible,
+Trainline and many more. A PayPal receipt names who was paid. Then match it to
+the bank's payment or add it as a new one, as with any receipt. Matched to a
+payment the bank only named vaguely — "PAYPAL *4029357733", a card payment
+with no category — the payment is filed by the receipt's shop, unless you
+filed it yourself.
+
+Sharing only a link to a page doesn't work: the app can't open your accounts
+on websites. Share the words, a PDF or a screenshot instead.
+
 **On any payment.** Open a payment and, under **Receipts and photos**, tap
 **Take a photo** or **Add a picture** to keep one with it. Tap a picture to see
 it full size — pinch to zoom — or to remove it.

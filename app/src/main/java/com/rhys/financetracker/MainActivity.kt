@@ -205,8 +205,27 @@ class MainActivity : FragmentActivity() {
             intent,
             Intent.EXTRA_STREAM,
             Uri::class.java,
-        )
+        ) ?: sharedWords(intent)
         else -> null
+    }
+
+    /**
+     * Words shared in — a receipt selected in an email or on a web page —
+     * written to a file of the app's own, so they travel the same way as a
+     * shared picture and land on the receipt screen.
+     */
+    private fun sharedWords(intent: Intent): Uri? {
+        val words = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()?.takeIf { it.isNotBlank() } ?: return null
+        val subject = intent.getStringExtra(Intent.EXTRA_SUBJECT)
+        val text = com.rhys.financetracker.data.receipts.EReceipts.compose(subject, words)
+        return runCatching {
+            val folder = java.io.File(cacheDir, "shared").apply { mkdirs() }
+            // Only the latest few are ever needed.
+            folder.listFiles()?.sortedBy { it.lastModified() }?.dropLast(SHARED_KEPT)?.forEach { it.delete() }
+            val file = java.io.File(folder, "receipt-words-${System.currentTimeMillis()}.txt")
+            file.writeText(text)
+            Uri.fromFile(file)
+        }.getOrNull()
     }
 
     /** Opens the system share sheet for a file the app has just produced. */
@@ -217,6 +236,9 @@ class MainActivity : FragmentActivity() {
 
     private companion object {
         const val LARGE_TEXT_SCALE = 1.2f
+
+        /** Shared words kept in the cache until read: the last few at most. */
+        const val SHARED_KEPT = 5
 
         /** Set once the intro has had its chance this time the app is running. */
         var introPlayed = false

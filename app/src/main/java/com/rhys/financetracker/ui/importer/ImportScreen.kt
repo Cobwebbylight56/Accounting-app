@@ -102,6 +102,8 @@ fun ImportScreen(
     expectedPersonId: Long? = null,
     incomingFile: Uri? = null,
     onIncomingFileHandled: () -> Unit = {},
+    /** A PDF that turned out to be a receipt or an invoice, to keep as one. */
+    onKeepAsReceipt: (Uri) -> Unit = {},
     viewModel: ImportViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -180,6 +182,7 @@ fun ImportScreen(
                         text = text,
                         onDismiss = viewModel::clearUnreadablePdf,
                         onShowAll = viewModel::showWhatWasRead,
+                        onKeepAsReceipt = state.sourceUri?.let { uri -> { onKeepAsReceipt(uri) } },
                     )
                 }
                 Spacer(Modifier.height(12.dp))
@@ -233,53 +236,79 @@ fun ImportScreen(
  * fixed: copy it, send it on, and the reader can be taught this layout.
  */
 @Composable
-private fun UnreadablePdfCard(text: String, onDismiss: () -> Unit, onShowAll: () -> Unit) {
+private fun UnreadablePdfCard(
+    text: String,
+    onDismiss: () -> Unit,
+    onShowAll: () -> Unit,
+    onKeepAsReceipt: (() -> Unit)? = null,
+) {
     val clipboard = LocalClipboardManager.current
     val preview = remember(text) {
         text.split("\n").filter { it.isNotBlank() }.take(PREVIEW_LINES)
     }
+    // Not a statement, but it has a total: an invoice or an order, most likely.
+    val hasTotal = remember(text) {
+        com.rhys.financetracker.data.receipts.ReceiptParser.totalIn(
+            text.lines().map { it.trim() }.filter { it.isNotEmpty() },
+        ) != null
+    }
+    // One under the other: the card can sit inside a Box.
+    Column {
+        if (onKeepAsReceipt != null && hasTotal) {
+            SectionCard(title = "Is it a receipt?", subtitle = "An invoice or an order rather than a statement") {
+                Text(
+                    text = "It has a total on it but no payments to import. Keep it as a receipt instead: it's " +
+                        "matched to the payment it was for, or added as a new one.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Spacer(Modifier.height(12.dp))
+                Button(onClick = onKeepAsReceipt, modifier = Modifier.fillMaxWidth()) { Text("Keep it as a receipt") }
+            }
+            Spacer(Modifier.height(12.dp))
+        }
 
-    SectionCard(
-        title = "What was read from the PDF",
-        subtitle = "The lines the app got out of your statement",
-    ) {
-        Text(
-            text = "Copy this and send it on, and the app can be taught your bank's " +
-                "layout. Blank out anything you would rather not share — the shape " +
-                "of the lines is what matters, not the figures.",
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        Spacer(Modifier.height(12.dp))
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceContainerHighest,
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.fillMaxWidth(),
+        SectionCard(
+            title = "What was read from the PDF",
+            subtitle = "The lines the app got out of your statement",
         ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                preview.forEach { line ->
-                    Text(
-                        text = line,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontFamily = FontFamily.Monospace,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+            Text(
+                text = "Copy this and send it on, and the app can be taught your bank's " +
+                    "layout. Blank out anything you would rather not share — the shape " +
+                    "of the lines is what matters, not the figures.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Spacer(Modifier.height(12.dp))
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    preview.forEach { line ->
+                        Text(
+                            text = line,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
-        }
-        Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                onClick = { clipboard.setText(AnnotatedString(text)) },
-                modifier = Modifier.weight(1f),
-            ) {
-                Text("Copy all text")
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = { clipboard.setText(AnnotatedString(text)) },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Copy all text")
+                }
+                OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
+                    Text("Dismiss")
+                }
             }
-            OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
-                Text("Dismiss")
-            }
+            TextButton(onClick = onShowAll) { Text("See every line") }
         }
-        TextButton(onClick = onShowAll) { Text("See every line") }
     }
 }
 

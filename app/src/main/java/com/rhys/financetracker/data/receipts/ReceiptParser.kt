@@ -54,7 +54,8 @@ object ReceiptParser {
 
         fun largestBy(keywords: Regex, notThese: Regex?, lookAbove: Boolean): Long? =
             lines.indices.flatMap { index ->
-                val lower = lines[index].lowercase()
+                // "Total (inc. VAT)" and "Order Total (2 items)" are the total all the same.
+                val lower = lines[index].lowercase().replace(INCLUDING_VAT, " ").replace(ITEM_COUNT, " ")
                 if (!keywords.containsMatchIn(lower) || notThese?.containsMatchIn(lower) == true) return@flatMap emptyList()
                 amountsAt(index)
                     .ifEmpty { amountsAt(index + 1) }
@@ -103,6 +104,12 @@ object ReceiptParser {
             } else {
                 known.name
             }
+        }
+        // A payment app's receipt names who was paid: "You sent a payment of
+        // £23.47 GBP to Acme Ltd", "Merchant: Acme Ltd".
+        for (line in lines) {
+            val paid = PAID_TO.find(line)?.groupValues?.get(1)?.trim()?.trimEnd('.', ',', '!') ?: continue
+            if (nameLike(paid.replace(COMPANY, ""), minLetters = 2)) return tidy(paid.replace(COMPANY, ""))
         }
         val top = lines.take(TOP_LINES)
         val candidate = top.firstOrNull { COMPANY.containsMatchIn(it) && nameLike(it.replace(COMPANY, ""), minLetters = 2) }
@@ -154,8 +161,14 @@ object ReceiptParser {
     private val SUBTOTAL_WORDS = Regex("""\b(sub ?-?total|subtotal)\b""")
 
     private val TOTAL_WORDS = Regex(
-        """\b(total|amount due|balance due|to pay|amount to pay|grand total|order total|you paid|amount paid|total paid|total charged)\b""",
+        """\b(total|amount due|balance due|to pay|amount to pay|grand total|order total|you paid|amount paid|total paid|total charged|amount charged|payment amount|order amount|total amount)\b""",
     )
+
+    /** "inc. VAT", "including VAT": the VAT is in this figure, not this figure. */
+    private val INCLUDING_VAT = Regex("""\b(inc|incl|including)\.?\s+vat\b""")
+
+    /** "(2 items)" beside a total. */
+    private val ITEM_COUNT = Regex("""\(\s*\d+\s+items?\s*\)""")
     private val PAID_WORDS = Regex("""\b(visa|mastercard|maestro|amex|debit card|credit card|card payment|contactless|paid by card|card sale|sale)\b""")
 
     /** Lines that look like a total but are not the one paid. */
@@ -166,7 +179,12 @@ object ReceiptParser {
     private val CARD_ENDING = Regex("""(?:\*{2,}|x{3,}|X{3,}|•+|ending(?: in)?)\s?(\d{4})\b""")
 
     private val NOT_A_NAME = Regex(
-        """\b(road|rd|street|st|lane|ln|avenue|ave|way|close|drive|park|unit|tel|telephone|phone|vat|reg|receipt|welcome|thank|www|http|store no|till|cashier|served by|order|orders|ordered|invoice|date|time|details|voucher)\b|\d{1,2}:\d{2}|@""",
+        """\b(road|rd|street|st|lane|ln|avenue|ave|way|close|drive|park|unit|tel|telephone|phone|vat|reg|receipt|welcome|thank|www|http|store no|till|cashier|served by|order|orders|ordered|invoice|date|time|details|voucher|dispatched|delivered|delivery|shipped|confirmation|account|copy|merchant|cardholder)\b|\b(subject|from|to):|^(hi|hello|dear|hey)\b|\d{1,2}:\d{2}|@""",
+    )
+
+    /** Who a payment app's receipt says was paid. */
+    private val PAID_TO = Regex(
+        """(?i)(?:you (?:sent|paid|made)(?: a payment)?(?: of)?(?:\s*£?\s?[\d,]+\.\d{2}(?:\s*gbp)?)? to|payment (?:sent )?to|merchant(?: name)?:|paid to:?)\s+(?!(?:id|no|number|copy)\b)([A-Za-z0-9][^\n£]{1,58})""",
     )
 
     /** The line a shop prints under its logo: "Big Brands Big Savings", "Every little helps". */
@@ -192,6 +210,11 @@ object ReceiptParser {
         // 3 Oct 2026, 30 Sept 2026, 2 Oct (this year, or last if that is ahead).
         DatePattern(Regex("""\b\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]{3,9}\.?(?:,?\s+\d{4})?\b""")) { m, today ->
             ScreenText.shortDate(m.value, today)
+        },
+        // October 14, 2026 and Oct 14 2026: as some websites write it.
+        DatePattern(Regex("""\b([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})\b""")) { m, today ->
+            val (month, day, year) = m.destructured
+            ScreenText.shortDate("$day $month $year", today)
         },
         // 2026-10-03.
         DatePattern(Regex("""\b(\d{4})-(\d{2})-(\d{2})\b""")) { m, _ ->

@@ -77,6 +77,16 @@
                 <data android:mimeType="image/*" />
             </intent-filter>
 
+            <!--
+                Words shared in — a receipt's text selected in an email or on a
+                website — are read as a receipt too.
+            -->
+            <intent-filter android:label="Add as a receipt">
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+
             <intent-filter android:label="Import into Finance Tracker">
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />

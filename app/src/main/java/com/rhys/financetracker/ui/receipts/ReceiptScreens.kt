@@ -31,6 +31,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.ReceiptLong
@@ -174,8 +175,10 @@ class ReceiptScanViewModel @Inject constructor(
     fun picked(uri: Uri) {
         viewModelScope.launch {
             _state.update { it.copy(stage = ScanStage.READING, message = null) }
-            val fileName = runCatching { receipts.keep(uri) }.getOrElse {
-                _state.update { it.copy(stage = ScanStage.PICK, message = "That picture couldn't be opened. Try another.") }
+            // A picture, a PDF, or the words of an email or web page shared in.
+            val fileName = runCatching { receipts.keepAny(uri) }.getOrElse { failure ->
+                val said = (failure as? IllegalStateException)?.message ?: "That couldn't be opened. Try another."
+                _state.update { it.copy(stage = ScanStage.PICK, message = said) }
                 return@launch
             }
             val scan = receipts.read(fileName)
@@ -358,6 +361,10 @@ fun ReceiptScanScreen(
     val choose = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         uri?.let(viewModel::picked)
     }
+    // An invoice or order confirmation saved from an email or a website.
+    val choosePdf = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let(viewModel::picked)
+    }
     val cameraUri = remember { cameraUriFor(context, viewModel.cameraFile()) }
     val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { taken ->
         if (taken) viewModel.picked(cameraUri)
@@ -415,6 +422,20 @@ fun ReceiptScanScreen(
                         Spacer(Modifier.width(8.dp))
                         Text("Choose a picture or screenshot")
                     }
+                    OutlinedButton(
+                        onClick = { choosePdf.launch(arrayOf("application/pdf")) },
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                    ) {
+                        Icon(Icons.Outlined.Description, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Choose a PDF receipt or invoice")
+                    }
+                    Text(
+                        text = "From an email or a website: select the receipt's words and share them to " +
+                            "Finance Tracker, or share the PDF. A screenshot of the order page works too.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
 
                 ScanStage.READING -> {
@@ -612,7 +633,7 @@ class PaymentReceiptsViewModel @Inject constructor(
         viewModelScope.launch {
             reading.value = true
             runCatching {
-                val name = receipts.keep(uri)
+                val name = receipts.keepAny(uri)
                 val (text, parsed) = receipts.read(name)
                 receipts.attach(transactionId, name, parsed, text)
             }

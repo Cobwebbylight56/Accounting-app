@@ -95,9 +95,22 @@ fun FinanceNavHost(
     val context = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(importFile) {
         if (importFile == null) return@LaunchedEffect
-        // A picture shared in is a receipt; anything else is a statement.
+        // A picture, words shared from an email or a web page, or a PDF that
+        // reads like a receipt or an invoice is a receipt; anything else is a
+        // statement.
         val type = runCatching { context.contentResolver.getType(importFile) }.getOrNull().orEmpty()
-        if (type.startsWith("image/")) {
+        val sharedWords = importFile.scheme == "file" && importFile.path.orEmpty().endsWith(".txt")
+        val pdfReceipt = (type == "application/pdf" || importFile.path.orEmpty().endsWith(".pdf", ignoreCase = true)) &&
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching {
+                    context.contentResolver.openInputStream(importFile)?.use { input ->
+                        com.rhys.financetracker.data.receipts.EReceipts.looksLikeReceipt(
+                            com.rhys.financetracker.data.importer.PdfStatementReader.extractTextForDiagnostics(input),
+                        )
+                    }
+                }.getOrNull() == true
+            }
+        if (type.startsWith("image/") || sharedWords || pdfReceipt) {
             navController.navigate(Routes.receiptScan(image = importFile))
             onImportFileHandled()
         } else {
@@ -650,6 +663,10 @@ private fun NavGraphBuilder.editorDestinations(
             expectedPersonId = personId.takeIf { it != Routes.NEW_ID },
             incomingFile = importFile,
             onIncomingFileHandled = onImportFileHandled,
+            onKeepAsReceipt = { uri ->
+                navController.popBackStack()
+                navController.navigate(Routes.receiptScan(image = uri))
+            },
         )
     }
 }
