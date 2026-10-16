@@ -97,7 +97,7 @@ class VisionShotsTest {
     @Test fun moreLight() = shoot("6-more-light", ThemeMode.LIGHT) { More() }
 
     // The finished picture, after the light has swept across and before the fade.
-    @Test fun intro() = shoot("7-intro", ThemeMode.DARK, advanceMs = 3_700) {
+    @Test fun intro() = shoot("7-intro", ThemeMode.DARK, advanceMs = 3_700, hold = true) {
         androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth().height(760.dp)) {
             com.rhys.financetracker.ui.intro.IntroScreen(onFinished = {})
         }
@@ -107,7 +107,18 @@ class VisionShotsTest {
 
     @Test fun progressLight() = shoot("9-progress-light", ThemeMode.LIGHT) { Progress() }
 
-    private fun shoot(name: String, mode: ThemeMode, advanceMs: Long = 3_000, content: @Composable () -> Unit) {
+    /**
+     * [hold] stops the clock at [advanceMs] rather than letting every
+     * animation run to its end — for the intro, which ends by fading away.
+     */
+    private fun shoot(
+        name: String,
+        mode: ThemeMode,
+        advanceMs: Long = 3_000,
+        hold: Boolean = false,
+        content: @Composable () -> Unit,
+    ) {
+        if (hold) compose.mainClock.autoAdvance = false
         compose.setContent {
             FinanceTrackerTheme(themeMode = mode) {
                 // As a screen's Scaffold does: the page colour, and text on it.
@@ -125,7 +136,7 @@ class VisionShotsTest {
         }
         // Let every chart draw itself in, and every figure count up.
         compose.mainClock.advanceTimeBy(advanceMs)
-        compose.waitForIdle()
+        if (!hold) compose.waitForIdle()
         // Drawn straight into a picture, then cut to what was drawn.
         val bottom = compose.onNodeWithTag(SHOT).fetchSemanticsNode().boundsInRoot.bottom
         val root = compose.activity.findViewById<ViewGroup>(android.R.id.content)
