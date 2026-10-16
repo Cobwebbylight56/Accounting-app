@@ -252,14 +252,14 @@ class VisionShotsTest {
             madeOn = java.time.LocalDate.of(2026, 10, 2),
         )!!
         // The receipt screen's "Paid from": whose, then which account.
-        val rhys = PersonEntity(id = 1, name = "Rhys Evans", colorHex = "#1F5FD0")
-        val hannah = PersonEntity(id = 2, name = "Hannah", colorHex = "#B4307A")
-        val jointPerson = PersonEntity(id = 3, name = "Joint", colorHex = "#888888", isShared = true)
+        val personRhys = PersonEntity(id = 1, name = "Rhys Evans", colorHex = "#1F5FD0")
+        val personHannah = PersonEntity(id = 2, name = "Hannah", colorHex = "#B4307A")
+        val personJoint = PersonEntity(id = 3, name = "Joint", colorHex = "#888888", isShared = true)
         fun account(id: Long, name: String, type: com.rhys.financetracker.domain.model.AccountType, personId: Long) =
             com.rhys.financetracker.data.local.entity.AccountEntity(id = id, name = name, type = type, personId = personId, colorHex = "#000000")
         com.rhys.financetracker.ui.components.PersonAccountPicker(
             label = "Paid from",
-            people = listOf(rhys, hannah, jointPerson),
+            people = listOf(personRhys, personHannah, personJoint),
             accounts = listOf(
                 account(1, "Lloyds Current Account", com.rhys.financetracker.domain.model.AccountType.CURRENT, 1),
                 account(3, "Zopa", com.rhys.financetracker.domain.model.AccountType.CREDIT_CARD, 1),
