@@ -380,7 +380,8 @@ class DashboardViewModel @Inject constructor(
             ).first()
             val byMonth = rows.mapNotNull { row -> DateUtils.parseYearMonthKey(row.yearMonth)?.let { it to row } }.toMap()
             val from = byMonth.filter { it.value.incomeMinor > 0L }.keys.minOrNull() ?: return@launch
-            val months = generateSequence(from) { it.plusMonths(1) }.takeWhile { !it.isAfter(last) }.map { month ->
+            // A list before the map: a sequence's map can't wait on the database.
+            val months = generateSequence(from) { it.plusMonths(1) }.takeWhile { !it.isAfter(last) }.toList().map { month ->
                 val start = month.atDay(1)
                 val end = month.atEndOfMonth()
                 com.rhys.financetracker.domain.report.MonthLeftOver(
@@ -394,7 +395,7 @@ class DashboardViewModel @Inject constructor(
                         start, end, currentScope.accountId, currentScope.personIds,
                     ).first(),
                 )
-            }.toList()
+            }
             val biggest = transactionRepository.searchOnce(
                 com.rhys.financetracker.data.local.dao.TransactionFilter(
                     dateFrom = from.atDay(1),
