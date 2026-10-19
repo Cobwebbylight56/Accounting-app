@@ -36,6 +36,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rhys.financetracker.data.local.projection.labelFor
 import com.rhys.financetracker.domain.model.TransactionType
+import com.rhys.financetracker.ui.components.CategoryPicker
 import com.rhys.financetracker.ui.components.AmountField
 import com.rhys.financetracker.ui.components.ConfirmDialog
 import com.rhys.financetracker.ui.components.DateField
@@ -187,14 +188,11 @@ fun TransactionEditScreen(
                 )
             }
 
-            DropdownField(
+            CategoryPicker(
                 label = "Category",
-                options = state.categories,
-                selected = state.categories.firstOrNull { it.id == state.form.categoryId },
-                onSelect = { category -> viewModel.update { it.copy(categoryId = category.id) } },
-                optionLabel = { it.name },
-                optionColor = { colorFromHex(it.colorHex) },
-                placeholder = "Not categorised",
+                categories = state.categories,
+                selectedId = state.form.categoryId,
+                onSelect = { category -> viewModel.update { it.copy(categoryId = category?.id) } },
             )
             if (state.movesOthers) {
                 val chosen = state.categories.firstOrNull { it.id == state.form.categoryId }?.name.orEmpty()

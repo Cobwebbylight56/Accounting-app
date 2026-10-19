@@ -20,6 +20,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -77,6 +79,8 @@ fun CategoriesScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var pendingDelete by remember { mutableLongStateOf(0L) }
+    // Groups start closed: a short list of headings, each opening up.
+    var openGroups by remember { mutableStateOf(emptySet<Long>()) }
 
     LaunchedEffect(state.message) {
         state.message?.let {
@@ -117,10 +121,16 @@ fun CategoriesScreen(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 state.groups.forEach { group ->
+                    val isOpen = group.parent.id in openGroups
                     item(key = "parent-${group.parent.id}") {
                         CategoryRow(
                             category = group.parent,
                             isChild = false,
+                            inside = group.children.size,
+                            isOpen = isOpen,
+                            onToggle = {
+                                openGroups = if (isOpen) openGroups - group.parent.id else openGroups + group.parent.id
+                            },
                             onClick = { onEditCategory(group.parent.id) },
                             onDuplicate = { viewModel.duplicate(group.parent.id) },
                             onArchive = {
@@ -129,7 +139,7 @@ fun CategoriesScreen(
                             onDelete = { pendingDelete = group.parent.id },
                         )
                     }
-                    items(
+                    if (isOpen) items(
                         count = group.children.size,
                         key = { index -> "child-${group.children[index].id}" },
                     ) { index ->
@@ -168,6 +178,10 @@ private fun CategoryRow(
     category: CategoryEntity,
     isChild: Boolean,
     onClick: () -> Unit,
+    /** How many categories the group holds; 0 for one that holds none. */
+    inside: Int = 0,
+    isOpen: Boolean = false,
+    onToggle: () -> Unit = {},
     onDuplicate: () -> Unit,
     onArchive: () -> Unit,
     onDelete: () -> Unit,
@@ -193,11 +207,22 @@ private fun CategoryRow(
                         MaterialTheme.typography.bodyLarge
                     },
                 )
-                category.monthlyBudgetMinor?.let {
+                listOfNotNull(
+                    category.monthlyBudgetMinor?.let { "Budget ${Money.format(it)} a month" },
+                    inside.takeIf { it > 0 }?.let { if (it == 1) "1 inside" else "$it inside" },
+                ).takeIf { it.isNotEmpty() }?.let {
                     Text(
-                        text = "Budget ${Money.format(it)} a month",
+                        text = it.joinToString(" · "),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            if (inside > 0) {
+                IconButton(onClick = onToggle) {
+                    Icon(
+                        if (isOpen) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                        contentDescription = if (isOpen) "Close ${category.name}" else "Open ${category.name}",
                     )
                 }
             }

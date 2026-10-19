@@ -10,8 +10,10 @@ import com.rhys.financetracker.data.local.entity.CashPotEntryEntity
 import com.rhys.financetracker.data.local.entity.PersonEntity
 import com.rhys.financetracker.data.local.entity.RecurringRuleEntity
 import com.rhys.financetracker.data.local.entity.SavingsGoalEntity
+import com.rhys.financetracker.data.local.seed.CategoryRegrouping
 import com.rhys.financetracker.data.local.seed.DefaultData
 import com.rhys.financetracker.data.local.seed.SampleData
+import com.rhys.financetracker.data.prefs.SettingsRepository
 import com.rhys.financetracker.domain.model.CategoryKind
 import com.rhys.financetracker.domain.model.TransactionType
 import java.time.LocalDate
@@ -29,6 +31,7 @@ import javax.inject.Singleton
 @Singleton
 class SeedRepository @Inject constructor(
     private val database: AppDatabase,
+    private val settingsRepository: SettingsRepository,
 ) {
 
     /**
@@ -59,6 +62,7 @@ class SeedRepository @Inject constructor(
             // "Cash" arrived that way, and without this the one install that
             // needed it would never have seen it.
             if (seedMissingCategories()) didSeed = true
+            regroupOnce()
             if (seedMissingWidgets()) didSeed = true
             separateFoodFromGroceries()
             didSeed
@@ -79,6 +83,20 @@ class SeedRepository @Inject constructor(
         ) {
             dao.update(food.copy(colorHex = DefaultData.FOOD_COLOUR))
         }
+    }
+
+    /**
+     * Puts categories from before the groups into them — Parking under
+     * Transport, Clothes under Shopping — once, so a category somebody moves
+     * back out afterwards stays where they put it.
+     */
+    private suspend fun regroupOnce() {
+        if (settingsRepository.categoryGroupsVersion() >= DefaultData.GROUPS) return
+        val dao = database.categoryDao()
+        val all = dao.getAll()
+        val moves = CategoryRegrouping.moves(all)
+        all.filter { it.id in moves }.forEach { dao.update(it.copy(parentId = moves.getValue(it.id))) }
+        settingsRepository.setCategoryGroupsVersion(DefaultData.GROUPS)
     }
 
     /**

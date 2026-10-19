@@ -90,7 +90,21 @@ class BillFinderRepository @Inject constructor(
         val known = recurringRuleDao.getAll()
             .filterNot { it.isArchived }
             .map { RecurringDetector.KnownBill(it.name, it.amountMinor, it.accountId) }
+        // Not ones you've said aren't yours, turned down before, or said are the same as another.
+        val plans = settingsRepository.settings.first().subscriptionPlans
         return RecurringDetector.find(payments, known)
+            .filter { bill -> plans[com.rhys.financetracker.data.importer.SubscriptionPlan.keyOf(bill.name)]?.offerAsBill != false }
+    }
+
+    /** Found, offered as bills and turned down: not offered again. */
+    suspend fun decline(bills: List<RecurringDetector.RegularPayment>) {
+        val plans = settingsRepository.settings.first().subscriptionPlans
+        bills.forEach { bill ->
+            val key = com.rhys.financetracker.data.importer.SubscriptionPlan.keyOf(bill.name)
+            settingsRepository.saveSubscriptionPlan(
+                (plans[key] ?: com.rhys.financetracker.data.importer.SubscriptionPlan(key)).copy(noBill = true),
+            )
+        }
     }
 
     /**

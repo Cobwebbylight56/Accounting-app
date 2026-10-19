@@ -206,13 +206,22 @@ class DashboardViewModel @Inject constructor(
             // take-home put right from them — nothing to type.
             // Dates and card spending older versions misread, put right; and a
             // card paid off from the bank, with both statements in, counts once.
-            runCatching { repairs.putRight() }
-            runCatching { repayments.countOnce() }
+            val putRight = runCatching { repairs.putRight() }.getOrDefault(0) +
+                runCatching { repayments.countOnce() }.getOrDefault(0)
             // At the start of the month and halfway: how it's going, once
             // the figures are right.
             runCatching { progress.makeDue() }
             val found = runCatching { incomeRepository.findWages() }.getOrDefault(emptyList())
-            if (found.isNotEmpty()) message.value = found.joinToString(". ") + "."
+            val said = buildList {
+                if (putRight > 0) {
+                    add(
+                        "Put right $putRight ${if (putRight == 1) "thing" else "things"} older versions had wrong — " +
+                            "card payments counted twice, cards set up as ordinary accounts. Each has a note saying why",
+                    )
+                }
+                addAll(found)
+            }
+            if (said.isNotEmpty()) message.value = said.joinToString(". ") + "."
         }
     }
 
@@ -354,6 +363,56 @@ class DashboardViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    /** How "Left over a month" was worked out, while it is open. */
+    private val leftOverOpen = MutableStateFlow<com.rhys.financetracker.domain.report.LeftOverExplained?>(null)
+    val leftOverExplained: StateFlow<com.rhys.financetracker.domain.report.LeftOverExplained?> = leftOverOpen
+
+    /** Works out, month by month, the figure on the "Left over a month" tile. */
+    fun explainLeftOver() {
+        viewModelScope.launch {
+            val currentScope = scope.value
+            val last = visibleMonth.value.minusMonths(1)
+            val first = visibleMonth.value.minusMonths(AverageLeftOver.MONTHS)
+            val rows = transactionRepository.observeMonthlyTotals(
+                first.atDay(1), last.atEndOfMonth(), currentScope.accountId, currentScope.personIds,
+            ).first()
+            val byMonth = rows.mapNotNull { row -> DateUtils.parseYearMonthKey(row.yearMonth)?.let { it to row } }.toMap()
+            val from = byMonth.filter { it.value.incomeMinor > 0L }.keys.minOrNull() ?: return@launch
+            val months = generateSequence(from) { it.plusMonths(1) }.takeWhile { !it.isAfter(last) }.map { month ->
+                val start = month.atDay(1)
+                val end = month.atEndOfMonth()
+                com.rhys.financetracker.domain.report.MonthLeftOver(
+                    month = month,
+                    inMinor = byMonth[month]?.incomeMinor ?: 0L,
+                    outMinor = byMonth[month]?.expenseMinor ?: 0L,
+                    savedMinor = transactionRepository.observePotFlow(
+                        CategoryKind.SAVING, start, end, currentScope.accountId, currentScope.personIds,
+                    ).first().netMinor,
+                    loansMinor = transactionRepository.observeLoanPayments(
+                        start, end, currentScope.accountId, currentScope.personIds,
+                    ).first(),
+                )
+            }.toList()
+            val biggest = transactionRepository.searchOnce(
+                com.rhys.financetracker.data.local.dao.TransactionFilter(
+                    dateFrom = from.atDay(1),
+                    dateTo = last.atEndOfMonth(),
+                    accountIds = setOfNotNull(currentScope.accountId),
+                    personIds = currentScope.personIds.orEmpty(),
+                    types = setOf(com.rhys.financetracker.domain.model.TransactionType.EXPENSE),
+                    sort = com.rhys.financetracker.data.local.dao.TransactionSort.AMOUNT_DESC,
+                    limit = BIGGEST_LOOKED_AT,
+                ),
+            ).filter { it.categoryKind != CategoryKind.SAVING && it.categoryKind != CategoryKind.TRANSFER }
+                .take(BIGGEST_SHOWN)
+            leftOverOpen.value = com.rhys.financetracker.domain.report.LeftOverExplained(months, biggest)
+        }
+    }
+
+    fun closeLeftOver() {
+        leftOverOpen.value = null
     }
 
     private fun potFlow(kind: CategoryKind) = monthFlow.flatMapLatest { (month, currentScope) ->
@@ -777,6 +836,10 @@ class DashboardViewModel @Inject constructor(
     }
 
     private companion object {
+        /** The biggest payments looked through, and shown, when "Left over" is explained. */
+        const val BIGGEST_LOOKED_AT = 60
+        const val BIGGEST_SHOWN = 8
+
         /** A fortnight without a backup before Home mentions it. */
         private const val BACKUP_NUDGE_AFTER_MS = 14L * 24 * 60 * 60 * 1000
 

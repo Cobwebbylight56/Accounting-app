@@ -4,6 +4,7 @@ import com.rhys.financetracker.domain.model.Frequency
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.temporal.ChronoUnit
+import kotlin.math.abs
 
 /**
  * The subscriptions and other regular payments in the statements, and
@@ -109,12 +110,57 @@ object SubscriptionTracker {
                 TransactionFingerprint.normaliseDescription(payment.description).split(' ').any { it in UNDONE }
             }
             .let(RecurringDetector::series)
+            .let { mergeAsTold(it, plans) }
+            .filterNot { plans[it.key]?.notMine == true }
             .mapNotNull { judge(it.key, it.payments, coveredTo) }
             .map { found ->
                 val plan = plans[found.key] ?: return@map found
                 found.copy(plan = plan, status = if (plan.hasEnded(today)) Status.ENDED else found.status)
             }
             .sortedWith(compareBy<Subscription> { it.status.ordinal }.thenByDescending { it.monthlyMinor })
+    }
+
+    /**
+     * Ones you said are the same as another counted as that one — "Amzn
+     * Prime" as "Amazon Prime" — with a payment held under both names (an
+     * alert's and the bank's line for it) counted once.
+     */
+    internal fun mergeAsTold(
+        series: List<RecurringDetector.Series>,
+        plans: Map<String, SubscriptionPlan>,
+    ): List<RecurringDetector.Series> {
+        fun target(key: String): String {
+            var current = key
+            // Followed a few steps at most, so a loop of "same as" can't hang.
+            repeat(MAX_SAME_AS_STEPS) { current = plans[current]?.sameAs ?: return current }
+            return current
+        }
+        // Only what you said is the same as another moves; two policies with
+        // one insurer, kept apart on purpose, stay two.
+        val (told, untold) = series.partition { plans[it.key]?.sameAs != null }
+        if (told.isEmpty()) return series
+        val result = untold.toMutableList()
+        for (part in told) {
+            val key = target(part.key)
+            val median = part.payments.map { it.amountMinor }.sorted().let { it[it.size / 2] }
+            val into = result.indices.filter { result[it].key == key }
+                .minByOrNull { index -> abs(result[index].payments.map { it.amountMinor }.sorted().let { it[it.size / 2] } - median) }
+            if (into == null) {
+                result += RecurringDetector.Series(key, part.payments)
+            } else {
+                val kept = result[into].payments.toMutableList()
+                // A payment held under both names (an alert's, and the bank's line) counts once.
+                part.payments.forEach { payment ->
+                    val twice = kept.any { other ->
+                        other.amountMinor == payment.amountMinor &&
+                            abs(ChronoUnit.DAYS.between(other.date, payment.date)) <= SAME_PAYMENT_DAYS
+                    }
+                    if (!twice) kept += payment
+                }
+                result[into] = RecurringDetector.Series(key, kept.sortedBy { it.date })
+            }
+        }
+        return result
     }
 
     private fun judge(key: String, group: List<RecurringDetector.Payment>, coveredTo: Map<Long, LocalDate>): Subscription? {
@@ -228,6 +274,10 @@ object SubscriptionTracker {
 
     /** A fixed sum to a person this many times is a standing order. */
     private const val MIN_STANDING_ORDERS = 3
+
+    /** How far apart one payment told twice can be dated: an alert's day and the bank's. */
+    private const val SAME_PAYMENT_DAYS = 3L
+    private const val MAX_SAME_AS_STEPS = 5
 
     /** A payment that came back or was undone is not a payment for anything. */
     private val UNDONE = setOf("returned", "refund", "refunded", "reversal", "reversed", "unpaid", "recalled")

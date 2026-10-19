@@ -22,6 +22,18 @@ object ReleaseNotes {
     /** Every release, newest first. */
     val ALL: List<Release> = listOf(
         Release(
+            "2.3.0", LocalDate.of(2026, 10, 19), "Categories in groups, and left over put right",
+            listOf(
+                "Choosing a category opens a list of groups — Food, Transport, Shopping, Health, Money and the rest — and each opens up to what's inside, with a search across the lot. \"Just Food\" is there when nothing more specific fits. More → Categories opens and closes the same way.",
+                "New categories where things didn't fit: Takeaways and Coffee & snacks under Food, Taxis, Parking and Breakdown cover under Transport, TV licence, Pet insurance, Vets, Pharmacy, Dentist & opticians, Hair & beauty, Electronics and Bank charges. Clothes and Household now sit under Shopping, Hobbies and Holidays under Entertainment, and card payments, payment apps and fees under Money. Payments the app filed itself move into the new ones — Undo on Home puts them back.",
+                "\"Left over a month\" counted paying off a card from the bank as spending, on top of what was spent on the card. A bank payment that names one of your cards or loans is now a move between your own accounts, with a note saying why. Tap the tile to see how it's worked out month by month, and the biggest payments counted as spending — tap one to put it right.",
+                "Cards and loans set up as an ordinary account — a Capital One card, car finance — are set up as what's owed, with a note.",
+                "Money boxes fill in like a till: type 2, 4, 9, 9 and it reads 24.99, with the comma put in from a thousand. No hunting for the point.",
+                "Subscriptions has Sort them out: one at a time, say you pay it, you've cancelled it, it isn't yours, or it's the same as another — two names for one subscription become one, and a payment in both is counted once. Sort the list by cost, name or next payment.",
+                "Bills found in a statement that aren't bills can be turned down with \"None of these are bills\", and any left unticked aren't offered again.",
+            ),
+        ),
+        Release(
             "2.2.1", LocalDate.of(2026, 10, 16), "Whose money, then which account",
             listOf(
                 "Adding a receipt now asks whose money it was first — a tab for each of you, then Joint — and then offers only that person's accounts. Two accounts both called \"Lloyds Current Account\" can no longer be mixed up.",

@@ -98,6 +98,48 @@ object RepaymentPairing {
         return steps
     }
 
+    /**
+     * Money out of a bank account that names one of the household's cards or
+     * loans — "CAPITAL ONE DD", "ZOPA BANK LTD" — paired with the one it pays:
+     * a move into it, not spending, whether or not that card's statement is
+     * in yet. Left as spending, it was counted twice once the card's own
+     * statement came in with what was bought on it.
+     *
+     * Only when the payment names one of them, plainly — a word of four
+     * letters or more from its name ("capital", "zopa"), so an account called
+     * "car" doesn't claim NCP CAR PARK — and the user didn't file it as
+     * something else.
+     */
+    fun namedRepayments(
+        owed: List<Owed>,
+        entries: List<Entry>,
+        mayPayFrom: (fromAccountId: Long, owedId: Long) -> Boolean,
+    ): List<Paired> {
+        val owedIds = owed.map { it.id }.toSet()
+        return entries
+            .filter { it.type == TransactionType.EXPENSE && it.accountId !in owedIds && mayPayOff(it) }
+            .mapNotNull { entry ->
+                val text = TransactionFingerprint.normaliseDescription(entry.description)
+                val named = owed.filter { card -> namesPlainly(text, card.name) && mayPayFrom(entry.accountId, card.id) }
+                named.singleOrNull()?.let { Paired(entry.id, it.id) }
+            }
+    }
+
+    /** A payment out and the card or loan it pays. */
+    data class Paired(val expenseId: Long, val owedId: Long)
+
+    private fun namesPlainly(text: String, name: String): Boolean {
+        if (OwnAccountMatcher.nameScore(name, text) == null) return false
+        val padded = " $text "
+        return TransactionFingerprint.normaliseDescription(name).split(' ')
+            .filter { it.length >= PLAIN_WORD && it !in NOT_A_NAME }
+            .any { padded.contains(" $it ") }
+    }
+
+    /** Words in a card's or loan's name that don't say whose it is. */
+    private val NOT_A_NAME = setOf("card", "credit", "loan", "loans", "finance", "mortgage", "account", "bank")
+    private const val PLAIN_WORD = 4
+
     /** Money in on a card that may be it being paid: not a refund, nor filed as something else. */
     private fun mayBeARepayment(entry: Entry): Boolean {
         val category = entry.categoryName

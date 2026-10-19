@@ -21,3 +21,26 @@ data class AverageLeftOver(
         const val MONTHS = 3L
     }
 }
+
+/** One month of the average: what came in, went out, was put aside and paid off loans. */
+data class MonthLeftOver(
+    val month: java.time.YearMonth,
+    val inMinor: Long,
+    val outMinor: Long,
+    val savedMinor: Long,
+    val loansMinor: Long,
+) {
+    val leftMinor: Long get() = inMinor - outMinor - savedMinor - loansMinor
+}
+
+/**
+ * How "Left over a month, on average" was worked out: each month, and the
+ * biggest payments counted as spending — where a payment that isn't really
+ * spending (a move between your own accounts, a card paid off) shows up.
+ */
+data class LeftOverExplained(
+    val months: List<MonthLeftOver>,
+    val biggest: List<com.rhys.financetracker.data.local.projection.TransactionWithDetails>,
+) {
+    val averageMinor: Long get() = if (months.isEmpty()) 0L else months.sumOf { it.leftMinor } / months.size
+}

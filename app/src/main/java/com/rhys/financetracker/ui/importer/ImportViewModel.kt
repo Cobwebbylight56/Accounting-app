@@ -92,12 +92,22 @@ class ImportViewModel @Inject constructor(
         )
     }
 
-    /** Sets up the ticked bills as regular payments. */
+    /** None of the regular payments found are bills: they aren't offered again. */
+    fun declineBills() {
+        val found = _state.value.foundBills
+        viewModelScope.launch {
+            billFinder.decline(found)
+            _state.value = _state.value.copy(foundBills = emptyList(), billsNote = "Got it — those won't be offered again")
+        }
+    }
+
+    /** Sets up the ticked bills as regular payments; the unticked ones aren't offered again. */
     fun addChosenBills() {
         val current = _state.value
         val bills = current.foundBills.filter { it.name in current.chosenBills }
         if (bills.isEmpty()) return
         viewModelScope.launch {
+            billFinder.decline(current.foundBills.filter { it.name !in current.chosenBills })
             val result = billFinder.addAsBills(bills)
             _state.value = _state.value.copy(
                 foundBills = emptyList(),

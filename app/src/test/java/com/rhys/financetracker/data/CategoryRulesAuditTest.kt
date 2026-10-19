@@ -54,8 +54,8 @@ class CategoryRulesAuditTest {
         "ANGLING DIRECT" to "Hobbies",
         // Other everyday places.
         "Contactless Payment PETS AT HOME LTD NEWPORT" to "Pets",
-        "Contactless Payment GREGGS PLC" to "Eating out",
-        "COSTA COFFEE" to "Eating out",
+        "Contactless Payment GREGGS PLC" to "Coffee & snacks",
+        "COSTA COFFEE" to "Coffee & snacks",
         "FRANKIE & BENNYS" to "Eating out",
         "Direct debit EE LIMITED" to "Mobile",
         "Direct debit VIRGIN MEDIA PYMTS" to "Broadband",

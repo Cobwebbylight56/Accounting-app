@@ -194,6 +194,36 @@ Tap **+** (on Home, Spending or Payments) and choose **A payment**, or **Move mo
 Only the description, amount, date and account are needed. Everything else is
 optional.
 
+**Typing an amount** works like a till: the digits fill in from the pence, and
+the comma and the point go in by themselves. Type 2, 4, 9, 9 and it reads
+24.99; 1, 2, 3, 4, 5, 6 reads 1,234.56. The last key typed is the first taken
+off. A minus makes an amount negative, where that's allowed, and a second one
+takes it off again. Every money box in the app works this way.
+
+**Choosing a category** opens the groups — Food, Transport, Shopping, Health,
+Money and the rest — each saying what's inside. Tap one to open it up and pick
+from inside it, or **Just Food** when nothing more specific fits. The search at
+the top finds a category in any group ("park" finds Transport › Parking). The
+box then reads "Food › Takeaways".
+
+| Group | What's inside |
+|---|---|
+| Food | Groceries, Drinks, Eating out, Takeaways, Coffee & snacks |
+| Transport | Fuel, Car finance, Road tax, MOT & servicing, Public transport, Taxis, Parking, Breakdown cover |
+| Housing | Mortgage, Rent, Council tax, Repairs, Home (furniture, the garden) |
+| Utilities | Energy, Electric, Gas, Water, Broadband, Mobile, TV licence |
+| Insurance | Car, Home, Life and Pet insurance |
+| Entertainment | Days out, Subscriptions, Hobbies, Holidays |
+| Shopping | Clothes, Household, Electronics, Gifts |
+| Health | Pharmacy, Dentist & opticians, Fitness, Hair & beauty |
+| Pets | Vets |
+| Personal | Education, Charity |
+| Money | Credit & loans, Bank charges, Payment apps, Card spending, People & services |
+
+**More → Categories** shows the same groups closed, with how many are inside
+each; the arrow opens one. Categories from before 2.3.0 were moved into their
+groups once — move one back out and it stays where you put it.
+
 ### Confirming a variable bill
 
 When a bill whose amount varies falls due, it appears with a **Check** tag. Tap
@@ -281,6 +311,18 @@ aside and paid off loans.
 figure averaged over the last three full months that had pay in them, so
 months before your statements began don't drag it down. Until there's a full
 month to go on, the tile shows your take-home a month instead.
+
+**Tap the tile to see how it's worked out**: each month's money in, spending,
+what was put aside and what paid off loans, and what was left. Under that are
+the biggest payments counted as spending. If one isn't spending — a move to
+your own saver, paying off a card — tap it and change it to a transfer, and
+the figure comes right.
+
+A bank payment that names one of your cards or loans ("CAPITAL ONE", "CAR
+FINANCE") is a move to it, not spending: the card's own spending is already
+counted once. Before 2.3.0 those could be counted twice — once leaving the
+bank and once on the card — which pulled the figure far below zero. Opening
+2.3.0 turns them into moves, each with a note saying why.
 
 ### Balances
 
@@ -639,6 +681,12 @@ whenever Home opens:
   for payments ("Money In… Balance on…") is put away, and jumbled heading
   words in a payee are taken out — so importing the statement again adds what
   was missed without doubling what was already there.
+* An account named like a card or a loan — "Capital One", "Barclaycard",
+  "Car finance", a mortgage — but set up as an ordinary account is set up as
+  what it is: money owed. A name that could be savings ("Zopa Smart Saver")
+  is left alone.
+* A payment from the bank that names one of your cards or loans becomes
+  paying it off — a move, not spending.
 
 Each one changed has a note saying why.
 
@@ -931,6 +979,10 @@ A payment that was **returned, refunded or unpaid** ("RETURNED DD") is never
 offered as a bill. Bills seen only once are listed but left unticked — check
 they're real before adding them.
 
+**Not bills?** Tap **None of these are bills** and none of them is offered
+again. Untick the ones that aren't and add the rest: the unticked ones aren't
+offered again either.
+
 ### Wage and overtime
 
 **Found for you.** When a statement shows the same employer paying into
@@ -1115,6 +1167,21 @@ already set up under a slightly different name: it isn't suggested again.
 When a bill's price changes, the copy the app added on its day (at the old
 price) is still matched to the statement's line, which puts in the new
 amount, so the month doesn't count the bill twice.
+**Sort them out.** At the top, **Sort them out** says how many haven't been
+looked at, and goes through them one at a time:
+
+* **Yes, I pay this** — it's real, and stops being asked about.
+* **I've cancelled it** — hidden, as above.
+* **Not mine — not a subscription** — hidden for good, and never offered as a
+  bill again.
+* **Same as another** — for one subscription under two names. Pick the other
+  one (the likeliest are first) and they become one row; a payment that
+  shows under both is counted once.
+* **Skip** — ask again later.
+
+The same choices are in each subscription's own sheet. **Sort by** at the top
+orders the list by **cost**, **name** or **next payment**.
+
 The total at the top is what the ones still going cost a month and a year. The
 graph shows what they came to each month, each one its own colour in the bar,
 so a new one or a price rise shows.

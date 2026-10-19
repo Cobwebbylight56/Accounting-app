@@ -98,6 +98,23 @@ data class SubscriptionsState(
 
     /** Stopped, cancelled or run out: kept out of sight. */
     val ended: List<Subscription> get() = subscriptions.filterNot { it.status.isGoing }
+
+    /** Still going, and nothing said about them yet: the ones to sort out. */
+    val toSortOut: List<Subscription> get() = going.filter { it.plan?.isSorted != true }
+}
+
+/** How the subscriptions are listed. */
+enum class SubscriptionOrder(val label: String) {
+    COST("Cost"),
+    NAME("Name"),
+    NEXT("Next due"),
+    ;
+
+    fun sort(list: List<Subscription>): List<Subscription> = when (this) {
+        COST -> list.sortedByDescending { it.monthlyMinor }
+        NAME -> list.sortedBy { it.name.lowercase() }
+        NEXT -> list.sortedBy { it.nextDue }
+    }
 }
 
 @HiltViewModel
@@ -147,6 +164,22 @@ class SubscriptionsViewModel @Inject constructor(
         save((subscription.plan ?: SubscriptionPlan(subscription.key)).copy(cancelledOn = null, months = null))
     }
 
+    /** "Yes, I pay this": sorted out. */
+    fun confirm(subscription: Subscription) {
+        save((subscription.plan ?: SubscriptionPlan(subscription.key)).copy(confirmed = true))
+    }
+
+    /** Not a subscription or bill you have: hidden, and never offered as a bill. */
+    fun notMine(subscription: Subscription) {
+        save((subscription.plan ?: SubscriptionPlan(subscription.key)).copy(notMine = true))
+    }
+
+    /** The same thing as [other], under another name: counted as that one. */
+    fun sameAs(subscription: Subscription, other: Subscription) {
+        if (subscription.key == other.key) return
+        save((subscription.plan ?: SubscriptionPlan(subscription.key)).copy(sameAs = other.key))
+    }
+
     private fun save(plan: SubscriptionPlan) {
         viewModelScope.launch {
             billFinder.savePlan(plan)
@@ -176,6 +209,8 @@ fun SubscriptionsScreen(
     var showSubscriptions by rememberSaveable { mutableStateOf(true) }
     var showEnded by rememberSaveable { mutableStateOf(false) }
     var editingKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var order by rememberSaveable { mutableStateOf(SubscriptionOrder.COST) }
+    var sortingOut by rememberSaveable { mutableStateOf(false) }
     Scaffold(
         contentWindowInsets = if (embedded) {
             androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0)
@@ -230,10 +265,36 @@ fun SubscriptionsScreen(
             }
             val shown = state.copy(subscriptions = state.subscriptions.filter { it.isSubscription == showSubscriptions })
             val noun = if (showSubscriptions) "subscription" else "bill"
+            // Found from the statements, so some may not be yours, or be one thing twice.
+            if (state.toSortOut.isNotEmpty()) {
+                item(key = "sort-out") {
+                    SectionCard(
+                        title = "Sort them out",
+                        subtitle = "${state.toSortOut.size} found in your statements to check",
+                    ) {
+                        Text(
+                            "Say which you pay, which aren't yours, which are one thing twice, and which you've " +
+                                "cancelled. Ones that aren't yours are hidden and never offered as bills again.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Button(onClick = { sortingOut = true }, modifier = Modifier.fillMaxWidth()) { Text("Sort them out") }
+                    }
+                }
+            }
+            item(key = "order") {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Sort by", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    SubscriptionOrder.entries.forEach { option ->
+                        FilterChip(selected = order == option, onClick = { order = option }, label = { Text(option.label) })
+                    }
+                }
+            }
             item { Summary(shown, noun) }
             item { MonthlyGraph(shown.subscriptions, noun) }
             listOf(Status.ACTIVE, Status.MISSED).forEach { status ->
-                val group = shown.subscriptions.filter { it.status == status }
+                val group = order.sort(shown.subscriptions.filter { it.status == status })
                 if (group.isEmpty()) return@forEach
                 item(key = "head-$status") { Heading("${status.label} · ${group.size}") }
                 items(group, key = { "${it.name}-${it.accountId}-${it.amountMinor}-${it.lastDate}" }) { subscription ->
@@ -282,10 +343,32 @@ fun SubscriptionsScreen(
         }
     }
 
+    if (sortingOut) {
+        SortOutDialog(
+            toSortOut = state.toSortOut,
+            everything = state.going,
+            accountNames = state.accountNames,
+            onConfirm = viewModel::confirm,
+            onCancelled = viewModel::cancelled,
+            onNotMine = viewModel::notMine,
+            onSameAs = viewModel::sameAs,
+            onClose = { sortingOut = false },
+        )
+    }
+
     val editing = state.subscriptions.firstOrNull { it.key == editingKey }
     if (editing != null) {
         SubscriptionSheet(
             subscription = editing,
+            others = state.going.filter { it.key != editing.key },
+            onNotMine = {
+                viewModel.notMine(editing)
+                editingKey = null
+            },
+            onSameAs = { other ->
+                viewModel.sameAs(editing, other)
+                editingKey = null
+            },
             accountName = state.accountNames[editing.accountId],
             onDismiss = { editingKey = null },
             onSave = { start, months ->
@@ -510,6 +593,9 @@ private fun SubscriptionRow(subscription: Subscription, accountName: String?, on
 @Composable
 private fun SubscriptionSheet(
     subscription: Subscription,
+    others: List<Subscription>,
+    onNotMine: () -> Unit,
+    onSameAs: (Subscription) -> Unit,
     accountName: String?,
     onDismiss: () -> Unit,
     onSave: (LocalDate?, Int?) -> Unit,
@@ -583,9 +669,100 @@ private fun SubscriptionSheet(
                     Text("It's still going")
                 }
             }
+            OutlinedButton(onClick = onNotMine, modifier = Modifier.fillMaxWidth()) {
+                Text("Not mine — hide it")
+            }
+            SameAsChooser(subscription = subscription, others = others, onChoose = onSameAs)
             TextButton(onClick = onSeePayments, modifier = Modifier.fillMaxWidth()) { Text("See its payments") }
         }
     }
+}
+
+/** "Same as another…": the others, the likeliest first, to say this one is one of them twice. */
+@Composable
+private fun SameAsChooser(subscription: Subscription, others: List<Subscription>, onChoose: (Subscription) -> Unit) {
+    if (others.isEmpty()) return
+    var open by rememberSaveable(subscription.key) { mutableStateOf(false) }
+    TextButton(onClick = { open = !open }, modifier = Modifier.fillMaxWidth()) {
+        Text(if (open) "Hide the others" else "It's the same as another one…")
+    }
+    if (!open) return
+    val first = subscription.name.lowercase().substringBefore(' ')
+    val likeliest = others.sortedWith(
+        compareByDescending<Subscription> { it.name.lowercase().startsWith(first) }
+            .thenBy { kotlin.math.abs(it.amountMinor - subscription.amountMinor) },
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        likeliest.forEach { other ->
+            OutlinedButton(onClick = { onChoose(other) }, modifier = Modifier.fillMaxWidth()) {
+                Text("${other.name} · ${Money.format(other.amountMinor)}", maxLines = 1)
+            }
+        }
+    }
+}
+
+/**
+ * One at a time, the subscriptions found in the statements that nothing has
+ * been said about: yours, cancelled, not yours, or the same as another.
+ */
+@Composable
+private fun SortOutDialog(
+    toSortOut: List<Subscription>,
+    everything: List<Subscription>,
+    accountNames: Map<Long, String>,
+    onConfirm: (Subscription) -> Unit,
+    onCancelled: (Subscription) -> Unit,
+    onNotMine: (Subscription) -> Unit,
+    onSameAs: (Subscription, Subscription) -> Unit,
+    onClose: () -> Unit,
+) {
+    var skipped by rememberSaveable { mutableStateOf(emptyList<String>()) }
+    val current = toSortOut.firstOrNull { it.key !in skipped }
+    val left = toSortOut.count { it.key !in skipped }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onClose,
+        title = { Text(if (current == null) "All sorted" else current.name) },
+        text = {
+            if (current == null) {
+                Text("Nothing left to sort out. Ones you skipped are still on the list to come back to.")
+            } else Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    listOfNotNull(
+                        "${Money.format(current.amountMinor)} ${current.frequency.displayName.lowercase()}",
+                        accountNames[current.accountId],
+                    ).joinToString(" · "),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    "Paid ${current.timesPaid} times since ${DateUtils.format(current.firstDate)}, last on ${DateUtils.format(current.lastDate)}. " +
+                        "$left to go.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Button(onClick = { onConfirm(current) }, modifier = Modifier.fillMaxWidth()) { Text("Yes, I pay this") }
+                OutlinedButton(onClick = { onCancelled(current) }, modifier = Modifier.fillMaxWidth()) { Text("I've cancelled it") }
+                OutlinedButton(onClick = { onNotMine(current) }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Not mine — not a subscription")
+                }
+                SameAsChooser(
+                    subscription = current,
+                    others = everything.filter { it.key != current.key },
+                    onChoose = { other -> onSameAs(current, other) },
+                )
+            }
+        },
+        confirmButton = {
+            if (current == null) {
+                TextButton(onClick = onClose) { Text("Done") }
+            } else {
+                TextButton(onClick = { skipped = skipped + current.key }) { Text("Skip") }
+            }
+        },
+        dismissButton = { if (current != null) TextButton(onClick = onClose) { Text("Finish later") } },
+    )
 }
 
 /** For a card or account page: the subscriptions paid from [accountId] that are still going. */

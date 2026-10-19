@@ -123,6 +123,19 @@ fun DashboardScreen(
     if (inboxRoutes != null) {
         com.rhys.financetracker.ui.inbox.NeedsALookPopup(routes = inboxRoutes, onOpenInbox = onOpenInbox)
     }
+    // How "Left over a month" was worked out, when its tile is tapped.
+    val leftOver by viewModel.leftOverExplained.collectAsStateWithLifecycle()
+    leftOver?.let { explained ->
+        LeftOverSheet(
+            explained = explained,
+            onOpenPayment = { id ->
+                viewModel.closeLeftOver()
+                onOpenTransaction(id)
+            },
+            onDismiss = viewModel::closeLeftOver,
+        )
+    }
+
     // How the month went, at its start and halfway through — after Needs a look, never on top of it.
     if (individuals.isNotEmpty()) {
         com.rhys.financetracker.ui.progress.ProgressPopup(onOpenReports = onOpenProgress)
@@ -251,7 +264,7 @@ fun DashboardScreen(
                     item { com.rhys.financetracker.ui.setup.GetSetUpCard(setupRoutes) }
                 }
 
-                item { HomeTiles(state = state, onOpenAccounts = onOpenAccounts) }
+                item { HomeTiles(state = state, onOpenAccounts = onOpenAccounts, onExplainLeftOver = viewModel::explainLeftOver) }
 
                 item { MonthList(state = state) }
 

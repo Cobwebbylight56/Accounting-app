@@ -67,9 +67,9 @@ import com.rhys.financetracker.data.receipts.SplitRepository
 import com.rhys.financetracker.data.repository.CategoryRepository
 import com.rhys.financetracker.data.repository.TransactionRepository
 import com.rhys.financetracker.domain.model.CategoryKind
+import com.rhys.financetracker.ui.components.CategoryPicker
 import com.rhys.financetracker.ui.components.AmountField
 import com.rhys.financetracker.ui.components.ColorDot
-import com.rhys.financetracker.ui.components.DropdownField
 import com.rhys.financetracker.ui.components.LabelledTextField
 import com.rhys.financetracker.ui.components.colorFromHex
 import com.rhys.financetracker.ui.navigation.Routes
@@ -560,13 +560,13 @@ private fun EditPartDialog(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 LabelledTextField(label = "What", value = row.label, onValueChange = onLabel)
                 AmountField(label = "Amount", value = row.amountText, onValueChange = onAmount)
-                DropdownField(
+                CategoryPicker(
                     label = "Category",
-                    options = listOf<CategoryEntity?>(null) + categories,
-                    selected = categories.firstOrNull { it.id == row.categoryId },
+                    categories = categories,
+                    selectedId = row.categoryId,
                     onSelect = { onCategory(it?.id) },
-                    optionLabel = { it?.name ?: "Other — stays in $own" },
                     placeholder = "Other — stays in $own",
+                    noneLabel = "Other — stays in $own",
                 )
             }
         },

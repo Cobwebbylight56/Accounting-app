@@ -152,7 +152,7 @@ object SampleData {
         rhys("Credit card", 250.00, "Credit & loans", 20, note = "sheet row \"credit\""),
         rhys("Phone", 19.77, "Mobile", 8),
         rhys("EE", 20.50, "Mobile", 8, note = "sheet row \"ee\""),
-        rhys("Takeaways", 90.00, "Eating out", 1, variable = true, note = "sheet row \"outfood\""),
+        rhys("Takeaways", 90.00, "Takeaways", 1, variable = true, note = "sheet row \"outfood\""),
         rhys("Miscellaneous", 75.00, "Other", 1, variable = true, note = "sheet row \"missol\""),
         rhys("Life insurance", 32.39, "Life insurance", 3),
 
@@ -165,7 +165,7 @@ object SampleData {
         hannah("YouTube Premium", 12.99, "Subscriptions", 12, note = "sheet row \"yt\""),
         hannah("Credit card", 130.00, "Credit & loans", 20, note = "sheet row \"credit\""),
         hannah("EE", 19.91, "Mobile", 8, note = "sheet row \"ee\""),
-        hannah("Takeaways", 30.00, "Eating out", 1, variable = true, note = "sheet row \"outfood\""),
+        hannah("Takeaways", 30.00, "Takeaways", 1, variable = true, note = "sheet row \"outfood\""),
         hannah("Miscellaneous", 165.00, "Other", 1, variable = true, note = "sheet row \"missol\""),
         hannah("Life insurance", 35.59, "Life insurance", 3),
     )

@@ -220,6 +220,7 @@ fun ImportScreen(
                     onFinish = onFinished,
                     onToggleBill = viewModel::toggleBill,
                     onAddBills = viewModel::addChosenBills,
+                    onDeclineBills = viewModel::declineBills,
                     onUndo = viewModel::undoImport,
                     onNext = viewModel::openNext,
                 )
@@ -1410,6 +1411,7 @@ private fun DoneStep(
     onFinish: () -> Unit,
     onToggleBill: (String) -> Unit = {},
     onAddBills: () -> Unit = {},
+    onDeclineBills: () -> Unit = {},
     onUndo: () -> Unit = {},
     onNext: () -> Unit = {},
 ) {
@@ -1508,6 +1510,9 @@ private fun DoneStep(
                     enabled = state.chosenBills.isNotEmpty(),
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("Add ${state.chosenBills.size} as bills") }
+                TextButton(onClick = onDeclineBills, modifier = Modifier.fillMaxWidth()) {
+                    Text("None of these are bills")
+                }
                 Text(
                     text = "They go on Regular payments with their next date. When the next statement " +
                         "arrives it updates them rather than adding them twice.",

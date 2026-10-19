@@ -27,7 +27,7 @@ object MerchantCategoriser {
      * app re-sorts everything it filed by itself — never anything the user
      * filed — so old payments follow the improved rules too.
      */
-    const val RULES_VERSION = 4
+    const val RULES_VERSION = 5
 
     /**
      * The category for [description], or null when nothing matches.
@@ -169,7 +169,7 @@ object MerchantCategoriser {
 
         // -- specific cases that must beat the general ones below ----------
         rule("Mobile", "tesco mobile", "sky mobile", "asda mobile"),
-        rule("Eating out", "uber eats", "ubereats"),
+        rule("Takeaways", "uber eats", "ubereats"),
         rule("Energy", "shell energy", "sainsbury energy"),
 
         // Fuel before groceries: the supermarkets' forecourts carry their
@@ -205,19 +205,34 @@ object MerchantCategoriser {
             "grocer", "butcher", "greengrocer", "milk and more", "milkman",
         ),
 
-        // -- eating out and takeaways --------------------------------------
+        // -- eating out, takeaways, and coffee on the go --------------------
+        //
+        // Three apart, because "Eating out" holding the Friday takeaway, the
+        // morning coffee and a meal out together said nothing about any of
+        // them. Coffee and takeaways first: "pizza" and "cafe" are left to a
+        // meal out.
+        rule(
+            "Coffee & snacks",
+            "costa", "starbucks", "caffe nero", "greggs", "pret", "coffee", "tim hortons",
+            "krispy kreme", "bakery", "cafe", "subway",
+        ),
+        rule(
+            "Takeaways",
+            "deliveroo", "just eat", "justeat", "domino", "papa john", "takeaway", "chippy",
+            "chip shop", "fish bar", "kebab", "mcdonald", "kfc", "burger king", "taco bell",
+            "wimpy", "five guys",
+        ),
         rule(
             "Eating out",
-            "costa", "starbucks", "caffe nero", "greggs", "pret", "nando", "mcdonald",
-            "kfc", "burger king", "subway", "pizza", "domino", "wagamama", "prezzo",
-            "harvester", "toby carvery", "wetherspoon", "deliveroo", "just eat",
-            "restaurant", "bistro", "cafe", "coffee", "takeaway", "chippy", "bakery",
-            "five guys", "tim hortons", "papa john", "frankie and benny", "zizzi", "ask italian",
+            "nando", "pizza", "wagamama", "prezzo",
+            "harvester", "toby carvery", "wetherspoon",
+            "restaurant", "bistro",
+            "frankie and benny", "zizzi", "ask italian",
             "bella italia", "beefeater", "brewers fayre", "miller and carter", "chiquito",
-            "tgi friday", "taco bell", "wimpy", "leon ", "itsu", "yo sushi", "krispy kreme",
+            "tgi friday", "leon ", "itsu", "yo sushi",
             "pub ", "tavern", "bar and grill", "arms ", "brewdog", "slug and lettuce",
-            "all bar one", "greene king", "marstons", "stonegate", "chip shop", "fish bar",
-            "kebab", "curry house", "curry ", "indian ", "chinese ", "thai ", "diner", "grill ", "noodle",
+            "all bar one", "greene king", "marstons", "stonegate",
+            "curry house", "curry ", "indian ", "chinese ", "thai ", "diner", "grill ", "noodle",
         ),
 
         // -- motoring -------------------------------------------------------
@@ -245,10 +260,13 @@ object MerchantCategoriser {
         rule(
             "Public transport",
             "trainline", "national rail", "tfl", "oyster", "stagecoach", "arriva",
-            "first bus", "lner", "avanti", "northern rail", "uber", "bolt ", "taxi",
+            "first bus", "lner", "avanti", "northern rail",
         ),
+        rule("Taxis", "uber", "bolt ", "taxi", "cabs ", "addison lee", "free now", "freenow"),
 
         // -- home and bills -------------------------------------------------
+        // Before the council: "TV LICENSING" is nobody's council tax.
+        rule("TV licence", "tv licence", "tv licensing", "tvlicensing", "tv licence direct debit"),
         rule("Council tax", "council tax", "council", "ncc collect", "cbc collect"),
         rule(
             "Energy",
@@ -293,6 +311,7 @@ object MerchantCategoriser {
         // -- insurance ------------------------------------------------------
         rule("Home insurance", "home insurance", "buildings insurance", "contents insurance"),
         rule("Life insurance", "life insurance", "life cover"),
+        rule("Pet insurance", "petplan", "pet insurance", "animal friends", "bought by many", "manypets"),
         rule("Insurance", "aviva", "axa", "legal and general", "lv ", "insurance", "insure"),
 
         // -- subscriptions and entertainment --------------------------------
@@ -300,7 +319,7 @@ object MerchantCategoriser {
             "Subscriptions",
             "netflix", "spotify", "disney", "amazon prime", "prime video", "apple com bill",
             "itunes", "google play", "youtube", "audible", "xbox", "playstation",
-            "nintendo", "patreon", "dropbox", "adobe", "microsoft", "now tv", "tv licence",
+            "nintendo", "patreon", "dropbox", "adobe", "microsoft", "now tv",
         ),
         rule(
             "Days out",
@@ -325,20 +344,25 @@ object MerchantCategoriser {
 
         // -- shopping -------------------------------------------------------
         rule(
+            "Electronics",
+            "currys", "apple store", "samsung shop", "cex ", "ao com", "ao retail", "richer sounds",
+            "box com", "scan computers", "overclockers",
+        ),
+        rule(
             "Shopping",
             "amazon", "argos", "ikea", "b and q", "wickes", "homebase", "dunelm",
-            "primark", "asos", "tk maxx", "sports direct", "john lewis", "currys",
+            "primark", "asos", "tk maxx", "sports direct", "john lewis",
             "very co uk", "shein", "temu", "ebay", "etsy", "wilko", "poundland",
             "home bargains", "b and m", "the range", "next retail", "matalan",
             // the high street
             "h and m", "zara", "new look", "river island", "jd sports", "footlocker",
             "foot locker", "next ", "tkmaxx", "the works", "smyths", "the entertainer",
             "hobbycraft", "waterstones", "whsmith", "wh smith", "superdry", "clarks", "schuh",
-            "deichmann", "mountain warehouse", "go outdoors", "decathlon", "hmv", "cex ",
+            "deichmann", "mountain warehouse", "go outdoors", "decathlon", "hmv",
             "game ", "lush ", "the fragrance shop", "the perfume shop", "savers ", "pandora",
             "h samuel", "ernest jones", "claires", "accessorize", "fat face", "fatface",
             "joules", "white stuff", "primark", "b and m bargains", "poundstretcher",
-            "the card shop", "apple store", "samsung shop",
+            "the card shop",
             // websites
             "amzn", "amazon co uk", "amazon eu", "amazon marketplace", "aliexpress",
             "zalando", "boohoo", "pretty little thing", "prettylittlething", "wish com",
@@ -347,9 +371,19 @@ object MerchantCategoriser {
         ),
 
         // -- health, pets, children ------------------------------------------
-        rule("Health", "boots", "superdrug", "pharmacy", "dentist", "dental", "specsavers",
-            "vision express", "optician", "bupa", "nuffield"),
-        rule("Pets", "pets at home", "veterinary", "vets", "jollyes", "pet shop", "petplan"),
+        rule("Pharmacy", "pharmacy", "chemist", "pharmacist"),
+        rule(
+            "Dentist & opticians",
+            "dentist", "dental", "orthodont", "specsavers", "vision express", "optician", "optical",
+        ),
+        rule("Health", "boots", "superdrug", "bupa", "nuffield"),
+        rule(
+            "Hair & beauty",
+            "hairdresser", "barber", "hair salon", "hair studio", "nail bar", "beauty salon",
+            "brow bar", "toni and guy", "rush hair",
+        ),
+        rule("Vets", "veterinary", "vets", "vet surgery", "medivet", "companion care"),
+        rule("Pets", "pets at home", "jollyes", "pet shop", "pet supplies", "zooplus"),
         rule("Childcare", "nursery", "childcare", "playgroup", "childminder", "after school"),
         rule("School", "school", "college fees", "uniform", "parentpay", "school meals"),
         rule(
@@ -380,10 +414,24 @@ object MerchantCategoriser {
             "People & services",
             "cleaner", "window clean", "cleaning", "gardener", "gardening",
             "babysitter", "childminder pay", "tutor", "lessons", "music lesson",
-            "driving lesson", "hairdresser", "barber", "therapist", "physio",
+            "driving lesson", "therapist", "physio",
             "osteopath", "chiropractor", "counselling", "decorator", "handyman",
             // Deliberately not beauty or nails: both are shop names as often
             // as services, and SAVERS HEALTH AND BEAUTY is a chemist.
+        ),
+
+        // -- the bank's own charges ------------------------------------------
+        //
+        // Before cards and loans: "CREDIT CARD LATE FEE" is a charge, not a
+        // payment off the card. On the money-out side "interest" is always
+        // what was charged — interest earned comes in, and is filed there.
+        rule(
+            "Bank charges",
+            "overdraft fee", "overdraft charge", "overdraft interest", "overdraft usage",
+            "unarranged overdraft", "arranged overdraft", "account fee", "monthly account fee", "non sterling", "foreign transaction fee", "transaction fee",
+            "late payment fee", "late fee", "returned payment fee", "over limit fee", "overlimit fee",
+            "interest charged", "debit interest", "purchase interest", "interest", "bank charge",
+            "unpaid item", "paid item fee",
         ),
 
         // -- money owed -------------------------------------------------------

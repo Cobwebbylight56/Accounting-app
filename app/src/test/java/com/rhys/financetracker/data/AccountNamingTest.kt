@@ -69,4 +69,20 @@ class AccountNamingTest {
         assertEquals(AccountType.CURRENT, AccountNaming.typeFor("Spare account"))
         assertTrue(!AccountNaming.looksMistyped("Spare account", Holding.SPEND))
     }
+
+    @Test
+    fun `cards, pay later, loans and mortgages are put in their place only when the name plainly says so`() {
+        assertEquals(AccountType.CREDIT_CARD, AccountNaming.owedTypeFor("Capital One"))
+        assertEquals(AccountType.CREDIT_CARD, AccountNaming.owedTypeFor("Barclaycard Platinum"))
+        assertEquals(AccountType.CREDIT_CARD, AccountNaming.owedTypeFor("Halifax credit card"))
+        assertEquals(AccountType.PAY_LATER, AccountNaming.owedTypeFor("Klarna"))
+        assertEquals(AccountType.LOAN, AccountNaming.owedTypeFor("Car finance"))
+        assertEquals(AccountType.MORTGAGE, AccountNaming.owedTypeFor("Nationwide Mortgage"))
+        // Not plainly: a bank that also does savings, a credit union, a saver, a current account.
+        assertEquals(null, AccountNaming.owedTypeFor("Zopa"))
+        assertEquals(null, AccountNaming.owedTypeFor("Credit Union"))
+        assertEquals(null, AccountNaming.owedTypeFor("Capital One Saver"))
+        assertEquals(null, AccountNaming.owedTypeFor("Lloyds Current Account"))
+        assertEquals(null, AccountNaming.owedTypeFor("car"))
+    }
 }

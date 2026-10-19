@@ -68,9 +68,20 @@ class RecurringViewModel @Inject constructor(
         _found.value = null
     }
 
-    fun addFound(bills: List<RecurringDetector.RegularPayment>) {
+    /** None of those found are bills: they aren't offered again. */
+    fun declineFound(bills: List<RecurringDetector.RegularPayment>) {
         viewModelScope.launch {
             _found.value = null
+            billFinder.decline(bills)
+            message.value = "Got it — those won't be offered again"
+        }
+    }
+
+    fun addFound(bills: List<RecurringDetector.RegularPayment>) {
+        val turnedDown = _found.value.orEmpty().filter { found -> bills.none { it.name == found.name } }
+        viewModelScope.launch {
+            _found.value = null
+            billFinder.decline(turnedDown)
             message.value = when (val result = billFinder.addAsBills(bills)) {
                 is AppResult.Success -> "${result.data} " +
                     (if (result.data == 1) "bill" else "bills") + " added"

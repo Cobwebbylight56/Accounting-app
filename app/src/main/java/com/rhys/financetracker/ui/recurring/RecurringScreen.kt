@@ -61,6 +61,7 @@ import com.rhys.financetracker.domain.model.Frequency
 import com.rhys.financetracker.domain.model.PaymentKind
 import com.rhys.financetracker.domain.model.RecurrenceMode
 import com.rhys.financetracker.domain.model.TransactionType
+import com.rhys.financetracker.ui.components.CategoryPicker
 import com.rhys.financetracker.ui.components.AmountField
 import com.rhys.financetracker.ui.components.ColorDot
 import com.rhys.financetracker.ui.components.ConfirmDialog
@@ -98,6 +99,7 @@ fun RecurringScreen(
         FoundBillsDialog(
             bills = bills,
             onAdd = viewModel::addFound,
+            onDecline = viewModel::declineFound,
             onDismiss = viewModel::closeFound,
         )
     }
@@ -523,14 +525,11 @@ fun RecurringEditScreen(
                 )
             }
 
-            DropdownField(
+            CategoryPicker(
                 label = "Category",
-                options = state.categories,
-                selected = state.categories.firstOrNull { it.id == state.form.categoryId },
-                onSelect = { category -> viewModel.update { it.copy(categoryId = category.id) } },
-                optionLabel = { it.name },
-                optionColor = { colorFromHex(it.colorHex) },
-                placeholder = "Not categorised",
+                categories = state.categories,
+                selectedId = state.form.categoryId,
+                onSelect = { category -> viewModel.update { it.copy(categoryId = category?.id) } },
             )
 
             DropdownField(
@@ -607,6 +606,7 @@ fun RecurringEditScreen(
 private fun FoundBillsDialog(
     bills: List<RecurringDetector.RegularPayment>,
     onAdd: (List<RecurringDetector.RegularPayment>) -> Unit,
+    onDecline: (List<RecurringDetector.RegularPayment>) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var chosen by remember { mutableStateOf(bills.filter { it.isConfirmed }.map { it.name }.toSet()) }
@@ -650,6 +650,7 @@ private fun FoundBillsDialog(
                 enabled = chosen.isNotEmpty(),
             ) { Text("Add ${chosen.size}") }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Not now") } },
+        // Turned down, they aren't offered again; tapping outside just closes it.
+        dismissButton = { TextButton(onClick = { onDecline(bills) }) { Text("None of these") } },
     )
 }

@@ -45,8 +45,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import com.rhys.financetracker.core.money.AmountEntry
 import com.rhys.financetracker.core.time.DateUtils
 import java.time.Instant
 import java.time.LocalDate
@@ -102,8 +105,10 @@ fun LabelledTextField(
 /**
  * The money field.
  *
- * The keyboard is set to decimal and the currency symbol is shown as a prefix,
- * so the user types `24.99` rather than having to remember not to type "£".
+ * Typed like a till: the digits fill in from the pence and the comma and the
+ * point go in by themselves, so 2, 4, 9, 9 is 24.99 and nobody has to find
+ * the point on the keyboard. See [AmountEntry]. The currency symbol sits in
+ * front, so "£" is never typed either.
  */
 @Composable
 fun AmountField(
@@ -114,19 +119,20 @@ fun AmountField(
     error: String? = null,
     currencySymbol: String = "£",
 ) {
-    LabelledTextField(
-        label = label,
-        value = value,
-        onValueChange = { input ->
-            // Accept only what can be part of an amount, so the parser never
-            // sees rubbish and the user cannot type a letter by accident.
-            onValueChange(input.filter { it.isDigit() || it == '.' || it == ',' || it == '-' })
-        },
-        modifier = modifier,
-        placeholder = "0.00",
-        error = error,
-        keyboardType = KeyboardType.Decimal,
-        prefix = currencySymbol,
+    val shown = AmountEntry.shown(value)
+    OutlinedTextField(
+        // The cursor stays at the end: each digit goes on the pence, and
+        // taking one off takes the last.
+        value = TextFieldValue(shown, selection = TextRange(shown.length)),
+        onValueChange = { input -> if (input.text != shown) onValueChange(AmountEntry.typed(input.text)) },
+        modifier = modifier.fillMaxWidth(),
+        label = { Text(label) },
+        placeholder = { Text("0.00") },
+        isError = error != null,
+        singleLine = true,
+        prefix = { Text(currencySymbol) },
+        supportingText = error?.let { { Text(it, color = MaterialTheme.colorScheme.error) } },
+        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
     )
 }
 

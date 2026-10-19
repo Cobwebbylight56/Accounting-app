@@ -2,6 +2,7 @@ package com.rhys.financetracker.data.repository
 
 import androidx.room.withTransaction
 import com.rhys.financetracker.core.time.DateUtils
+import com.rhys.financetracker.data.importer.AccountNaming
 import com.rhys.financetracker.data.importer.CardSpendingCheck
 import com.rhys.financetracker.data.importer.CardStatementJunk
 import com.rhys.financetracker.data.importer.MerchantCategoriser
@@ -39,6 +40,10 @@ import javax.inject.Singleton
  *   transactions", "Dear Mr …" — put away; see [CardStatementJunk].
  * * **Paying a card off read as spending on it** — "Direct Debit Payment -
  *   Thank You" as money out — turned round to money in.
+ * * **A card, pay-later plan, loan or mortgage set up as an ordinary
+ *   account** — "Capital One", "Klarna", "Car loan" counted as money to
+ *   spend — put in its place: what's on it is owed. See
+ *   [AccountNaming.owedTypeFor].
  * * **A Lloyds statement with its headings over every payment** — the
  *   summary at the top ("Money In. . Balance on . .") put away, and the
  *   jumbled heading scraps taken out of a payee, so the same payment
@@ -57,7 +62,7 @@ class StatementRepairRepository @Inject constructor(
 
     /** Puts right whatever needs it; returns how many entries changed. */
     suspend fun putRight(today: LocalDate = DateUtils.today()): Int =
-        backFromTheFuture(today) + cardStatementText(today) + cardSpendingReadAsIn(today) + repeatedHeadings(today) +
+        owedAccounts() + backFromTheFuture(today) + cardStatementText(today) + cardSpendingReadAsIn(today) + repeatedHeadings(today) +
             recurringRuleDao.cardPaymentsAsCard(Instant.now().toEpochMilli())
 
     /** On cards: the statement's own lines put away, and paying it off turned to money in. */
@@ -93,6 +98,22 @@ class StatementRepairRepository @Inject constructor(
             }
         }
         return junk.size + paidOff.size
+    }
+
+    private suspend fun owedAccounts(): Int {
+        val now = Instant.now().toEpochMilli()
+        val wrong = accountDao.getAllActive().mapNotNull { account ->
+            if (account.holding == Holding.OWED) return@mapNotNull null
+            val type = AccountNaming.owedTypeFor(account.name) ?: return@mapNotNull null
+            account.copy(
+                type = type,
+                holding = Holding.OWED,
+                notes = listOfNotNull(account.notes?.takeIf { it.isNotBlank() }, OWED_NOTE).joinToString(" "),
+                updatedAt = now,
+            )
+        }
+        wrong.forEach { accountDao.update(it) }
+        return wrong.size
     }
 
     private suspend fun repeatedHeadings(today: LocalDate): Int {
@@ -197,5 +218,6 @@ class StatementRepairRepository @Inject constructor(
         const val READ_AS_IN = "Read as money in by mistake: it was spent on the card."
         const val NOT_A_PAYMENT = "Part of the statement's own writing, read as a payment by mistake."
         const val PAID_OFF = "Read as money out by mistake: it paid the card off."
+        const val OWED_NOTE = "Set as owed: its name says it's a card, pay-later plan, loan or mortgage."
     }
 }

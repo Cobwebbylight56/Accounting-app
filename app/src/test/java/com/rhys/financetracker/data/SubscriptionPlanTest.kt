@@ -116,4 +116,40 @@ class SubscriptionPlanTest {
         assertTrue(SubscriptionPlan.parse(null).isEmpty())
         assertTrue(SubscriptionPlan.parse("rubbish").isEmpty())
     }
+
+    @Test
+    fun `what you said when sorting them out is kept, and older plans still read`() {
+        val plans = listOf(
+            SubscriptionPlan("netflix com", confirmed = true),
+            SubscriptionPlan("tesco stores", notMine = true),
+            SubscriptionPlan("amzn prime", sameAs = "amazon prime"),
+            SubscriptionPlan("puregym", noBill = true),
+        )
+        assertEquals(plans.associateBy { it.key }, SubscriptionPlan.parse(SubscriptionPlan.write(plans)))
+        // Written by an older version: four fields.
+        val old = SubscriptionPlan.parse("audible uk|2024-03-02||")
+        assertEquals(LocalDate.of(2024, 3, 2), old.getValue("audible uk").startedOn)
+        assertFalse(old.getValue("audible uk").notMine)
+    }
+
+    @Test
+    fun `one you said isn't yours is gone, and one the same as another is counted as it`() {
+        val payments = monthly("NETFLIX.COM", 1_099, 15, 1..9) +
+            monthly("TESCO STORES", 2_500, 2, 1..9) +
+            monthly("AMAZON PRIME", 899, 5, 1..4) +
+            monthly("AMZN PRIME", 899, 5, 5..9) +
+            // The same September payment, told twice: by an alert and by the bank.
+            monthly("AMAZON PRIME", 899, 6, 9..9) +
+            coverage
+        val plans = listOf(
+            SubscriptionPlan("tesco stores", notMine = true),
+            SubscriptionPlan("amzn prime", sameAs = "amazon prime"),
+        ).associateBy { it.key }
+        val found = SubscriptionTracker.track(payments, plans, today).associateBy { it.name }
+        assertNull(found["Tesco Stores"])
+        assertNull(found["Amzn Prime"])
+        val prime = found.getValue("Amazon Prime")
+        assertEquals(9, prime.timesPaid)
+        assertTrue(prime.status.isGoing)
+    }
 }

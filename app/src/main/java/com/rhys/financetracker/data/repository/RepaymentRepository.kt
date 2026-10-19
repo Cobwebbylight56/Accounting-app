@@ -59,10 +59,30 @@ class RepaymentRepository @Inject constructor(
         }
         val payFrom = accounts.filter { it.holding != Holding.OWED }
             .associate { account -> account.id to importer.ownAccountTargets(account.id).map { it.id }.toSet() }
-        val steps = RepaymentPairing.find(owed, entries) { from, to -> payFrom[from]?.contains(to) == true }
-        if (steps.isEmpty()) return 0
-
+        val mayPayFrom = { from: Long, to: Long -> payFrom[from]?.contains(to) == true }
         val byId = rows.associateBy { it.id }
+
+        // A payment that names one of the cards or loans pays it, whether or
+        // not the card's statement is in yet: a move, not spending.
+        val named = RepaymentPairing.namedRepayments(owed, entries, mayPayFrom)
+        val moved = named.mapNotNull { pair ->
+            byId[pair.expenseId]?.let { row ->
+                TidyUpRepository.asTransfer(row, pair.owedId, now).copy(
+                    notes = listOfNotNull(row.notes?.takeIf { it.isNotBlank() }, NAMED_NOTE).joinToString(" "),
+                )
+            }
+        }
+        if (moved.isNotEmpty()) database.withTransaction { moved.forEach { transactionDao.update(it) } }
+        val movedIds = moved.map { it.id }.toSet()
+        val afterMoves = entries.map { entry ->
+            if (entry.id !in movedIds) return@map entry
+            val pair = named.first { it.expenseId == entry.id }
+            entry.copy(type = TransactionType.TRANSFER, transferAccountId = pair.owedId, categoryName = null)
+        }
+
+        val steps = RepaymentPairing.find(owed, afterMoves, mayPayFrom)
+        if (steps.isEmpty()) return moved.size
+
         database.withTransaction {
             steps.forEach { step ->
                 when (step) {
@@ -76,7 +96,7 @@ class RepaymentRepository @Inject constructor(
                 }
             }
         }
-        return steps.size
+        return moved.size + steps.size
     }
 
     /** Money in on the card, now counted as the move into it instead. */
@@ -107,5 +127,8 @@ class RepaymentRepository @Inject constructor(
     private companion object {
         /** A little over a year of statements. */
         const val LOOK_BACK_DAYS = 400L
+
+        /** On a payment out that names a card or loan, once it is counted as paying it. */
+        const val NAMED_NOTE = "Pays off one of your cards or loans, so it isn't counted as spending."
     }
 }

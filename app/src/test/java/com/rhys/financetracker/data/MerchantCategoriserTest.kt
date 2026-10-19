@@ -146,7 +146,7 @@ class MerchantCategoriserTest {
         assertEquals("Groceries", categoryFor("TESCO STORES 3294"))
         assertEquals("Groceries", categoryFor("ALDI 812 CARDIFF"))
         assertEquals("Fuel", categoryFor("SHELL FILLING STN"))
-        assertEquals("Eating out", categoryFor("GREGGS PLC 1042"))
+        assertEquals("Coffee & snacks", categoryFor("GREGGS PLC 1042"))
         assertEquals("Subscriptions", categoryFor("NETFLIX.COM"))
         assertEquals("Council tax", categoryFor("CARDIFF COUNCIL TAX"))
         assertEquals("Shopping", categoryFor("AMAZON.CO.UK*A12BC"))
@@ -156,7 +156,7 @@ class MerchantCategoriserTest {
     fun `a longer rule wins over the shorter one it contains`() {
         // Each of these would be filed wrongly if the broader rule ran first.
         assertEquals("Mobile", categoryFor("TESCO MOBILE LTD"))
-        assertEquals("Eating out", categoryFor("UBER EATS"))
+        assertEquals("Takeaways", categoryFor("UBER EATS"))
         assertEquals("Energy", categoryFor("SHELL ENERGY RETAIL"))
         assertEquals("Fuel", categoryFor("SAINSBURYS PETROL 41"))
     }
@@ -223,9 +223,33 @@ class MerchantCategoriserTest {
         // A name matches nothing and never will. What can be read is the
         // service beside it.
         assertEquals("People & services", categoryFor("WINDOW CLEANER"))
-        assertEquals("People & services", categoryFor("Standing order HAIRDRESSER"))
+        assertEquals("Hair & beauty", categoryFor("Standing order HAIRDRESSER"))
         // A bare name is still left alone — guessing at one is worse.
         assertNull(categoryFor("PETER ROCHE"))
+    }
+
+    @Test
+    fun `the new groups' categories are found`() {
+        assertEquals("Takeaways", categoryFor("DELIVEROO CO UK"))
+        assertEquals("Takeaways", categoryFor("JUST EAT.CO.UK LTD"))
+        assertEquals("Takeaways", categoryFor("DOMINOS PIZZA"))
+        assertEquals("Coffee & snacks", categoryFor("STARBUCKS CARDIFF"))
+        assertEquals("Eating out", categoryFor("PIZZA EXPRESS"))
+        assertEquals("Taxis", categoryFor("UBER *TRIP"))
+        assertEquals("Taxis", categoryFor("BOLT.EU/O/2610"))
+        assertEquals("Public transport", categoryFor("TRAINLINE.COM"))
+        assertEquals("TV licence", categoryFor("Direct debit TV LICENCE MBP"))
+        assertEquals("Pet insurance", categoryFor("Direct debit PETPLAN LTD"))
+        assertEquals("Vets", categoryFor("VETS4PETS NEWPORT"))
+        assertEquals("Pets", categoryFor("PETS AT HOME"))
+        assertEquals("Pharmacy", categoryFor("WELL PHARMACY"))
+        assertEquals("Dentist & opticians", categoryFor("SPECSAVERS OPTICIANS"))
+        assertEquals("Electronics", categoryFor("CURRYS ONLINE"))
+        assertEquals("Bank charges", categoryFor("NON-STERLING TRANSACTION FEE"))
+        assertEquals("Bank charges", categoryFor("INTEREST"))
+        assertEquals("Bank charges", categoryFor("UNARRANGED OVERDRAFT FEE"))
+        // Interest earned is still money in, not a charge.
+        assertEquals("Interest", categoryFor("GROSS INTEREST", TransactionType.INCOME))
     }
 
     @Test

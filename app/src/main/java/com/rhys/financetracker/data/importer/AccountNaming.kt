@@ -109,6 +109,34 @@ object AccountNaming {
     }
 
     /**
+     * The card, pay-later plan, loan or mortgage a name plainly says an
+     * account is — a card company's name, "credit card", "loan", "car
+     * finance", "mortgage" — or null. Stricter than [typeFor]: it puts
+     * accounts right without asking, so "credit" alone (a credit union saver)
+     * or "card" alone isn't enough, and anything named as savings is left be.
+     */
+    fun owedTypeFor(name: String): AccountType? {
+        val text = " ${TransactionFingerprint.normaliseDescription(name)} "
+        fun says(words: List<String>) = words.any { text.contains(" $it") }
+        return when {
+            says(SAVINGS) || says(INVESTMENT) -> null
+            text.contains(" mortgage") -> AccountType.MORTGAGE
+            says(PLAIN_LOANS) -> AccountType.LOAN
+            says(PAY_LATER) -> AccountType.PAY_LATER
+            says(CARD_COMPANIES) -> AccountType.CREDIT_CARD
+            else -> null
+        }
+    }
+
+    private val PLAIN_LOANS = listOf("loan", "car finance", "personal loan", "hire purchase")
+
+    /** Card companies by name, and the words "credit card" together. */
+    private val CARD_COMPANIES = listOf(
+        "credit card", "barclaycard", "amex", "american express", "capital one", "vanquis",
+        "aqua", "tymit", "mbna", "marbles", "fluid card", "jaja",
+    )
+
+    /**
      * True when this "account" is really notes and coins — a spreadsheet row
      * called Cash, or £1 coins — which belong in the cash pot rather than
      * being made into an account.

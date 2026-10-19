@@ -125,4 +125,36 @@ class RepaymentPairingTest {
         )
         assertTrue(steps.isEmpty())
     }
+
+    @Test
+    fun `a bank payment naming the card pays it, with or without the card's statement`() {
+        val car = RepaymentPairing.Owed(9, "car", LocalDate.of(2026, 1, 1))
+        val named = RepaymentPairing.namedRepayments(
+            listOf(card, zopaCard, car),
+            listOf(
+                entry(20, nationwide, TransactionType.EXPENSE, 3_999, 8, "CAPITAL ONE", "Credit & loans"),
+                entry(21, nationwide, TransactionType.EXPENSE, 12_500, 9, "ZOPA BANK LIMITED"),
+                // Not a card company's word: an account called "car" doesn't claim the car park.
+                entry(22, nationwide, TransactionType.EXPENSE, 450, 9, "NCP CAR PARK"),
+                // Filed by the user as something else: left as they put it.
+                entry(23, nationwide, TransactionType.EXPENSE, 2_000, 9, "CAPITAL ONE", "Gifts", byUser = true),
+                // Spending on the card itself is not paying it.
+                entry(24, capitalOne, TransactionType.EXPENSE, 899, 9, "AUDIBLE UK"),
+            ),
+        ) { _, _ -> true }
+        assertEquals(
+            listOf(RepaymentPairing.Paired(20, capitalOne), RepaymentPairing.Paired(21, zopa)),
+            named,
+        )
+    }
+
+    @Test
+    fun `a payment naming two of the cards is left alone`() {
+        val other = RepaymentPairing.Owed(8, "Capital One Platinum", LocalDate.of(2026, 1, 1))
+        val named = RepaymentPairing.namedRepayments(
+            listOf(card, other),
+            listOf(entry(20, nationwide, TransactionType.EXPENSE, 3_999, 8, "CAPITAL ONE PLATINUM")),
+        ) { _, _ -> true }
+        assertTrue(named.isEmpty())
+    }
 }

@@ -295,7 +295,7 @@ internal fun SharedPeopleDialog(
  * columns — short then tall on the left, tall then short on the right.
  */
 @Composable
-internal fun HomeTiles(state: DashboardState, onOpenAccounts: () -> Unit) {
+internal fun HomeTiles(state: DashboardState, onOpenAccounts: () -> Unit, onExplainLeftOver: () -> Unit = {}) {
     val colors = FinanceTheme.colors
     val summary = state.summary
     val income = state.incomeInScope
@@ -365,7 +365,8 @@ internal fun HomeTiles(state: DashboardState, onOpenAccounts: () -> Unit) {
                     },
                     bubble = colors.bubbleViolet,
                     height = SHORT_TILE,
-                    onClick = null,
+                    // Tapped, it shows how it was worked out, month by month.
+                    onClick = if (average != null) onExplainLeftOver else null,
                 )
             }
         }

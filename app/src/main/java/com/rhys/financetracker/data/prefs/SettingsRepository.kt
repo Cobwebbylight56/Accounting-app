@@ -85,6 +85,7 @@ class SettingsRepository @Inject constructor(
         val LIVE_LISTENER_AT = longPreferencesKey("live_listener_at")
         val LIVE_TEST_HEARD = longPreferencesKey("live_test_heard")
         val LAST_SEEN_VERSION = stringPreferencesKey("last_seen_version")
+        val CATEGORY_GROUPS = intPreferencesKey("category_groups_version")
         val LIVE_STATEMENT_NUDGE = booleanPreferencesKey("live_statement_nudge")
         val LIVE_CARD_ACCOUNTS = stringPreferencesKey("live_card_accounts")
         val SETUP_HIDDEN = booleanPreferencesKey("setup_checklist_hidden")
@@ -399,6 +400,11 @@ class SettingsRepository @Inject constructor(
     suspend fun lastSeenVersion(): String? = preferences.first()[Keys.LAST_SEEN_VERSION]
 
     suspend fun setLastSeenVersion(version: String) = put(Keys.LAST_SEEN_VERSION, version)
+
+    /** Which DefaultData.GROUPS the categories were last put into; 0 before the first. */
+    suspend fun categoryGroupsVersion(): Int = preferences.first()[Keys.CATEGORY_GROUPS] ?: 0
+
+    suspend fun setCategoryGroupsVersion(version: Int) = put(Keys.CATEGORY_GROUPS, version)
 
     /** Records that Android has been asked once for permission to show reminders. */
     suspend fun setNotificationsAsked() = put(Keys.NOTIFICATIONS_ASKED, true)

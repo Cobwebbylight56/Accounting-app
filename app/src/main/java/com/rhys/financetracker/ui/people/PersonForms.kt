@@ -346,20 +346,25 @@ fun PayRiseForm(
             label = "How was it given?",
             options = options,
             selected = draft.given.takeIf { it in options } ?: PayRise.Given.NEW_PAY,
-            onSelect = { onChange(draft.copy(given = it)) },
+            // A percentage and an amount don't carry over into each other.
+            onSelect = { if (it != draft.given) onChange(draft.copy(given = it, valueText = "")) },
             optionLabel = { it.displayName },
         )
         val given = draft.given.takeIf { it in options } ?: PayRise.Given.NEW_PAY
-        LabelledTextField(
-            label = when (given) {
-                PayRise.Given.PERCENT -> "Rise (%)"
-                PayRise.Given.AMOUNT -> "Extra a year (£)"
-                PayRise.Given.NEW_PAY -> "New yearly pay before tax (£)"
-            },
-            value = draft.valueText,
-            onValueChange = { onChange(draft.copy(valueText = it)) },
-            keyboardType = KeyboardType.Decimal,
-        )
+        if (given == PayRise.Given.PERCENT) {
+            LabelledTextField(
+                label = "Rise (%)",
+                value = draft.valueText,
+                onValueChange = { onChange(draft.copy(valueText = it)) },
+                keyboardType = KeyboardType.Decimal,
+            )
+        } else {
+            AmountField(
+                label = if (given == PayRise.Given.AMOUNT) "Extra a year" else "New yearly pay before tax",
+                value = draft.valueText,
+                onValueChange = { onChange(draft.copy(valueText = it)) },
+            )
+        }
         draft.valueText.replace(",", "").toDoubleOrNull()
             ?.let { PayRise.newGross(currentGrossMinor, given, it) }
             ?.let { newGross ->
