@@ -147,7 +147,7 @@ interface AccountDao {
     @Query(
         """
         SELECT a.id AS id, a.name AS name, a.color_hex AS color_hex, p.name AS person_name,
-            a.holding AS holding, a.type AS type
+            a.holding AS holding, a.type AS type, a.person_id AS person_id, a.is_shared AS is_shared
         FROM accounts a
         LEFT JOIN people p ON p.id = a.person_id
         WHERE a.is_archived = 0

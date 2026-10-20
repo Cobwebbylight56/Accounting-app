@@ -32,6 +32,7 @@ object SpendingSplit {
             .filter { it.transaction.type == TransactionType.EXPENSE && !it.transaction.isArchived }
             // Left out of money out altogether, as the month's totals leave them out.
             .filter { it.categoryKind != CategoryKind.SAVING && it.categoryKind != CategoryKind.TRANSFER }
+            .filter { !it.transaction.isOneOff }
             .groupBy { YearMonth.from(it.transaction.date) }
             .mapValues { (_, inMonth) ->
                 val (subscriptions, rest) = inMonth.partition {

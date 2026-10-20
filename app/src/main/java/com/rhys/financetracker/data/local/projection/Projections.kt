@@ -290,6 +290,9 @@ data class AccountOption(
     /** Where its money counts, so a statement is only offered accounts of its kind. */
     @ColumnInfo(name = "holding") val holding: Holding = Holding.SPEND,
     @ColumnInfo(name = "type") val type: AccountType = AccountType.CURRENT,
+    /** Whose it is, for choosing the person before the account. */
+    @ColumnInfo(name = "person_id") val personId: Long? = null,
+    @ColumnInfo(name = "is_shared") val isShared: Boolean = false,
 )
 
 /**

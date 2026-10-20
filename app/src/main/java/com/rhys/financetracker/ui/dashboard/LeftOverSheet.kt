@@ -29,12 +29,15 @@ import com.rhys.financetracker.ui.theme.FinanceTheme
 /**
  * How "Left over a month, on average" was worked out: each month's money in,
  * spending, savings and loan payments, and the biggest payments counted as
- * spending — tap one to open it, and change it if it isn't spending.
+ * spending — tap one to open it, and change it if it isn't spending, or mark
+ * it a one-off. One-offs are listed apart, with a way to count them again.
  */
 @Composable
 internal fun LeftOverSheet(
     explained: LeftOverExplained,
     onOpenPayment: (Long) -> Unit,
+    /** Marks a payment one-off (true), or counts it again (false). */
+    onOneOff: (Long, Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
     AlertDialog(
@@ -56,50 +59,80 @@ internal fun LeftOverSheet(
                     HorizontalDivider(color = FinanceTheme.colors.cardEdge)
                     Text("Biggest payments counted as spending", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     Text(
-                        "A move between your own accounts, or paying off a card, isn't spending. If one of these is, " +
-                            "tap it and change it to a transfer.",
+                        "A move between your own accounts, or paying off a card, isn't spending: tap it and change it " +
+                            "to a transfer. Something bought once — a car, say — tap One-off and it's left out.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     explained.biggest.forEach { payment ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onOpenPayment(payment.transaction.id) }
-                                .padding(vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    payment.transaction.description,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                Text(
-                                    listOfNotNull(
-                                        DateUtils.formatShort(payment.transaction.date),
-                                        payment.accountName,
-                                        payment.categoryName,
-                                    ).joinToString(" · "),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                            Text(
-                                Money.format(payment.transaction.amountMinor),
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                            )
-                        }
+                        PaymentRow(payment, action = "One-off", onOpen = onOpenPayment) { onOneOff(payment.transaction.id, true) }
+                    }
+                }
+                if (explained.oneOffs.isNotEmpty()) {
+                    HorizontalDivider(color = FinanceTheme.colors.cardEdge)
+                    Text("Left out as one-offs", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text(
+                        "Still in your balances, but not in what was spent, came in or was left over.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    explained.oneOffs.forEach { payment ->
+                        PaymentRow(payment, action = "Count it", onOpen = onOpenPayment) { onOneOff(payment.transaction.id, false) }
                     }
                 }
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
     )
+}
+
+/** A payment: tap it to open it, or the button beside its amount. */
+@Composable
+private fun PaymentRow(
+    payment: com.rhys.financetracker.data.local.projection.TransactionWithDetails,
+    action: String,
+    onOpen: (Long) -> Unit,
+    onAction: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onOpen(payment.transaction.id) }
+            .padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                payment.transaction.description,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                listOfNotNull(
+                    DateUtils.formatShort(payment.transaction.date),
+                    payment.accountName,
+                    payment.categoryName,
+                ).joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                Money.format(payment.transaction.amountMinor),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+            )
+            TextButton(
+                onClick = onAction,
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                modifier = Modifier.heightIn(min = 32.dp),
+            ) { Text(action, style = MaterialTheme.typography.labelMedium) }
+        }
+    }
 }
 
 @Composable

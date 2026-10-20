@@ -520,9 +520,19 @@ object Migrations {
         if (!has) db.execSQL("ALTER TABLE recurring_rules ADD COLUMN payment_kind TEXT")
     }
 
+    /** Version 15 marks a payment as a one-off, left out of left over. */
+    val MIGRATION_14_15 = Migration(14, 15) { db ->
+        val has = db.query("PRAGMA table_info(`transactions`)").use { cursor ->
+            val name = cursor.getColumnIndex("name")
+            generateSequence { if (cursor.moveToNext()) cursor.getString(name) else null }
+                .any { it == "is_one_off" }
+        }
+        if (!has) db.execSQL("ALTER TABLE `transactions` ADD COLUMN `is_one_off` INTEGER NOT NULL DEFAULT 0")
+    }
+
     val ALL: Array<Migration> = arrayOf(
         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
         MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
-        MIGRATION_13_14,
+        MIGRATION_13_14, MIGRATION_14_15,
     )
 }

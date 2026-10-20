@@ -97,6 +97,19 @@ class TransactionRepository @Inject constructor(
     ): Flow<List<MonthTotals>> =
         transactionDao.observeMonthlyTotals(start, end, accountId, personIds == null, personIds.orEmpty().toList())
 
+    /** One-offs in a period, biggest first; see [TransactionEntity.isOneOff]. */
+    suspend fun oneOffs(
+        start: LocalDate,
+        end: LocalDate,
+        accountId: Long? = null,
+        personIds: Set<Long>? = null,
+    ): List<TransactionWithDetails> =
+        transactionDao.getOneOffs(start, end, accountId, personIds == null, personIds.orEmpty().toList())
+
+    /** Leaves a payment out of left over and the totals, or counts it again. */
+    suspend fun setOneOff(id: Long, oneOff: Boolean) =
+        transactionDao.setOneOff(id, oneOff, java.time.Instant.now().toEpochMilli())
+
     /** Money paid off loans and mortgages; see [TransactionDao.observeLoanPayments]. */
     fun observeLoanPayments(
         start: LocalDate,

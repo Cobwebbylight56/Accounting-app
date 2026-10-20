@@ -422,6 +422,21 @@ private fun TransactionRow(
                             )
                         }
                     }
+                    // Left out of spending and left over: say so where it's listed.
+                    if (entry.isOneOff) {
+                        Spacer(Modifier.width(6.dp))
+                        Surface(
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            shape = MaterialTheme.shapes.small,
+                        ) {
+                            Text(
+                                text = "One-off",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            )
+                        }
+                    }
                     // The same small marks everywhere: from a bank alert
                     // (the statement will replace it), and has a receipt.
                     // "Live": added the moment a bank or Google Wallet alert

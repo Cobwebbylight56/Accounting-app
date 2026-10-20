@@ -288,6 +288,7 @@ class BackupSerializer @Inject constructor() {
         put("createdAt", transaction.createdAt)
         put("updatedAt", transaction.updatedAt)
         put("categoryByUser", transaction.categoryByUser)
+        put("isOneOff", transaction.isOneOff)
     }
 
     fun transactionFromJson(json: JSONObject): TransactionEntity = TransactionEntity(
@@ -325,6 +326,7 @@ class BackupSerializer @Inject constructor() {
                 categoryId = json.optLongOrNull("categoryId"),
             )
         },
+        isOneOff = json.optBoolean("isOneOff", false),
     )
 
     // ------------------------------------------------------------ recurring

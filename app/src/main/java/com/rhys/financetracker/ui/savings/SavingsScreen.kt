@@ -51,7 +51,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rhys.financetracker.core.money.Money
 import com.rhys.financetracker.core.time.DateUtils
-import com.rhys.financetracker.data.local.projection.labelFor
 import com.rhys.financetracker.data.local.seed.DefaultData
 import com.rhys.financetracker.ui.components.AmountField
 import com.rhys.financetracker.ui.components.ColorPicker
@@ -495,14 +494,16 @@ fun SavingsEditScreen(
                 onClear = { viewModel.update { it.copy(targetDate = null) } },
             )
 
-            DropdownField(
+            // Whose, then which of their accounts — or none, kept by hand.
+            com.rhys.financetracker.ui.components.PersonAccountPicker(
                 label = "Linked account",
-                options = state.accounts,
-                selected = state.accounts.firstOrNull { it.id == state.form.accountId },
-                onSelect = { account -> viewModel.update { it.copy(accountId = account.id) } },
-                optionLabel = { state.accounts.labelFor(it) },
-                optionColor = { colorFromHex(it.colorHex) },
-                placeholder = "Track this goal by hand",
+                people = state.people,
+                accounts = state.accounts,
+                selectedId = state.form.accountId,
+                onSelect = { id -> viewModel.update { it.copy(accountId = id) } },
+                everyKind = true,
+                noneLabel = "By hand",
+                onNone = { viewModel.update { it.copy(accountId = null) } },
             )
 
             DropdownField(

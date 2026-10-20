@@ -24,6 +24,19 @@ internal class AccountOwners private constructor(
         private const val JOINT = "joint"
         private const val OTHER = "other"
 
+        /**
+         * [account]'s name, with whose it is when another account shares the
+         * name: "Lloyds Current Account · Rhys".
+         */
+        fun nameOf(account: AccountEntity, accounts: List<AccountEntity>, people: List<PersonEntity>): String {
+            if (accounts.count { it.name.equals(account.name, ignoreCase = true) } < 2) return account.name
+            val owner = when {
+                account.isShared -> "Joint"
+                else -> people.firstOrNull { it.id == account.personId }?.name?.substringBefore(' ')
+            }
+            return owner?.let { "${account.name} · $it" } ?: account.name
+        }
+
         /** A current account or a card: what a payment comes out of. */
         fun paysFrom(account: AccountEntity): Boolean =
             account.holding == Holding.SPEND || account.type == AccountType.CREDIT_CARD || account.type == AccountType.PAY_LATER

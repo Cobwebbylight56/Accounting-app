@@ -34,15 +34,15 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.rhys.financetracker.data.local.projection.labelFor
 import com.rhys.financetracker.domain.model.TransactionType
-import com.rhys.financetracker.ui.components.CategoryPicker
 import com.rhys.financetracker.ui.components.AmountField
+import com.rhys.financetracker.ui.components.CategoryPicker
 import com.rhys.financetracker.ui.components.ConfirmDialog
 import com.rhys.financetracker.ui.components.DateField
 import com.rhys.financetracker.ui.components.DropdownField
 import com.rhys.financetracker.ui.components.ErrorBanner
 import com.rhys.financetracker.ui.components.LabelledTextField
+import com.rhys.financetracker.ui.components.PersonAccountPicker
 import com.rhys.financetracker.ui.components.SegmentedChoice
 import com.rhys.financetracker.ui.components.colorFromHex
 
@@ -161,30 +161,31 @@ fun TransactionEditScreen(
                 error = state.form.dateError,
             )
 
-            DropdownField(
+            // Whose money, then which of their accounts: two accounts both
+            // called "Lloyds Current Account" are never mixed up.
+            val betweenAccounts = state.form.type == TransactionType.TRANSFER && !state.form.withPerson
+            PersonAccountPicker(
                 label = when {
                     state.form.type != TransactionType.TRANSFER -> "Account"
                     !state.form.withPerson -> "From account"
                     state.form.received -> "Into account"
                     else -> "From account"
                 },
-                options = state.accounts,
-                selected = state.accounts.firstOrNull { it.id == state.form.accountId },
-                onSelect = { account -> viewModel.update { it.copy(accountId = account.id) } },
-                optionLabel = { state.accounts.labelFor(it) },
-                optionColor = { colorFromHex(it.colorHex) },
+                people = state.people,
+                accounts = state.accounts,
+                selectedId = state.form.accountId,
+                onSelect = { id -> viewModel.update { it.copy(accountId = id) } },
+                everyKind = betweenAccounts,
             )
 
-            if (state.form.type == TransactionType.TRANSFER && !state.form.withPerson) {
-                DropdownField(
+            if (betweenAccounts) {
+                PersonAccountPicker(
                     label = "To account",
-                    options = state.accounts.filter { it.id != state.form.accountId },
-                    selected = state.accounts.firstOrNull { it.id == state.form.transferAccountId },
-                    onSelect = { account ->
-                        viewModel.update { it.copy(transferAccountId = account.id) }
-                    },
-                    optionLabel = { state.accounts.labelFor(it) },
-                    optionColor = { colorFromHex(it.colorHex) },
+                    people = state.people,
+                    accounts = state.accounts.filter { it.id != state.form.accountId },
+                    selectedId = state.form.transferAccountId,
+                    onSelect = { id -> viewModel.update { it.copy(transferAccountId = id) } },
+                    everyKind = true,
                 )
             }
 
@@ -205,6 +206,23 @@ fun TransactionEditScreen(
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary,
+                )
+            }
+
+            // Something bought once — the car — left out of left over.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("One-off", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        text = "A car, a holiday paid in full, a windfall: left out of spending, money in " +
+                            "and left over, so the month isn't thrown. Your balance still counts it.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = state.form.isOneOff,
+                    onCheckedChange = { checked -> viewModel.update { it.copy(isOneOff = checked) } },
                 )
             }
 

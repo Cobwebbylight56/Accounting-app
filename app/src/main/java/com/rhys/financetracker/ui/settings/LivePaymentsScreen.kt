@@ -45,6 +45,7 @@ import com.rhys.financetracker.data.prefs.LiveAlertLogEntry
 import com.rhys.financetracker.data.prefs.SettingsRepository
 import com.rhys.financetracker.data.repository.AccountRepository
 import com.rhys.financetracker.notify.Notifier
+import com.rhys.financetracker.ui.components.AccountOwners
 import com.rhys.financetracker.ui.components.DropdownField
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.Instant
@@ -61,12 +62,15 @@ import kotlinx.coroutines.launch
 data class LivePaymentsState(
     val settings: AppSettings = AppSettings(),
     val accounts: List<AccountEntity> = emptyList(),
+    /** Whose each account is, so two called the same can be told apart. */
+    val people: List<com.rhys.financetracker.data.local.entity.PersonEntity> = emptyList(),
 )
 
 @HiltViewModel
 class LivePaymentsViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     accountRepository: AccountRepository,
+    peopleRepository: com.rhys.financetracker.data.repository.PeopleRepository,
     private val notifier: Notifier,
 ) : ViewModel() {
 
@@ -81,8 +85,12 @@ class LivePaymentsViewModel @Inject constructor(
     }
 
     val state: StateFlow<LivePaymentsState> =
-        combine(settingsRepository.settings, accountRepository.observeActive()) { settings, accounts ->
-            LivePaymentsState(settings, accounts)
+        combine(
+            settingsRepository.settings,
+            accountRepository.observeActive(),
+            peopleRepository.observeActive(),
+        ) { settings, accounts, people ->
+            LivePaymentsState(settings, accounts, people)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LivePaymentsState())
 
     fun setEnabled(enabled: Boolean) {
@@ -215,7 +223,9 @@ fun LivePaymentsScreen(
                 options = options,
                 selected = state.accounts.firstOrNull { it.id == settings.liveAlertAccounts[app] },
                 onSelect = { viewModel.setAccount(app, it?.id) },
-                optionLabel = { it?.name ?: "Choose automatically" },
+                optionLabel = { account ->
+                    account?.let { AccountOwners.nameOf(it, state.accounts, state.people) } ?: "Choose automatically"
+                },
                 placeholder = "Choose automatically",
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
             )
@@ -240,7 +250,9 @@ fun LivePaymentsScreen(
                 options = listOf<AccountEntity?>(null) + state.accounts,
                 selected = state.accounts.firstOrNull { it.id == accountId },
                 onSelect = { viewModel.setCardAccount(ending, it?.id) },
-                optionLabel = { it?.name ?: "Forget this card" },
+                optionLabel = { account ->
+                    account?.let { AccountOwners.nameOf(it, state.accounts, state.people) } ?: "Forget this card"
+                },
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
             )
         }

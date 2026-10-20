@@ -199,7 +199,7 @@ class SpendingViewModel @Inject constructor(
                 // Money to people is a transfer, not spending; Money with
                 // people is where it is shown.
                 payees = payments
-                    .filterNot { it.isPersonTransfer }
+                    .filterNot { it.isPersonTransfer || it.transaction.isOneOff }
                     .groupBy { PayeeNames.of(it.transaction.description).ifBlank { it.transaction.description.trim() } }
                     .map { (name, rows) -> PayeeTotal(name, rows.sumOf { it.transaction.amountMinor }, rows.size) }
                     .sortedByDescending { it.totalMinor }

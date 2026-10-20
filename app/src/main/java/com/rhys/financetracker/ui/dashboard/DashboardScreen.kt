@@ -132,6 +132,7 @@ fun DashboardScreen(
                 viewModel.closeLeftOver()
                 onOpenTransaction(id)
             },
+            onOneOff = viewModel::setOneOff,
             onDismiss = viewModel::closeLeftOver,
         )
     }

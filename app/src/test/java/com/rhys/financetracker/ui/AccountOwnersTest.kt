@@ -51,6 +51,14 @@ class AccountOwnersTest {
     }
 
     @Test
+    fun `two accounts with one name say whose each is`() {
+        val people = listOf(rhys, hannah, joint)
+        assertEquals("Lloyds Current Account · Rhys", AccountOwners.nameOf(accounts[0], accounts, people))
+        assertEquals("Lloyds Current Account · Hannah", AccountOwners.nameOf(accounts[1], accounts, people))
+        assertEquals("Zopa", AccountOwners.nameOf(accounts[2], accounts, people))
+    }
+
+    @Test
     fun `an account nobody owns goes under Other`() {
         val owners = AccountOwners.of(listOf(rhys), accounts + account(7, "Cash", AccountType.OTHER, null))
         assertEquals(listOf("Rhys", "Other"), owners.groups.map { it.label })

@@ -77,7 +77,7 @@ interface TransactionDao {
          * any other payment as itself.
          */
         const val PARTS = """
-            SELECT t.id, t.type, t.date, t.account_id, t.person_id, t.is_archived,
+            SELECT t.id, t.type, t.date, t.account_id, t.person_id, t.is_archived, t.is_one_off,
                    COALESCE(s.category_id, t.category_id) AS category_id,
                    COALESCE(s.amount_minor, t.amount_minor) AS amount_minor
             FROM transactions t
@@ -300,6 +300,7 @@ interface TransactionDao {
         LEFT JOIN categories c ON c.id = t.category_id
         WHERE t.is_archived = 0
           AND (c.kind IS NULL OR c.kind NOT IN ('SAVING', 'TRANSFER'))
+          AND t.is_one_off = 0
           AND t.date BETWEEN :start AND :end
           AND (:accountId IS NULL OR t.account_id = :accountId)
           AND (:everyone = 1 OR COALESCE(t.person_id, a.person_id) IN (:personIds))
@@ -323,6 +324,7 @@ interface TransactionDao {
         LEFT JOIN categories c ON c.id = t.category_id
         WHERE t.is_archived = 0
           AND (c.kind IS NULL OR c.kind NOT IN ('SAVING', 'TRANSFER'))
+          AND t.is_one_off = 0
           AND t.date BETWEEN :start AND :end
           AND (:accountId IS NULL OR t.account_id = :accountId)
           AND (:personId IS NULL OR COALESCE(t.person_id, a.person_id) = :personId)
@@ -347,6 +349,7 @@ interface TransactionDao {
         LEFT JOIN accounts a ON a.id = t.account_id
         WHERE t.is_archived = 0
           AND (c.kind IS NULL OR c.kind NOT IN ('SAVING', 'TRANSFER'))
+          AND t.is_one_off = 0
           AND t.type = :type
           AND t.date BETWEEN :start AND :end
           AND (:accountId IS NULL OR t.account_id = :accountId)
@@ -394,7 +397,7 @@ interface TransactionDao {
         LEFT JOIN categories c ON c.id = t.category_id
         LEFT JOIN accounts a ON a.id = t.account_id
         LEFT JOIN accounts d ON d.id = t.transfer_account_id
-        WHERE t.is_archived = 0
+        WHERE t.is_archived = 0 AND t.is_one_off = 0
           AND t.date BETWEEN :start AND :end
           AND (:accountId IS NULL OR t.account_id = :accountId)
           AND (:everyone = 1 OR COALESCE(t.person_id, a.person_id) IN (:personIds))
@@ -422,7 +425,7 @@ interface TransactionDao {
         FROM transactions t
         LEFT JOIN accounts a ON a.id = t.account_id
         JOIN accounts d ON d.id = t.transfer_account_id
-        WHERE t.is_archived = 0 AND t.type = 'TRANSFER'
+        WHERE t.is_archived = 0 AND t.is_one_off = 0 AND t.type = 'TRANSFER'
           AND d.type IN ('LOAN', 'MORTGAGE')
           AND IFNULL(a.holding, 'SPEND') <> 'OWED'
           AND t.date BETWEEN :start AND :end
@@ -437,6 +440,25 @@ interface TransactionDao {
         everyone: Boolean,
         personIds: List<Long>,
     ): Flow<Long>
+
+    /** The one-offs in a period: left out of every total above, listed apart. */
+    @Query(
+        "SELECT $DETAIL_COLUMNS $DETAIL_JOINS " +
+            "WHERE t.is_archived = 0 AND t.is_one_off = 1 AND t.date BETWEEN :start AND :end " +
+            "AND (:accountId IS NULL OR t.account_id = :accountId) " +
+            "AND (:everyone = 1 OR COALESCE(t.person_id, a.person_id) IN (:personIds)) " +
+            "ORDER BY t.amount_minor DESC, t.id DESC",
+    )
+    suspend fun getOneOffs(
+        start: LocalDate,
+        end: LocalDate,
+        accountId: Long?,
+        everyone: Boolean,
+        personIds: List<Long>,
+    ): List<TransactionWithDetails>
+
+    @Query("UPDATE transactions SET is_one_off = :oneOff, updated_at = :updatedAt WHERE id = :id")
+    suspend fun setOneOff(id: Long, oneOff: Boolean, updatedAt: Long)
 
     /** [observePotFlow] for every person at once. */
     @Query(
@@ -459,7 +481,7 @@ interface TransactionDao {
         LEFT JOIN categories c ON c.id = t.category_id
         LEFT JOIN accounts a ON a.id = t.account_id
         LEFT JOIN accounts d ON d.id = t.transfer_account_id
-        WHERE t.is_archived = 0
+        WHERE t.is_archived = 0 AND t.is_one_off = 0
           AND t.date BETWEEN :start AND :end
         GROUP BY COALESCE(t.person_id, a.person_id)
         """,
@@ -490,7 +512,7 @@ interface TransactionDao {
         LEFT JOIN categories c ON c.id = t.category_id
         LEFT JOIN accounts a ON a.id = t.account_id
         LEFT JOIN accounts d ON d.id = t.transfer_account_id
-        WHERE t.is_archived = 0
+        WHERE t.is_archived = 0 AND t.is_one_off = 0
           AND t.date BETWEEN :start AND :end
           AND (:accountId IS NULL OR t.account_id = :accountId)
           AND (:personId IS NULL OR COALESCE(t.person_id, a.person_id) = :personId)
@@ -516,6 +538,7 @@ interface TransactionDao {
         LEFT JOIN accounts a ON a.id = t.account_id
         WHERE t.is_archived = 0
           AND (c.kind IS NULL OR c.kind NOT IN ('SAVING', 'TRANSFER'))
+          AND t.is_one_off = 0
           AND t.type = :type
           AND t.date BETWEEN :start AND :end
           AND (:accountId IS NULL OR t.account_id = :accountId)
@@ -542,6 +565,7 @@ interface TransactionDao {
         LEFT JOIN categories c ON c.id = t.category_id
         WHERE t.is_archived = 0
           AND (c.kind IS NULL OR c.kind NOT IN ('SAVING', 'TRANSFER'))
+          AND t.is_one_off = 0
           AND t.date BETWEEN :start AND :end
           AND (:accountId IS NULL OR t.account_id = :accountId)
           AND (:everyone = 1 OR COALESCE(t.person_id, a.person_id) IN (:personIds))
@@ -567,6 +591,7 @@ interface TransactionDao {
         LEFT JOIN categories c ON c.id = t.category_id
         WHERE t.is_archived = 0
           AND (c.kind IS NULL OR c.kind NOT IN ('SAVING', 'TRANSFER'))
+          AND t.is_one_off = 0
           AND t.date BETWEEN :start AND :end
           AND (:accountId IS NULL OR t.account_id = :accountId)
           AND (:personId IS NULL OR COALESCE(t.person_id, a.person_id) = :personId)
@@ -594,6 +619,7 @@ interface TransactionDao {
         LEFT JOIN categories c ON c.id = t.category_id
         WHERE t.is_archived = 0 AND t.date BETWEEN :start AND :end
           AND (c.kind IS NULL OR c.kind NOT IN ('SAVING', 'TRANSFER'))
+          AND t.is_one_off = 0
         -- Grouped on the whole expression, not the output alias: both
         -- `transactions` and `accounts` carry a `person_id`, so a bare
         -- `GROUP BY person_id` is ambiguous to SQLite.

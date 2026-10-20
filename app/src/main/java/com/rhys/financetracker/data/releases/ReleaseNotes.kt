@@ -22,6 +22,15 @@ object ReleaseNotes {
     /** Every release, newest first. */
     val ALL: List<Release> = listOf(
         Release(
+            "2.4.0", LocalDate.of(2026, 10, 20), "One-offs, and accounts under your names",
+            listOf(
+                "Mark a payment as a one-off — buying a car, a holiday paid in full, a windfall — and it's left out of spending, money in, left over, the averages and the progress reports, so one big payment doesn't make the month look broken. Your balances still count it.",
+                "Every payment has a One-off switch. Tap \"Left over a month\" and each of the biggest payments has a One-off button beside it; one-offs are listed apart there, with Count it to put one back. They're tagged One-off in Payments.",
+                "Choosing an account is whose first, then which: the payment editor (and From and To on a move), regular payments, importing a statement and a savings goal's linked account all show a tab for each of you and Joint, then only that person's accounts. The one already chosen is never hidden.",
+                "In Settings → bank alerts, two accounts with one name say whose each is: \"Lloyds Current Account · Rhys\".",
+            ),
+        ),
+        Release(
             "2.3.0", LocalDate.of(2026, 10, 19), "Categories in groups, and left over put right",
             listOf(
                 "Choosing a category opens a list of groups — Food, Transport, Shopping, Health, Money and the rest — and each opens up to what's inside, with a search across the lot. \"Just Food\" is there when nothing more specific fits. More → Categories opens and closes the same way.",

@@ -194,6 +194,20 @@ Tap **+** (on Home, Spending or Payments) and choose **A payment**, or **Move mo
 Only the description, amount, date and account are needed. Everything else is
 optional.
 
+**Whose money, then which account.** Wherever an account is chosen — a
+payment, a move (From and To), a regular payment, a statement being imported,
+a savings goal — there's a tab for each of you and Joint, and under it only
+that person's accounts. A payment shows the accounts money comes out of
+(current accounts and cards), with **Show savings and loans too** for the
+rest; a move, a statement or a goal shows them all. Tapping a person picks
+their main account straight away.
+
+**One-off.** Something bought once — the car, a holiday paid in full — or
+money that came in once, like an inheritance: turn on **One-off** and it's left
+out of spending, money in, left over, the averages and the progress reports, so
+it doesn't make the month look broken. It still counts in your balances, and is
+tagged **One-off** in Payments. Turn it off to count it again.
+
 **Typing an amount** works like a till: the digits fill in from the pence, and
 the comma and the point go in by themselves. Type 2, 4, 9, 9 and it reads
 24.99; 1, 2, 3, 4, 5, 6 reads 1,234.56. The last key typed is the first taken
@@ -316,7 +330,9 @@ month to go on, the tile shows your take-home a month instead.
 what was put aside and what paid off loans, and what was left. Under that are
 the biggest payments counted as spending. If one isn't spending — a move to
 your own saver, paying off a card — tap it and change it to a transfer, and
-the figure comes right.
+the figure comes right. If it's something bought once, like a car, tap
+**One-off** beside it: it moves down to **Left out as one-offs**, and the
+figure is worked out without it. **Count it** puts it back.
 
 A bank payment that names one of your cards or loans ("CAPITAL ONE", "CAR
 FINANCE") is a move to it, not spending: the card's own spending is already

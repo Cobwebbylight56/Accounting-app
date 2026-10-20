@@ -67,8 +67,8 @@ import com.rhys.financetracker.data.receipts.SplitRepository
 import com.rhys.financetracker.data.repository.CategoryRepository
 import com.rhys.financetracker.data.repository.TransactionRepository
 import com.rhys.financetracker.domain.model.CategoryKind
-import com.rhys.financetracker.ui.components.CategoryPicker
 import com.rhys.financetracker.ui.components.AmountField
+import com.rhys.financetracker.ui.components.CategoryPicker
 import com.rhys.financetracker.ui.components.ColorDot
 import com.rhys.financetracker.ui.components.LabelledTextField
 import com.rhys.financetracker.ui.components.colorFromHex

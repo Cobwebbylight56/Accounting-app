@@ -406,9 +406,24 @@ class DashboardViewModel @Inject constructor(
                     sort = com.rhys.financetracker.data.local.dao.TransactionSort.AMOUNT_DESC,
                     limit = BIGGEST_LOOKED_AT,
                 ),
-            ).filter { it.categoryKind != CategoryKind.SAVING && it.categoryKind != CategoryKind.TRANSFER }
-                .take(BIGGEST_SHOWN)
-            leftOverOpen.value = com.rhys.financetracker.domain.report.LeftOverExplained(months, biggest)
+            ).filter {
+                it.categoryKind != CategoryKind.SAVING && it.categoryKind != CategoryKind.TRANSFER && !it.transaction.isOneOff
+            }.take(BIGGEST_SHOWN)
+            val oneOffs = transactionRepository.oneOffs(
+                from.atDay(1), last.atEndOfMonth(), currentScope.accountId, currentScope.personIds,
+            )
+            leftOverOpen.value = com.rhys.financetracker.domain.report.LeftOverExplained(months, biggest, oneOffs)
+        }
+    }
+
+    /**
+     * Leaves a payment out of left over as a one-off — the car, a holiday
+     * paid in full — or counts it again, and works the figures out afresh.
+     */
+    fun setOneOff(id: Long, oneOff: Boolean) {
+        viewModelScope.launch {
+            transactionRepository.setOneOff(id, oneOff)
+            if (leftOverOpen.value != null) explainLeftOver()
         }
     }
 
@@ -708,7 +723,8 @@ class DashboardViewModel @Inject constructor(
                         colorHex = selection.colorHex,
                         month = month,
                         transactions = entries,
-                        totalMinor = entries.sumOf { it.transaction.amountMinor },
+                        // A one-off is listed, but left out of the total as the chart leaves it out.
+                        totalMinor = entries.filterNot { it.transaction.isOneOff }.sumOf { it.transaction.amountMinor },
                         previousMonthTotalMinor = lastMonth
                             .firstOrNull { it.categoryId == selection.categoryId }
                             ?.totalMinor ?: 0L,

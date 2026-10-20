@@ -520,15 +520,22 @@ private fun DetectedStatementCard(state: ImportState, viewModel: ImportViewModel
             }
         }
         Spacer(Modifier.height(12.dp))
-        DropdownField(
+        // Whose, then which: the accounts under each person's name.
+        com.rhys.financetracker.ui.components.PersonAccountPicker(
             label = if (preselected != null) "Adding to" else "Add these to",
-            options = accounts,
-            selected = chosen,
-            onSelect = { chosen = it },
-            optionLabel = { accounts.labelFor(it) },
-            optionColor = { colorFromHex(it.colorHex) },
-            placeholder = if (accounts.isEmpty()) "No accounts of this kind" else "Choose an account",
+            people = people,
+            accounts = accounts,
+            selectedId = chosen?.id,
+            onSelect = { id -> chosen = accounts.firstOrNull { it.id == id } },
+            everyKind = true,
         )
+        if (accounts.isEmpty()) {
+            Text(
+                "No accounts of this kind",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         if (found != null || whom != null) {
             TextButton(onClick = { showEveryAccount = !showEveryAccount }) {
                 Text(if (showEveryAccount) "Only matching accounts" else "Show every account")

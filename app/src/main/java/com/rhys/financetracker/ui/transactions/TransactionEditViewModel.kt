@@ -155,6 +155,7 @@ class TransactionEditViewModel @Inject constructor(
             tags = existing.tags.orEmpty(),
             isCleared = existing.isCleared,
             isConfirmed = existing.isConfirmed,
+            isOneOff = existing.isOneOff,
         )
         original.value = Original(
             categoryId = existing.categoryId,
@@ -276,6 +277,7 @@ class TransactionEditViewModel @Inject constructor(
                 tags = current.tags.trim().takeIf { it.isNotEmpty() },
                 isCleared = current.isCleared,
                 isConfirmed = true,
+                isOneOff = current.isOneOff,
                 // The hidden mark: the user picked this category, so the app
                 // never re-sorts it. Saving without touching the category
                 // keeps whatever mark it had.
@@ -381,6 +383,8 @@ data class TransactionForm(
     val tags: String = "",
     val isCleared: Boolean = true,
     val isConfirmed: Boolean = true,
+    /** Left out of spending, income and left over; see [TransactionEntity.isOneOff]. */
+    val isOneOff: Boolean = false,
     /** On the Transfer tab: money with a person, rather than between the user's own accounts. */
     val withPerson: Boolean = false,
     /** For money with a person: they sent it, rather than the user. */

@@ -56,13 +56,12 @@ import com.rhys.financetracker.core.money.Money
 import com.rhys.financetracker.data.importer.RecurringDetector
 import com.rhys.financetracker.core.time.DateUtils
 import com.rhys.financetracker.data.local.projection.RecurringRuleWithDetails
-import com.rhys.financetracker.data.local.projection.labelFor
 import com.rhys.financetracker.domain.model.Frequency
 import com.rhys.financetracker.domain.model.PaymentKind
 import com.rhys.financetracker.domain.model.RecurrenceMode
 import com.rhys.financetracker.domain.model.TransactionType
-import com.rhys.financetracker.ui.components.CategoryPicker
 import com.rhys.financetracker.ui.components.AmountField
+import com.rhys.financetracker.ui.components.CategoryPicker
 import com.rhys.financetracker.ui.components.ColorDot
 import com.rhys.financetracker.ui.components.ConfirmDialog
 import com.rhys.financetracker.ui.components.DateField
@@ -70,6 +69,7 @@ import com.rhys.financetracker.ui.components.DropdownField
 import com.rhys.financetracker.ui.components.EmptyState
 import com.rhys.financetracker.ui.components.ErrorBanner
 import com.rhys.financetracker.ui.components.LabelledTextField
+import com.rhys.financetracker.ui.components.PersonAccountPicker
 import com.rhys.financetracker.ui.components.SectionCard
 import com.rhys.financetracker.ui.components.SegmentedChoice
 import com.rhys.financetracker.ui.components.StatEmphasis
@@ -497,31 +497,27 @@ fun RecurringEditScreen(
                 }
             }
 
-            DropdownField(
+            // Whose money, then which of their accounts.
+            PersonAccountPicker(
                 label = if (state.form.type == TransactionType.TRANSFER) {
                     "Comes out of"
                 } else {
                     "Account"
                 },
-                options = state.accounts,
-                selected = state.accounts.firstOrNull { it.id == state.form.accountId },
-                onSelect = { account -> viewModel.update { it.copy(accountId = account.id) } },
-                optionLabel = { state.accounts.labelFor(it) },
-                optionColor = { colorFromHex(it.colorHex) },
+                people = state.people,
+                accounts = state.accounts,
+                selectedId = state.form.accountId,
+                onSelect = { id -> viewModel.update { it.copy(accountId = id) } },
             )
 
             if (state.form.type == TransactionType.TRANSFER) {
-                DropdownField(
+                PersonAccountPicker(
                     label = "Goes into",
-                    options = state.accounts.filter { it.id != state.form.accountId },
-                    selected = state.accounts.firstOrNull {
-                        it.id == state.form.transferAccountId
-                    },
-                    onSelect = { account ->
-                        viewModel.update { it.copy(transferAccountId = account.id) }
-                    },
-                    optionLabel = { state.accounts.labelFor(it) },
-                    optionColor = { colorFromHex(it.colorHex) },
+                    people = state.people,
+                    accounts = state.accounts.filter { it.id != state.form.accountId },
+                    selectedId = state.form.transferAccountId,
+                    onSelect = { id -> viewModel.update { it.copy(transferAccountId = id) } },
+                    everyKind = true,
                 )
             }
 

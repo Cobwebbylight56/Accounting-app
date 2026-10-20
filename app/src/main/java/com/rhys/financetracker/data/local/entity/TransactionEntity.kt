@@ -108,6 +108,12 @@ data class TransactionEntity(
      * learns better; entries with it are never moved by the app.
      */
     @ColumnInfo(name = "category_by_user", defaultValue = "0") val categoryByUser: Boolean = false,
+    /**
+     * A one-off: a car, a holiday paid in full, an inheritance. It still moves
+     * the balance, but spending, income, left over and the averages leave it
+     * out, so one big payment doesn't make every month look broken.
+     */
+    @ColumnInfo(name = "is_one_off", defaultValue = "0") val isOneOff: Boolean = false,
 ) {
     companion object {
         /**
