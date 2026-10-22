@@ -282,6 +282,15 @@ data class AccountPayee(
  * Carries the owner because account names are unique per person rather than
  * across the app, so "Main account" can legitimately appear more than once.
  */
+/** A payment added from an alert, for telling one payment told twice. */
+data class LivePayment(
+    @ColumnInfo(name = "id") val id: Long,
+    @ColumnInfo(name = "import_hash") val hash: String,
+    @ColumnInfo(name = "type") val type: TransactionType,
+    @ColumnInfo(name = "account_id") val accountId: Long,
+    @ColumnInfo(name = "created_at") val createdAt: Long,
+)
+
 data class AccountOption(
     @ColumnInfo(name = "id") val id: Long,
     @ColumnInfo(name = "name") val name: String,

@@ -15,6 +15,7 @@ import com.rhys.financetracker.data.local.dao.AccountDao
 import com.rhys.financetracker.data.local.dao.CategoryDao
 import com.rhys.financetracker.data.local.dao.RecurringRuleDao
 import com.rhys.financetracker.data.local.dao.TransactionDao
+import com.rhys.financetracker.data.live.LiveTwins
 import com.rhys.financetracker.data.local.entity.TransactionEntity
 import com.rhys.financetracker.domain.model.CategoryKind
 import com.rhys.financetracker.domain.model.Holding
@@ -63,7 +64,37 @@ class StatementRepairRepository @Inject constructor(
     /** Puts right whatever needs it; returns how many entries changed. */
     suspend fun putRight(today: LocalDate = DateUtils.today()): Int =
         owedAccounts() + backFromTheFuture(today) + cardStatementText(today) + cardSpendingReadAsIn(today) + repeatedHeadings(today) +
-            recurringRuleDao.cardPaymentsAsCard(Instant.now().toEpochMilli())
+            liveTwins(today) + recurringRuleDao.cardPaymentsAsCard(Instant.now().toEpochMilli())
+
+    /**
+     * Payments from alerts added twice before 2.4.1 — two apps telling of one
+     * payment at the same moment, or two banks of one move between them:
+     * the extra one put away, and a move made one move.
+     */
+    private suspend fun liveTwins(today: LocalDate): Int {
+        val rows = transactionDao.liveSince(today.minusDays(LIVE_LOOK_BACK_DAYS))
+            .filter { it.source == RecordSource.LIVE && it.importHash?.startsWith("live:") == true }
+        if (rows.size < 2) return 0
+        val own = accountDao.getAllActive().filter { it.holding != Holding.OWED }.map { it.id }.toSet()
+        val doubled = LiveTwins.doubled(
+            rows.map { LiveTwins.Row(it.id, it.importHash.orEmpty(), it.type, it.accountId, it.createdAt, it.amountMinor) },
+            own,
+        )
+        if (doubled.isEmpty()) return 0
+        val byId = rows.associateBy { it.id }
+        val now = Instant.now().toEpochMilli()
+        database.withTransaction {
+            doubled.forEach { twin ->
+                val extra = byId.getValue(twin.extra)
+                transactionDao.update(extra.copy(isArchived = true, notes = noted(extra.notes, TOLD_TWICE), updatedAt = now))
+                twin.moveFrom?.let { otherEnd ->
+                    val kept = byId.getValue(twin.kept)
+                    transactionDao.update(TidyUpRepository.asTransfer(kept, otherEnd, now).copy(notes = noted(kept.notes, TOLD_BY_BOTH)))
+                }
+            }
+        }
+        return doubled.size
+    }
 
     /** On cards: the statement's own lines put away, and paying it off turned to money in. */
     private suspend fun cardStatementText(today: LocalDate): Int {
@@ -219,5 +250,10 @@ class StatementRepairRepository @Inject constructor(
         const val NOT_A_PAYMENT = "Part of the statement's own writing, read as a payment by mistake."
         const val PAID_OFF = "Read as money out by mistake: it paid the card off."
         const val OWED_NOTE = "Set as owed: its name says it's a card, pay-later plan, loan or mortgage."
+
+        /** Alerts from before a statement replaces them: a few months is plenty. */
+        const val LIVE_LOOK_BACK_DAYS = 120L
+        const val TOLD_TWICE = "Told by two apps at once, and added twice by mistake: the other one is kept."
+        const val TOLD_BY_BOTH = "Told by both banks: money out of one and into the other, so one move between your accounts."
     }
 }

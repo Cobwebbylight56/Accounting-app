@@ -216,7 +216,7 @@ class DashboardViewModel @Inject constructor(
                 if (putRight > 0) {
                     add(
                         "Put right $putRight ${if (putRight == 1) "thing" else "things"} older versions had wrong — " +
-                            "card payments counted twice, cards set up as ordinary accounts. Each has a note saying why",
+                            "payments counted twice, cards set up as ordinary accounts. Each has a note saying why",
                     )
                 }
                 addAll(found)

@@ -13,6 +13,7 @@ import com.rhys.financetracker.data.local.entity.TransactionEntity
 import com.rhys.financetracker.data.prefs.AppSettings
 import com.rhys.financetracker.data.prefs.LiveAlertLogEntry
 import com.rhys.financetracker.data.prefs.SettingsRepository
+import com.rhys.financetracker.data.repository.TidyUpRepository
 import com.rhys.financetracker.domain.model.AccountType
 import com.rhys.financetracker.domain.model.CategoryKind
 import com.rhys.financetracker.domain.model.Holding
@@ -25,6 +26,8 @@ import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Turns a banking app's alert into a payment, the moment it arrives.
@@ -44,17 +47,25 @@ class LivePaymentRepository @Inject constructor(
     private val notifier: Notifier,
 ) {
 
-    enum class Outcome { ADDED, OFF, NOT_A_PAYMENT, NOT_ALLOWED, ALREADY_ADDED, NO_ACCOUNT, STATEMENT_READY, BALANCE }
+    enum class Outcome { ADDED, OFF, NOT_A_PAYMENT, NOT_ALLOWED, ALREADY_ADDED, NO_ACCOUNT, STATEMENT_READY, BALANCE, MOVED }
+
+    /**
+     * One alert at a time. Google Wallet and the card's own app tell of a tap
+     * within a second of each other; read side by side, neither saw the
+     * other's payment yet, and both were added.
+     */
+    private val oneAtATime = Mutex()
 
     /**
      * Reads one alert from [app] (shown as [appLabel]), posted at [postedAt]
      * epoch millis, and adds the payment in it when there is one.
      */
-    suspend fun record(app: String, appLabel: String, title: String?, text: String?, postedAt: Long): Outcome {
-        val outcome = read(app, appLabel, title, text, postedAt)
-        log(app, appLabel, title, text, outcome)
-        return outcome
-    }
+    suspend fun record(app: String, appLabel: String, title: String?, text: String?, postedAt: Long): Outcome =
+        oneAtATime.withLock {
+            val outcome = read(app, appLabel, title, text, postedAt)
+            log(app, appLabel, title, text, outcome)
+            outcome
+        }
 
     /** Android has started the alert reader. */
     suspend fun listenerConnected() = settingsRepository.setLiveListenerAt(Instant.now().toEpochMilli())
@@ -89,6 +100,8 @@ class LivePaymentRepository @Inject constructor(
             Outcome.NOT_ALLOWED -> return
             // Noted where it was set, with the account's name.
             Outcome.BALANCE -> return
+            // Noted where the two were made one, with both accounts.
+            Outcome.MOVED -> return
             Outcome.OFF, Outcome.ADDED -> return
         }
         settingsRepository.logLiveAlert(LiveAlertLogEntry(Instant.now().toEpochMilli(), appLabel, said, detail))
@@ -145,22 +158,36 @@ class LivePaymentRepository @Inject constructor(
         // came first is kept — but the bank knows the account for certain, so
         // when Wallet or PayPal came first, the bank's alert puts it right.
         val now = Instant.now().toEpochMilli()
-        val sameMoment = transactionDao.recentLiveHashes(alert.amountMinor, alert.type.name, now - SAME_PAYMENT_MILLIS)
-        val sameDay = transactionDao.recentLiveHashes(alert.amountMinor, alert.type.name, now - TOLD_TWICE_MILLIS)
-        val twin = sameMoment.firstOrNull() ?: sameDay.firstOrNull { other ->
-            val otherApp = appOf(other)
-            otherApp != app && (app in BankApps.ALSO_TOLD_BY_BANK || otherApp in BankApps.ALSO_TOLD_BY_BANK)
+        val recent = transactionDao.recentLive(alert.amountMinor, now - LiveTwins.TOLD_TWICE_MILLIS).map {
+            LiveTwins.Row(it.id, it.hash, it.type, it.accountId, it.createdAt)
         }
+        val twin = LiveTwins.sameAs(app, alert.type, now, recent)
         // Already in, but the balance the bank gives with it still counts.
         suspend fun alreadyIn(): Outcome {
             if (balance != null) setBalance(accountId, balance, accounts, appLabel = null)
             return Outcome.ALREADY_ADDED
         }
         if (twin != null) {
-            if (app !in BankApps.ALSO_TOLD_BY_BANK && appOf(twin) in BankApps.ALSO_TOLD_BY_BANK) {
-                transactionDao.moveLive(twin, accountId, now)
+            if (app !in BankApps.ALSO_TOLD_BY_BANK && twin.app in BankApps.ALSO_TOLD_BY_BANK) {
+                transactionDao.moveLive(twin.hash, accountId, now)
             }
             return alreadyIn()
+        }
+
+        // Money moved between two of your own banks, told by both: out of one,
+        // the same into the other. One move — not spending at one and income
+        // at the other.
+        val own = accounts.filter { it.holding != Holding.OWED }.map { it.id }.toSet()
+        LiveTwins.otherSide(app, alert.type, accountId, now, recent, own)?.let { other ->
+            val first = transactionDao.getById(other.id) ?: return@let
+            val move = TidyUpRepository.asTransfer(first, accountId, now).copy(notes = first.notes ?: MOVE_NOTE)
+            transactionDao.update(move)
+            if (balance != null) setBalance(accountId, balance, accounts, appLabel = null)
+            val names = listOf(move.accountId, move.transferAccountId).map { id -> accounts.firstOrNull { it.id == id }?.name ?: "?" }
+            settingsRepository.logLiveAlert(
+                LiveAlertLogEntry(now, appLabel, "Move", "${Money.format(alert.amountMinor)} · ${names.joinToString(" → ")} · told by both banks"),
+            )
+            return Outcome.MOVED
         }
 
         // Money paid to a mortgage, loan, card or pay-later plan — an
@@ -201,6 +228,20 @@ class LivePaymentRepository @Inject constructor(
                 around = date,
             ) != null
         ) {
+            return alreadyIn()
+        }
+        // Typed in, or added from a receipt shared from another app, just
+        // before the bank's alert came: the alert is for that one — once, so
+        // a second payment of the same the next day is still added.
+        transactionDao.findTypedInNear(
+            accountId = accountId,
+            amountMinor = alert.amountMinor,
+            incoming = alert.type == TransactionType.INCOME,
+            from = date.minusDays(1),
+            until = date.plusDays(1),
+            since = now - TOLD_TWICE_MILLIS,
+        )?.let { typedIn ->
+            transactionDao.tieToAlert(typedIn, hash)
             return alreadyIn()
         }
 
@@ -308,9 +349,6 @@ class LivePaymentRepository @Inject constructor(
         )
     }
 
-    /** The app a live payment's hash ("live:<app>:…") came from. */
-    private fun appOf(hash: String): String = hash.split(':').getOrNull(1).orEmpty()
-
     /** "mortgage", "loan", "credit card" or "pay later" for borrowing; null for anything else. */
     private fun borrowingKind(type: AccountType): String? = when (type) {
         AccountType.MORTGAGE -> "mortgage"
@@ -330,11 +368,11 @@ class LivePaymentRepository @Inject constructor(
     }
 
     private companion object {
-        /** Two alerts for one payment arrive well within this. */
-        const val SAME_PAYMENT_MILLIS = 3 * 60 * 1000L
+        /** How long ago something typed in may be what an alert is telling of. */
+        const val TOLD_TWICE_MILLIS = LiveTwins.TOLD_TWICE_MILLIS
 
-        /** How far apart a bank and a payment app may tell of one payment. */
-        const val TOLD_TWICE_MILLIS = 24 * 60 * 60 * 1000L
+        /** The note on a move made of two banks' alerts. */
+        const val MOVE_NOTE = "Told by both banks: money out of one and into the other, so one move between your accounts."
 
         /** How far from its day a regular payment may actually go out. */
         const val SCHEDULED_DAYS = 4L

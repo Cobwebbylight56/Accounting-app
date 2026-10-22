@@ -22,6 +22,15 @@ object ReleaseNotes {
     /** Every release, newest first. */
     val ALL: List<Release> = listOf(
         Release(
+            "2.4.1", LocalDate.of(2026, 10, 22), "Payments from alerts added once",
+            listOf(
+                "A payment told by two apps at once — Google Wallet and your card's own app a second apart — is added once. Alerts are now read one at a time, so the second always sees the first.",
+                "Money moved between two of your own banks, told by both (sent from one, received by the other), is one move between your accounts — not spending at one and income at the other.",
+                "A payment you typed in, or added from a receipt, just before the bank's alert came is matched to the alert instead of being added again.",
+                "Payments added twice like this before are tidied when Home opens: the extra one is put away with a note, and a move told by both banks becomes one move.",
+            ),
+        ),
+        Release(
             "2.4.0", LocalDate.of(2026, 10, 20), "One-offs, and accounts under your names",
             listOf(
                 "Mark a payment as a one-off — buying a car, a holiday paid in full, a windfall — and it's left out of spending, money in, left over, the averages and the progress reports, so one big payment doesn't make the month look broken. Your balances still count it.",

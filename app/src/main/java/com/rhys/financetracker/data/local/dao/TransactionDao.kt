@@ -19,6 +19,7 @@ import com.rhys.financetracker.data.local.projection.DescriptionCategory
 import com.rhys.financetracker.data.local.projection.ExistingEntry
 import com.rhys.financetracker.data.local.projection.FingerprintCount
 import com.rhys.financetracker.data.local.projection.IncomeExpenseTotals
+import com.rhys.financetracker.data.local.projection.LivePayment
 import com.rhys.financetracker.data.local.projection.MonthTotals
 import com.rhys.financetracker.data.local.projection.PaymentOut
 import com.rhys.financetracker.data.local.projection.PayeeEntry
@@ -1139,18 +1140,41 @@ interface TransactionDao {
     suspend fun moveLive(hash: String, accountId: Long, updatedAt: Long): Int
 
     /**
-     * The import hashes ("live:<app>:…") of payments of this amount and
-     * direction added from alerts since [since], to spot one payment told by
-     * two apps. [type] is the TransactionType name.
+     * Payments of this amount added from alerts since [since], either way,
+     * newest first: to spot one payment told by two apps, or one move told
+     * by both banks.
      */
     @Query(
         """
-        SELECT import_hash FROM transactions
+        SELECT id, import_hash, type, account_id, created_at FROM transactions
         WHERE source = 'LIVE' AND is_archived = 0 AND import_hash IS NOT NULL
-          AND amount_minor = :amountMinor AND type = :type AND created_at >= :since
+          AND amount_minor = :amountMinor AND created_at >= :since
+        ORDER BY created_at DESC
         """,
     )
-    suspend fun recentLiveHashes(amountMinor: Long, type: String, since: Long): List<String>
+    suspend fun recentLive(amountMinor: Long, since: Long): List<LivePayment>
+
+    /**
+     * A payment typed in, or added from a receipt, in the last while
+     * ([since]) for this money near this date, not yet matched to an alert:
+     * the alert is for that one.
+     */
+    @Query(
+        "SELECT id FROM transactions WHERE source = 'MANUAL' AND import_hash IS NULL " +
+            "AND created_at >= :since AND $SAME_MONEY ORDER BY created_at DESC LIMIT 1",
+    )
+    suspend fun findTypedInNear(
+        accountId: Long,
+        amountMinor: Long,
+        incoming: Boolean,
+        from: LocalDate,
+        until: LocalDate,
+        since: Long,
+    ): Long?
+
+    /** Ties a typed-in payment to the alert that told of it, so it's matched once. */
+    @Query("UPDATE transactions SET import_hash = :hash WHERE id = :id AND import_hash IS NULL")
+    suspend fun tieToAlert(id: Long, hash: String)
 
     /**
      * Payments of [amountMinor] added from alerts since [since] that paid

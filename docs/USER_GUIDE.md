@@ -943,6 +943,16 @@ alerts — see **Your cards** on the Live payments page, where you can set or
 change the account for each card. And if Wallet's alert came first and went to
 the wrong account, your bank's alert moves it to the right one.
 
+**Told by two apps at once.** Alerts are read one at a time, so Wallet's and
+your card app's alert for the same tap — often a second apart — are added
+once. Money moved between two of your own banks, told by both ("£100 sent"
+from one, "£100 received" by the other, within 20 minutes), is one move
+between your accounts rather than spending at one and income at the other.
+A payment you typed in, or added from a receipt, just before the bank's alert
+came is matched to it instead of being added again. Payments older versions
+added twice this way are tidied when Home opens: the extra one is put away
+with a note.
+
 **Statement ready.** When your bank's app says a new statement is out, the
 app reminds you to bring it in. Switch **Tell me when a statement is ready**
 off if you'd rather not.
