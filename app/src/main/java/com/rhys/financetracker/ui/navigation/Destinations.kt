@@ -51,6 +51,7 @@ object Routes {
     const val SETTINGS_EXTERNAL_DATA = "settings/external"
     const val SETTINGS_DASHBOARD = "settings/dashboard"
     const val SETTINGS_LIVE_PAYMENTS = "settings/live"
+    const val SETTINGS_TIPS = "settings/tips"
     const val WHATS_NEW = "settings/whats-new"
     const val RECEIPT_SCAN = "receipts/scan"
     const val INBOX = "inbox"

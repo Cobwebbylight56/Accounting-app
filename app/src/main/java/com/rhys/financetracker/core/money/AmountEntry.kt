@@ -3,8 +3,8 @@ package com.rhys.financetracker.core.money
 /**
  * Typing an amount the way a till takes it: the digits fill in from the
  * pence, and the comma and the point go in by themselves — 5, 0, 0 reads
- * 5.00 and 1, 2, 3, 4, 5, 6 reads 1,234.56. A minus makes it negative, and a
- * second takes it off again.
+ * 5.00 and 1, 2, 3, 4, 5, 6 reads 1,234.56. Where an amount can be below
+ * nothing, a minus makes it negative, and a second takes it off again.
  *
  * The form keeps plain pounds ("1234.56"), as it always has; only what the
  * field shows is laid out.
@@ -27,12 +27,22 @@ object AmountEntry {
      * been pressed: a digit added at the end, the last one taken off, or
      * something pasted in.
      */
-    fun typed(text: String): String {
-        val negative = text.count { it == '-' } % 2 == 1
+    fun typed(text: String, allowNegative: Boolean = true): String {
+        val negative = allowNegative && text.count { it == '-' } % 2 == 1
         val digits = text.filter { it.isDigit() }.trimStart('0').take(MAX_DIGITS)
         val sign = if (negative) "-" else ""
         if (digits.isEmpty()) return sign
         return sign + Money.formatPlain(digits.toLong())
+    }
+
+    /** [pounds] the other side of nothing: overdrawn, or back in credit. */
+    fun flipped(pounds: String): String {
+        val trimmed = pounds.trim()
+        return when {
+            trimmed.isEmpty() -> "-"
+            trimmed.startsWith("-") -> trimmed.drop(1)
+            else -> "-$trimmed"
+        }
     }
 
     /** Up to £9,999,999,999.99: more than anyone types, and well inside a Long. */

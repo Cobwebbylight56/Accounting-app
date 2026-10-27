@@ -402,7 +402,15 @@ fun SpendingScreen(
                 }
             }
 
-            item { SpentHeadline(state) }
+            item {
+                Column {
+                    SpentHeadline(state)
+                    com.rhys.financetracker.ui.components.TipCard(
+                        com.rhys.financetracker.domain.tips.TipPlace.SPENDING,
+                        modifier = Modifier.padding(top = 14.dp),
+                    )
+                }
+            }
 
             item {
                 SectionCard(

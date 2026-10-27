@@ -80,9 +80,12 @@ class ProgressViewModel @Inject constructor(
         .map { it.progressReports }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    /** The reports the pop-up hasn't shown yet. */
+    /**
+     * The reports the pop-up hasn't shown yet — none while the pop-up is
+     * turned off in Tips & reminders. They're still kept, and listed.
+     */
     val unseen: StateFlow<List<ProgressReport>> = settingsRepository.settings
-        .map { s -> s.progressReports.filter { it.key in s.progressUnseen } }
+        .map { s -> if (!s.progressPopup) emptyList() else s.progressReports.filter { it.key in s.progressUnseen } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun markSeen() {

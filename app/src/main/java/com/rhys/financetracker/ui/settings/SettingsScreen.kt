@@ -19,6 +19,7 @@ import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.NewReleases
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PlayCircle
@@ -72,6 +73,7 @@ fun SettingsScreen(
     onOpenSortEverything: () -> Unit = {},
     onOpenLivePayments: () -> Unit = {},
     onOpenWhatsNew: () -> Unit = {},
+    onOpenTips: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -173,6 +175,13 @@ fun SettingsScreen(
                 },
                 icon = Icons.Outlined.Lock,
                 onClick = onOpenSecurity,
+            )
+            SettingsItem(
+                title = "Tips & reminders",
+                subtitle = "Tips, New marks on what's new, and which pop-ups appear",
+                icon = Icons.Outlined.Lightbulb,
+                trailing = { com.rhys.financetracker.ui.components.NewBadge("settings-tips") },
+                onClick = onOpenTips,
             )
             SettingsItem(
                 title = "Notifications",

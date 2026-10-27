@@ -391,6 +391,10 @@ private const val PREVIEW_ROWS = 12
 @Composable
 private fun ChooseFileStep(onChoose: () -> Unit) {
     Column {
+        com.rhys.financetracker.ui.components.TipCard(
+            com.rhys.financetracker.domain.tips.TipPlace.IMPORT,
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp),
+        )
         EmptyState(
             icon = Icons.Outlined.UploadFile,
             title = "Bank statement or spreadsheet",
@@ -521,15 +525,17 @@ private fun DetectedStatementCard(state: ImportState, viewModel: ImportViewModel
         }
         Spacer(Modifier.height(12.dp))
         // Whose, then which: the accounts under each person's name.
-        com.rhys.financetracker.ui.components.PersonAccountPicker(
-            label = if (preselected != null) "Adding to" else "Add these to",
-            people = people,
-            accounts = accounts,
-            selectedId = chosen?.id,
-            onSelect = { id -> chosen = accounts.firstOrNull { it.id == id } },
-            everyKind = true,
-        )
-        if (accounts.isEmpty()) {
+        if (accounts.isNotEmpty()) {
+            com.rhys.financetracker.ui.components.PersonAccountPicker(
+                label = if (preselected != null) "Adding to" else "Add these to",
+                people = people,
+                accounts = accounts,
+                selectedId = chosen?.id,
+                onSelect = { id -> chosen = accounts.firstOrNull { it.id == id } },
+                everyKind = true,
+            )
+        } else {
+            // The button above adds one of the right kind.
             Text(
                 "No accounts of this kind",
                 style = MaterialTheme.typography.bodyMedium,

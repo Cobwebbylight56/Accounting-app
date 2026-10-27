@@ -115,6 +115,10 @@ fun CategoriesScreen(
                 optionLabel = { it.displayName },
                 modifier = Modifier.padding(16.dp),
             )
+            com.rhys.financetracker.ui.components.TipCard(
+                com.rhys.financetracker.domain.tips.TipPlace.CATEGORIES,
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+            )
 
             LazyColumn(
                 contentPadding = PaddingValues(16.dp, 0.dp, 16.dp, 96.dp),

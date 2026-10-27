@@ -98,8 +98,9 @@ fun MoreScreen(
             )
             SettingsItem(
                 title = "Settings",
-                subtitle = "Appearance, security, notifications, backup",
+                subtitle = "Appearance, tips & reminders, notifications, backup",
                 icon = Icons.Outlined.Settings,
+                trailing = { com.rhys.financetracker.ui.components.NewBadge("settings-tips") },
                 onClick = onOpenSettings,
             )
 

@@ -120,7 +120,7 @@ class DashboardViewModel @Inject constructor(
         accountRepository.observeWithBalances(),
     ) { s, list ->
         val now = System.currentTimeMillis()
-        list.isNotEmpty() && !s.autoBackupEnabled &&
+        s.backupReminder && list.isNotEmpty() && !s.autoBackupEnabled &&
             (s.lastBackupAt == null || now - s.lastBackupAt > BACKUP_NUDGE_AFTER_MS) &&
             (s.backupNudgeSnoozedUntil == null || now > s.backupNudgeSnoozedUntil)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)

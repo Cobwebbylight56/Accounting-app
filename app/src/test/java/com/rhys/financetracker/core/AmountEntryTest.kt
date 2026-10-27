@@ -60,4 +60,17 @@ class AmountEntryTest {
     fun `something pasted in is read by its digits`() {
         assertEquals("12.50", AmountEntry.typed("£12.50"))
     }
+
+    @Test
+    fun `a minus is ignored where an amount can't be below nothing`() {
+        assertEquals("12.50", AmountEntry.typed("12.50-", allowNegative = false))
+    }
+
+    @Test
+    fun `the plus-minus button turns a balance round`() {
+        assertEquals("-250.00", AmountEntry.flipped("250.00"))
+        assertEquals("250.00", AmountEntry.flipped("-250.00"))
+        assertEquals("-", AmountEntry.flipped(""))
+        assertEquals("-2.50", AmountEntry.shown(AmountEntry.flipped(AmountEntry.typed("250"))))
+    }
 }

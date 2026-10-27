@@ -48,6 +48,7 @@ class TransactionEditViewModel @Inject constructor(
     private val savingsRepository: SavingsRepository,
     private val payeeRepository: PayeeRepository,
     private val splitRepository: com.rhys.financetracker.data.receipts.SplitRepository,
+    private val settingsRepository: com.rhys.financetracker.data.prefs.SettingsRepository,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -122,10 +123,15 @@ class TransactionEditViewModel @Inject constructor(
     private suspend fun load() {
         val defaults = accountRepository.observeActiveOptions().first()
         if (transactionId == Routes.NEW_ID) {
+            // The account chosen as the default, else the first to spend
+            // from — not whichever is first in the list, a saver or a card.
+            val chosen = settingsRepository.settings.first().defaultAccountId
             form.value = TransactionForm(
                 type = startType ?: TransactionType.EXPENSE,
                 date = DateUtils.today(),
-                accountId = defaults.firstOrNull()?.id,
+                accountId = defaults.firstOrNull { it.id == chosen }?.id
+                    ?: defaults.firstOrNull { it.holding == com.rhys.financetracker.domain.model.Holding.SPEND }?.id
+                    ?: defaults.firstOrNull()?.id,
             )
             return
         }

@@ -687,6 +687,13 @@ private fun NavGraphBuilder.settingsDestinations(navController: NavHostControlle
             onOpenSortEverything = { navController.navigate(Routes.SORT_EVERYTHING) },
             onOpenLivePayments = { navController.navigate(Routes.SETTINGS_LIVE_PAYMENTS) },
             onOpenWhatsNew = { navController.navigate(Routes.WHATS_NEW) },
+            onOpenTips = { navController.navigate(Routes.SETTINGS_TIPS) },
+        )
+    }
+    composable(Routes.SETTINGS_TIPS) {
+        com.rhys.financetracker.ui.settings.TipsSettingsScreen(
+            onBack = { navController.popBackStack() },
+            onOpenNotifications = { navController.navigate(Routes.SETTINGS_NOTIFICATIONS) },
         )
     }
     composable(Routes.WHATS_NEW) {

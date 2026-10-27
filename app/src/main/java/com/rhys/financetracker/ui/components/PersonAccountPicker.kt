@@ -76,7 +76,18 @@ fun PersonAccountPicker(
     onNone: () -> Unit = {},
 ) {
     val owners = remember(people, accounts) { AccountOwners.of(people, accounts) }
-    if (owners.groups.isEmpty()) return
+    if (owners.groups.isEmpty()) {
+        // Said, rather than the field vanishing and the form refusing to save.
+        Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                "No accounts to choose yet — add one under Accounts first.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+        return
+    }
     val selected = accounts.firstOrNull { it.id == selectedId }
     var groupKey by remember(selectedId, owners) {
         mutableStateOf(selected?.let { owners.keyOf(it) } ?: owners.groups.first().key)

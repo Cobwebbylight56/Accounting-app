@@ -257,6 +257,10 @@ fun TransactionListScreen(
                 onValueChange = viewModel::setSearchText,
                 onClear = { viewModel.setSearchText("") },
             )
+            com.rhys.financetracker.ui.components.TipCard(
+                com.rhys.financetracker.domain.tips.TipPlace.PAYMENTS,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+            )
 
             if (state.hasFilters || state.transactions.isNotEmpty()) {
                 ResultSummary(state = state, onClearFilters = viewModel::clearFilters)

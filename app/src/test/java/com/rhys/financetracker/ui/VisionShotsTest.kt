@@ -107,6 +107,10 @@ class VisionShotsTest {
 
     @Test fun progressLight() = shoot("9-progress-light", ThemeMode.LIGHT) { Progress() }
 
+    @Test fun tipsDark() = shoot("10-tips-dark", ThemeMode.DARK) { Tips() }
+
+    @Test fun tipsLight() = shoot("11-tips-light", ThemeMode.LIGHT) { Tips() }
+
     /**
      * [hold] stops the clock at [advanceMs] rather than letting every
      * animation run to its end — for the intro, which ends by fading away.
@@ -278,6 +282,28 @@ class VisionShotsTest {
             }
         }
         Spacer(Modifier.height(4.dp))
+    }
+
+    /** A tip for something new, an everyday one, the New mark, and a balance with ±. */
+    @Composable
+    private fun Tips() {
+        val book = com.rhys.financetracker.domain.tips.TipBook.ALL
+        com.rhys.financetracker.ui.components.TipCardContent(book.first { it.id == "home-left-over" }, onGotIt = {}, onTipsOff = {})
+        com.rhys.financetracker.ui.components.TipCardContent(book.first { it.id == "home-add" }, onGotIt = {}, onTipsOff = {})
+        SectionCard(title = "Settings") {
+            com.rhys.financetracker.ui.settings.SettingsItem(
+                title = "Tips & reminders",
+                subtitle = "Tips, New marks on what's new, and which pop-ups appear",
+                trailing = { com.rhys.financetracker.ui.components.NewMark() },
+            )
+        }
+        com.rhys.financetracker.ui.components.AmountField(
+            label = "Balance (owed is a minus)",
+            value = "-250.00",
+            onValueChange = {},
+            allowNegative = true,
+            supportingText = "£250 owed is −250.00: type 25000, then tap ±.",
+        )
     }
 
     @Composable

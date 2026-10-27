@@ -179,26 +179,32 @@ fun AccountsScreen(
                 }
             }
             item {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    StatTile(
-                        label = "Owed",
-                        value = Money.format(state.totalLiabilitiesMinor),
-                        emphasis = if (state.totalLiabilitiesMinor < 0L) {
-                            StatEmphasis.NEGATIVE
-                        } else {
-                            StatEmphasis.NEUTRAL
-                        },
-                        modifier = Modifier.weight(1f),
-                    )
-                    StatTile(
-                        label = "Net worth",
-                        value = Money.format(state.netWorthMinor),
-                        emphasis = if (state.netWorthMinor < 0L) {
-                            StatEmphasis.NEGATIVE
-                        } else {
-                            StatEmphasis.POSITIVE
-                        },
-                        modifier = Modifier.weight(1f),
+                Column {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        StatTile(
+                            label = "Owed",
+                            value = Money.format(state.totalLiabilitiesMinor),
+                            emphasis = if (state.totalLiabilitiesMinor < 0L) {
+                                StatEmphasis.NEGATIVE
+                            } else {
+                                StatEmphasis.NEUTRAL
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                        StatTile(
+                            label = "Net worth",
+                            value = Money.format(state.netWorthMinor),
+                            emphasis = if (state.netWorthMinor < 0L) {
+                                StatEmphasis.NEGATIVE
+                            } else {
+                                StatEmphasis.POSITIVE
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    com.rhys.financetracker.ui.components.TipCard(
+                        com.rhys.financetracker.domain.tips.TipPlace.ACCOUNTS,
+                        modifier = Modifier.padding(top = 14.dp),
                     )
                 }
             }
@@ -555,10 +561,16 @@ fun AccountEditScreen(
             }
 
             AmountField(
-                label = "Money in it",
+                label = if (state.form.holding == Holding.OWED) "Balance (owed is a minus)" else "Money in it",
                 value = state.form.openingBalanceText,
                 onValueChange = { text ->
                     viewModel.update { it.copy(openingBalanceText = text) }
+                },
+                allowNegative = true,
+                supportingText = if (state.form.holding == Holding.OWED) {
+                    "£250 owed is −250.00: type 25000, then tap ±."
+                } else {
+                    "Overdrawn? Tap ± to make it a minus."
                 },
             )
 
@@ -588,6 +600,8 @@ fun AccountEditScreen(
                 label = "Warn me below",
                 value = state.form.lowBalanceText,
                 onValueChange = { text -> viewModel.update { it.copy(lowBalanceText = text) } },
+                // Below an overdraft's start is a minus too.
+                allowNegative = true,
             )
 
             if (state.form.type == AccountType.CREDIT_CARD ||

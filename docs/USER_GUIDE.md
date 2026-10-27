@@ -5,6 +5,29 @@ knowledge.
 
 ---
 
+## Tips, New marks and reminders
+
+Each page has a short tip about what you can do there, shown one at a time.
+**Got it** puts it away and brings the next; **Turn tips off** stops them.
+
+Anything new in an update is marked **New**, with a note saying where it is —
+on Home, a payment, Bills & subscriptions and so on. A New mark stays until
+you've seen its note. New marks are on even when tips are off, and anything
+added in a later update is always pointed out once.
+
+**Settings → Tips & reminders** has every tip and pop-up in one place:
+
+* **Tips on each page**, and **Point out what's new**.
+* **Show every tip again**, including ones already seen.
+* The pop-ups when the app opens: **How you're doing** (the reports are still
+  kept in More → Progress reports), **Needs a look** (still listed on Home),
+  and the **back up reminder**.
+* **Statement ready** reminders from your bank's alerts, and a link to the
+  bill, overdue and low-balance reminders under Notifications.
+
+Pop-ups only open once each time the app starts, and never on top of each
+other.
+
 ## After an update
 
 The first time you open the app after an update, a note says which version
@@ -55,7 +78,13 @@ missing statement month, a regular payment that seems to have stopped, the
 backup reminder — each with one tap to deal with it. It pops up when the app
 opens; **Not now** closes it until next time, **Hide for a week** keeps it away
 for seven days. Home keeps a slim **N things need a look** line; tap it (or
-**More → Needs a look**) for the full list and the tidying-up tools.
+**More → Needs a look**) for the full list and the tidying-up tools. The
+pop-up can be turned off in **Settings → Tips & reminders**.
+
+A **missing statement** is only looked for on current accounts and cards,
+which get a statement every month — savings, ISAs and loans usually get one a
+year. A statement with no payments in it adds nothing, so its month can look
+missing: tap **It was empty** and it won't be asked about again.
 
 **Live** on a payment means it was added from a bank or Google Wallet alert,
 the moment it happened. When that month's statement is imported, the bank's
@@ -211,8 +240,10 @@ tagged **One-off** in Payments. Turn it off to count it again.
 **Typing an amount** works like a till: the digits fill in from the pence, and
 the comma and the point go in by themselves. Type 2, 4, 9, 9 and it reads
 24.99; 1, 2, 3, 4, 5, 6 reads 1,234.56. The last key typed is the first taken
-off. A minus makes an amount negative, where that's allowed, and a second one
-takes it off again. Every money box in the app works this way.
+off. Every money box in the app works this way. An account's balance can be
+below nothing — overdrawn, or what's owed on a card — so it has a **±**
+button: type the amount, then tap ± to make it a minus. Anywhere else a minus
+is ignored, as a payment's way is set by Expense or Income.
 
 **Choosing a category** opens the groups — Food, Transport, Shopping, Health,
 Money and the rest — each saying what's inside. Tap one to open it up and pick

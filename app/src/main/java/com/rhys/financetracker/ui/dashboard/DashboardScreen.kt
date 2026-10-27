@@ -248,14 +248,21 @@ fun DashboardScreen(
                 }
 
                 item {
-                    PersonTabs(
-                        individuals = individuals,
-                        scope = state.scope,
-                        onPerson = viewModel::showPerson,
-                        onShared = viewModel::showShared,
-                        onChooseShared = { choosingShared = true },
-                        onAddPerson = onOpenSetup,
-                    )
+                    Column {
+                        PersonTabs(
+                            individuals = individuals,
+                            scope = state.scope,
+                            onPerson = viewModel::showPerson,
+                            onShared = viewModel::showShared,
+                            onChooseShared = { choosingShared = true },
+                            onAddPerson = onOpenSetup,
+                        )
+                        // A tip, or a pointer to something new, when there is one.
+                        com.rhys.financetracker.ui.components.TipCard(
+                            com.rhys.financetracker.domain.tips.TipPlace.HOME,
+                            modifier = Modifier.padding(top = 14.dp),
+                        )
+                    }
                 }
 
                 // Get set up: people, accounts, a statement, live payments and

@@ -56,6 +56,7 @@ import com.rhys.financetracker.data.repository.AccountRepository
 import com.rhys.financetracker.data.repository.BillFinderRepository
 import com.rhys.financetracker.data.repository.ResortNote
 import com.rhys.financetracker.data.repository.TidyUpRepository
+import com.rhys.financetracker.domain.report.StatementGaps
 import com.rhys.financetracker.ui.components.SectionCard
 import com.rhys.financetracker.ui.transactions.LedgerRequests
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -67,6 +68,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -82,6 +84,8 @@ data class InboxItem(
     /** A second, lesser choice: "Put them back", "Later". */
     val secondAction: String? = null,
     val accountId: Long? = null,
+    /** The months a missing statement is for. */
+    val months: List<java.time.YearMonth> = emptyList(),
 ) {
     enum class Kind { RESORTED, UNSORTED, TO_CHECK, OLD_ALERTS, MISSING_STATEMENT, SUBSCRIPTION_MISSED, BACKUP }
 }
@@ -126,15 +130,20 @@ class InboxViewModel @Inject constructor(
     private val missingStatements: Flow<List<Triple<Long, String, List<YearMonth>>>> =
         accountRepository.observeActive().flatMapLatest { accounts ->
             if (accounts.isEmpty()) return@flatMapLatest flowOf(emptyList())
-            combine(accounts.map { account -> transactionDao.observeStatementMonths(account.id).map { account to it } }) { rows ->
+            // Only accounts sent a statement every month: a saver's comes once a year.
+            val monthly = accounts.filter { StatementGaps.monthly(it.type, it.holding) }
+            if (monthly.isEmpty()) return@flatMapLatest flowOf(emptyList())
+            combine(
+                settingsRepository.settings.map { it.statementGapsOk }.distinctUntilChanged(),
+                combine(monthly.map { account -> transactionDao.observeStatementMonths(account.id).map { account to it } }) { it.toList() },
+            ) { said, rows ->
                 val lastMonth = DateUtils.currentYearMonth().minusMonths(1)
                 rows.mapNotNull { (account, months) ->
                     val have = months.mapNotNull { DateUtils.parseYearMonthKey(it) }.toSet()
-                    val first = have.minOrNull() ?: return@mapNotNull null
-                    val from = maxOf(first, lastMonth.minusMonths(LOOK_BACK_MONTHS))
-                    val missing = generateSequence(from) { it.plusMonths(1) }.takeWhile { !it.isAfter(lastMonth) }
-                        .filter { it !in have }.toList()
-                    missing.takeIf { it.isNotEmpty() }?.let { Triple(account.id, account.name, it) }
+                    val empty = said.filter { it.startsWith("${account.id}:") }
+                        .mapNotNull { DateUtils.parseYearMonthKey(it.substringAfter(':')) }.toSet()
+                    StatementGaps.missing(have, lastMonth, LOOK_BACK_MONTHS, empty)
+                        .takeIf { it.isNotEmpty() }?.let { Triple(account.id, account.name, it) }
                 }
             }
         }
@@ -205,7 +214,10 @@ class InboxViewModel @Inject constructor(
                         detail = "No statement for " + months.takeLast(MONTHS_NAMED).joinToString(", ") { DateUtils.formatMonth(it) } +
                             (if (months.size > MONTHS_NAMED) " and earlier" else "") + ".",
                         action = "Open",
+                        // A statement with no payments in it adds nothing, so its month looks missing.
+                        secondAction = if (months.size == 1) "It was empty" else "They were empty",
                         accountId = id,
+                        months = months,
                     ),
                 )
             }
@@ -220,7 +232,7 @@ class InboxViewModel @Inject constructor(
                 )
             }
             val now = System.currentTimeMillis()
-            val backupDue = balances.isNotEmpty() && !settings.autoBackupEnabled &&
+            val backupDue = settings.backupReminder && balances.isNotEmpty() && !settings.autoBackupEnabled &&
                 (settings.lastBackupAt == null || now - settings.lastBackupAt > BACKUP_AFTER_MS) &&
                 (settings.backupNudgeSnoozedUntil == null || now > settings.backupNudgeSnoozedUntil)
             if (backupDue) {
@@ -254,7 +266,9 @@ class InboxViewModel @Inject constructor(
 
     /** Whether the pop-up may open with the app: not hidden for the week. */
     val popupAllowed: StateFlow<Boolean> = settingsRepository.settings
-        .map { s -> s.needsLookSnoozedUntil == null || System.currentTimeMillis() > s.needsLookSnoozedUntil }
+        .map { s ->
+            s.needsLookPopup && (s.needsLookSnoozedUntil == null || System.currentTimeMillis() > s.needsLookSnoozedUntil)
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     /** Keeps the pop-up away for a week; Home's line still shows. */
@@ -267,6 +281,10 @@ class InboxViewModel @Inject constructor(
             InboxItem.Kind.RESORTED -> viewModelScope.launch { tidyUp.undoLastResort() }
             InboxItem.Kind.BACKUP -> viewModelScope.launch {
                 settingsRepository.snoozeBackupNudge(System.currentTimeMillis() + SNOOZE_MS)
+            }
+            InboxItem.Kind.MISSING_STATEMENT -> viewModelScope.launch {
+                val id = item.accountId ?: return@launch
+                settingsRepository.markStatementGapsOk(item.months.map { StatementGaps.key(id, it) })
             }
             else -> Unit
         }

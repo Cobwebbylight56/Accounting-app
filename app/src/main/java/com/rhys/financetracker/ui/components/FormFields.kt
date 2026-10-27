@@ -118,20 +118,46 @@ fun AmountField(
     modifier: Modifier = Modifier,
     error: String? = null,
     currencySymbol: String = "£",
+    /**
+     * For a balance, which can be below nothing: a ± beside it, as the
+     * number keyboard on many phones has no minus. Anywhere else a minus is
+     * ignored — a payment's way is its type, never its sign.
+     */
+    allowNegative: Boolean = false,
+    supportingText: String? = null,
 ) {
     val shown = AmountEntry.shown(value)
     OutlinedTextField(
         // The cursor stays at the end: each digit goes on the pence, and
         // taking one off takes the last.
         value = TextFieldValue(shown, selection = TextRange(shown.length)),
-        onValueChange = { input -> if (input.text != shown) onValueChange(AmountEntry.typed(input.text)) },
+        onValueChange = { input ->
+            if (input.text != shown) onValueChange(AmountEntry.typed(input.text, allowNegative))
+        },
         modifier = modifier.fillMaxWidth(),
         label = { Text(label) },
         placeholder = { Text("0.00") },
         isError = error != null,
         singleLine = true,
         prefix = { Text(currencySymbol) },
-        supportingText = error?.let { { Text(it, color = MaterialTheme.colorScheme.error) } },
+        trailingIcon = if (allowNegative) {
+            {
+                TextButton(onClick = { onValueChange(AmountEntry.flipped(value)) }) {
+                    Text("±", style = MaterialTheme.typography.titleMedium)
+                }
+            }
+        } else {
+            null
+        },
+        supportingText = when {
+            error != null -> {
+                { Text(error, color = MaterialTheme.colorScheme.error) }
+            }
+            supportingText != null -> {
+                { Text(supportingText) }
+            }
+            else -> null
+        },
         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
     )
 }

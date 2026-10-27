@@ -22,6 +22,18 @@ object ReleaseNotes {
     /** Every release, newest first. */
     val ALL: List<Release> = listOf(
         Release(
+            "2.5.0", LocalDate.of(2026, 10, 27), "Tips, and New where things are new",
+            listOf(
+                "Each page has a short tip about what you can do there, one at a time — \"Got it\" brings the next, and \"Turn tips off\" stops them.",
+                "Anything new is marked New, with a note saying where it is: whose account first, One-off on a payment, Left over a month, Sort them out, categories in groups. New marks stay on even with tips off, and things added in later updates are always pointed out once.",
+                "Settings → Tips & reminders puts every tip and pop-up in one place: tips, New marks, the How you're doing and Needs a look pop-ups, the back-up reminder, statement-ready reminders, and Show every tip again.",
+                "Fixed: money boxes now open a number keyboard, and on many phones it has no minus. An account's balance has a ± button for overdrawn, or what's owed on a card; anywhere else a stray minus is ignored.",
+                "Fixed: \"a statement is missing\" no longer nags about savings, ISAs and loans, which get a statement once a year — and a month whose statement had nothing in it can be marked \"It was empty\".",
+                "Fixed: a new payment starts on your default account, or your first everyday account, rather than whichever came first — sometimes a saver or a card.",
+                "Fixed: where there's no account to choose yet, the payment form says so instead of leaving a blank space.",
+            ),
+        ),
+        Release(
             "2.4.1", LocalDate.of(2026, 10, 22), "Payments from alerts added once",
             listOf(
                 "A payment told by two apps at once — Google Wallet and your card's own app a second apart — is added once. Alerts are now read one at a time, so the second always sees the first.",

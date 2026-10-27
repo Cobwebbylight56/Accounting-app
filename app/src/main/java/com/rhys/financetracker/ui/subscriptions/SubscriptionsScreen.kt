@@ -271,6 +271,7 @@ fun SubscriptionsScreen(
                     SectionCard(
                         title = "Sort them out",
                         subtitle = "${state.toSortOut.size} found in your statements to check",
+                        action = { com.rhys.financetracker.ui.components.NewBadge("subs-sort-out") },
                     ) {
                         Text(
                             "Say which you pay, which aren't yours, which are one thing twice, and which you've " +
@@ -284,10 +285,16 @@ fun SubscriptionsScreen(
                 }
             }
             item(key = "order") {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Sort by", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    SubscriptionOrder.entries.forEach { option ->
-                        FilterChip(selected = order == option, onClick = { order = option }, label = { Text(option.label) })
+                Column {
+                    com.rhys.financetracker.ui.components.TipCard(
+                        com.rhys.financetracker.domain.tips.TipPlace.SUBSCRIPTIONS,
+                        modifier = Modifier.padding(bottom = 12.dp),
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Sort by", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        SubscriptionOrder.entries.forEach { option ->
+                            FilterChip(selected = order == option, onClick = { order = option }, label = { Text(option.label) })
+                        }
                     }
                 }
             }

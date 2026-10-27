@@ -90,6 +90,13 @@ class SettingsRepository @Inject constructor(
         val LIVE_CARD_ACCOUNTS = stringPreferencesKey("live_card_accounts")
         val SETUP_HIDDEN = booleanPreferencesKey("setup_checklist_hidden")
         val NEEDS_LOOK_SNOOZED_UNTIL = longPreferencesKey("needs_look_snoozed_until")
+        val STATEMENT_GAPS_OK = stringSetPreferencesKey("statement_gaps_ok")
+        val TIPS_ON = booleanPreferencesKey("tips_on")
+        val NEW_OFF_AT = stringPreferencesKey("new_pointers_off_at")
+        val TIPS_SEEN = stringSetPreferencesKey("tips_seen")
+        val PROGRESS_POPUP = booleanPreferencesKey("progress_popup")
+        val NEEDS_LOOK_POPUP = booleanPreferencesKey("needs_look_popup")
+        val BACKUP_REMINDER = booleanPreferencesKey("backup_reminder")
     }
 
     /** Defaults chosen so a fresh install is immediately usable and private. */
@@ -182,6 +189,13 @@ class SettingsRepository @Inject constructor(
             liveCardAccounts = cardAccountsOf(prefs[Keys.LIVE_CARD_ACCOUNTS]),
             setupChecklistHidden = prefs[Keys.SETUP_HIDDEN] ?: false,
             needsLookSnoozedUntil = prefs[Keys.NEEDS_LOOK_SNOOZED_UNTIL],
+            statementGapsOk = prefs[Keys.STATEMENT_GAPS_OK].orEmpty(),
+            tipsOn = prefs[Keys.TIPS_ON] ?: true,
+            newPointersOffAt = prefs[Keys.NEW_OFF_AT],
+            tipsSeen = prefs[Keys.TIPS_SEEN].orEmpty(),
+            progressPopup = prefs[Keys.PROGRESS_POPUP] ?: true,
+            needsLookPopup = prefs[Keys.NEEDS_LOOK_POPUP] ?: true,
+            backupReminder = prefs[Keys.BACKUP_REMINDER] ?: true,
             liveAlertLog = LiveAlertLogEntry.parse(prefs[Keys.LIVE_ALERT_LOG]),
             subscriptionPlans = com.rhys.financetracker.data.importer.SubscriptionPlan.parse(prefs[Keys.SUBSCRIPTION_PLANS]),
             progressReports = com.rhys.financetracker.domain.report.ProgressReportCodec.read(prefs[Keys.PROGRESS_REPORTS]),
@@ -369,6 +383,37 @@ class SettingsRepository @Inject constructor(
     /** Keeps the Needs a look pop-up from opening with the app until [until] (epoch millis). */
     suspend fun snoozeNeedsALook(until: Long) = put(Keys.NEEDS_LOOK_SNOOZED_UNTIL, until)
 
+    /** Says [keys] ("accountId:2026-10") had no statement to import. */
+    suspend fun markStatementGapsOk(keys: Collection<String>) {
+        context.dataStore.edit { it[Keys.STATEMENT_GAPS_OK] = it[Keys.STATEMENT_GAPS_OK].orEmpty() + keys }
+    }
+
+    suspend fun setTipsOn(on: Boolean) = put(Keys.TIPS_ON, on)
+
+    /** "What's new" pointers on, or off from [version] on — later versions' are still shown. */
+    suspend fun setNewPointersOn(on: Boolean, version: String) {
+        context.dataStore.edit { if (on) it.remove(Keys.NEW_OFF_AT) else it[Keys.NEW_OFF_AT] = version }
+    }
+
+    suspend fun markTipSeen(id: String) {
+        context.dataStore.edit { it[Keys.TIPS_SEEN] = it[Keys.TIPS_SEEN].orEmpty() + id }
+    }
+
+    /** Every tip and pointer shown again, and both switched on. */
+    suspend fun showTipsAgain() {
+        context.dataStore.edit {
+            it.remove(Keys.TIPS_SEEN)
+            it.remove(Keys.NEW_OFF_AT)
+            it[Keys.TIPS_ON] = true
+        }
+    }
+
+    suspend fun setProgressPopup(on: Boolean) = put(Keys.PROGRESS_POPUP, on)
+
+    suspend fun setNeedsLookPopup(on: Boolean) = put(Keys.NEEDS_LOOK_POPUP, on)
+
+    suspend fun setBackupReminder(on: Boolean) = put(Keys.BACKUP_REMINDER, on)
+
     /** Hides the Get set up checklist on Home for good. */
     suspend fun hideSetupChecklist() = put(Keys.SETUP_HIDDEN, true)
 
@@ -506,6 +551,23 @@ data class AppSettings(
     val setupChecklistHidden: Boolean = false,
     /** The Needs a look pop-up stays away until then (epoch millis). */
     val needsLookSnoozedUntil: Long? = null,
+    /** "accountId:2026-10": months said to have had no statement, so not missing. */
+    val statementGapsOk: Set<String> = emptySet(),
+    /** Short tips on each page; see TipBook. */
+    val tipsOn: Boolean = true,
+    /**
+     * The version "what's new" pointers were turned off in, or null while on.
+     * Things added in later versions are still pointed out.
+     */
+    val newPointersOffAt: String? = null,
+    /** Tips and pointers already seen, by id. */
+    val tipsSeen: Set<String> = emptySet(),
+    /** The "How you're doing" pop-up at the start and middle of each month. */
+    val progressPopup: Boolean = true,
+    /** The Needs a look pop-up when the app opens. */
+    val needsLookPopup: Boolean = true,
+    /** The reminder to back up, when nothing has been backed up for a while. */
+    val backupReminder: Boolean = true,
     /** What the alert reader heard lately from banking apps and what came of it, newest first. */
     val liveAlertLog: List<LiveAlertLogEntry> = emptyList(),
     /** When each subscription started, how long it runs or that it was cancelled, by its key. */

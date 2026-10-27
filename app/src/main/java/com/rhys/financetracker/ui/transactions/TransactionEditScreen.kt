@@ -106,6 +106,8 @@ fun TransactionEditScreen(
             state.form.errorSummary?.let {
                 ErrorBanner(message = it, onDismiss = viewModel::clearMessage)
             }
+            // What's new on this page first — whose account, One-off — then tips.
+            com.rhys.financetracker.ui.components.TipCard(com.rhys.financetracker.domain.tips.TipPlace.PAYMENT_EDIT)
 
             SegmentedChoice(
                 options = TransactionType.entries,
@@ -212,7 +214,10 @@ fun TransactionEditScreen(
             // Something bought once — the car — left out of left over.
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("One-off", style = MaterialTheme.typography.bodyLarge)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("One-off", style = MaterialTheme.typography.bodyLarge)
+                        com.rhys.financetracker.ui.components.NewBadge("edit-one-off")
+                    }
                     Text(
                         text = "A car, a holiday paid in full, a windfall: left out of spending, money in " +
                             "and left over, so the month isn't thrown. Your balance still counts it.",

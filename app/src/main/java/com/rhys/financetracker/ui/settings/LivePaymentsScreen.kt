@@ -149,6 +149,10 @@ fun LivePaymentsScreen(
     }
 
     SettingsSubScreen("Live payments", onBack, snackbarHostState) {
+        com.rhys.financetracker.ui.components.TipCard(
+            com.rhys.financetracker.domain.tips.TipPlace.LIVE_PAYMENTS,
+            modifier = Modifier.padding(16.dp),
+        )
         SettingsSwitch(
             title = "Add payments from bank alerts",
             subtitle = "When your banking app tells you money went out or came in, it's added straight away",
