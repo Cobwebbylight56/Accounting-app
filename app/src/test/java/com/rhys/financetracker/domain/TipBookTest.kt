@@ -21,7 +21,7 @@ class TipBookTest {
     @Test
     fun `with tips off, new things are still pointed out`() {
         assertEquals("edit-account", TipBook.next(TipPlace.PAYMENT_EDIT, emptySet(), tipsOn = false, newOffAt = null)?.id)
-        assertNull(TipBook.next(TipPlace.PAYMENTS, emptySet(), tipsOn = false, newOffAt = null))
+        assertNull(TipBook.next(TipPlace.ACCOUNTS, emptySet(), tipsOn = false, newOffAt = null))
     }
 
     @Test

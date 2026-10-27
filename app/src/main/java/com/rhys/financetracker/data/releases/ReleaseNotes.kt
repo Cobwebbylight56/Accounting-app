@@ -22,6 +22,16 @@ object ReleaseNotes {
     /** Every release, newest first. */
     val ALL: List<Release> = listOf(
         Release(
+            "2.6.0", LocalDate.of(2026, 10, 27), "Spending by group, and price rises",
+            listOf(
+                "\"Where it went\" on Spending, and Spending by category on Home, show your spending by group — Food, Transport, Shopping — each with everything in it, so the picture is clear at a glance. Tap a group to see all its payments, or Every category to see them all apart.",
+                "When a bill or subscription goes up — Netflix from £10.99 to £12.99 — Bills & subscriptions says by how much, and what that comes to over a year. Needs a look says so once, with OK to put it away.",
+                "Search by amount: type 12.50 in Payments to find every payment of exactly £12.50, as well as any with it in the name.",
+                "A balance below nothing reads \"−£250.00\", the way a bank writes it, rather than \"£-250.00\".",
+                "New marks point out each of these where it is.",
+            ),
+        ),
+        Release(
             "2.5.0", LocalDate.of(2026, 10, 27), "Tips, and New where things are new",
             listOf(
                 "Each page has a short tip about what you can do there, one at a time — \"Got it\" brings the next, and \"Turn tips off\" stops them.",

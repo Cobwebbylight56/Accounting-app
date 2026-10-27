@@ -88,6 +88,11 @@ object TipBook {
 
         // ------------------------------------------------------- Payments
         Tip(
+            "payments-amount", TipPlace.PAYMENTS, "Search by amount",
+            "Type an amount, like 12.50, to find every payment of exactly that — as well as any with it in the name.",
+            newIn = "2.6.0",
+        ),
+        Tip(
             "payments-find", TipPlace.PAYMENTS, "Finding a payment",
             "Search by shop or note, or use the filter to pick an account, a person, a category or an amount.",
         ),
@@ -98,11 +103,22 @@ object TipBook {
 
         // ------------------------------------------------------- Spending
         Tip(
+            "spending-groups", TipPlace.SPENDING, "Spending by group",
+            "\"Where it went\" shows Food, Transport, Shopping and the rest, each with everything in it. Tap a " +
+                "group for its payments, or Every category to see them all apart.",
+            newIn = "2.6.0",
+        ),
+        Tip(
             "spending-tap", TipPlace.SPENDING, "Tap the charts",
             "Tap a bar or a slice to see exactly which payments are in it.",
         ),
 
         // ----------------------------------------------- Bills & subscriptions
+        Tip(
+            "subs-price-rise", TipPlace.SUBSCRIPTIONS, "Price rises",
+            "When something goes up, it says by how much — and what that is over a year — here and in Needs a look.",
+            newIn = "2.6.0",
+        ),
         Tip(
             "subs-sort-out", TipPlace.SUBSCRIPTIONS, "Sort them out",
             "Go through them one at a time: you pay it, you've cancelled it, it isn't yours, or it's the same as " +

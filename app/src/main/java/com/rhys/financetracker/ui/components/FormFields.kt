@@ -126,20 +126,25 @@ fun AmountField(
     allowNegative: Boolean = false,
     supportingText: String? = null,
 ) {
-    val shown = AmountEntry.shown(value)
+    // A minus goes before the £ — "−£250.00", as a bank writes it — so the
+    // box holds only the digits, and the sign is carried round them.
+    val negative = allowNegative && value.trim().startsWith("-")
+    val shown = AmountEntry.shown(value).removePrefix("-")
     OutlinedTextField(
         // The cursor stays at the end: each digit goes on the pence, and
         // taking one off takes the last.
         value = TextFieldValue(shown, selection = TextRange(shown.length)),
         onValueChange = { input ->
-            if (input.text != shown) onValueChange(AmountEntry.typed(input.text, allowNegative))
+            if (input.text != shown) {
+                onValueChange(AmountEntry.typed((if (negative) "-" else "") + input.text, allowNegative))
+            }
         },
         modifier = modifier.fillMaxWidth(),
         label = { Text(label) },
         placeholder = { Text("0.00") },
         isError = error != null,
         singleLine = true,
-        prefix = { Text(currencySymbol) },
+        prefix = { Text(if (negative) "−$currencySymbol" else currencySymbol) },
         trailingIcon = if (allowNegative) {
             {
                 TextButton(onClick = { onValueChange(AmountEntry.flipped(value)) }) {

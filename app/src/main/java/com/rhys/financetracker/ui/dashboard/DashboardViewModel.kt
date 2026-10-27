@@ -89,7 +89,12 @@ class DashboardViewModel @Inject constructor(
     private val repayments: com.rhys.financetracker.data.repository.RepaymentRepository,
     private val repairs: com.rhys.financetracker.data.repository.StatementRepairRepository,
     private val progress: com.rhys.financetracker.data.repository.ProgressRepository,
+    categoryRepository: com.rhys.financetracker.data.repository.CategoryRepository,
 ) : ViewModel() {
+
+    /** Every category, for adding spending up by group. */
+    val categoryList: StateFlow<List<com.rhys.financetracker.data.local.entity.CategoryEntity>> =
+        categoryRepository.observeAll().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** Which tab is picked; null until somebody picks, meaning the first person. */
     private val choice = MutableStateFlow<ScopeChoice?>(null)
@@ -700,8 +705,8 @@ class DashboardViewModel @Inject constructor(
                 combine(
                     transactionRepository.search(
                         TransactionFilter(
-                            categoryIds = selection.categoryId?.let { setOf(it) } ?: emptySet(),
-                            onlyUncategorised = selection.categoryId == null,
+                            categoryIds = selection.members ?: selection.categoryId?.let { setOf(it) } ?: emptySet(),
+                            onlyUncategorised = selection.categoryId == null && selection.members == null,
                             dateFrom = range.start,
                             dateTo = range.endInclusive,
                             types = setOf(TransactionType.EXPENSE),
@@ -726,8 +731,8 @@ class DashboardViewModel @Inject constructor(
                         // A one-off is listed, but left out of the total as the chart leaves it out.
                         totalMinor = entries.filterNot { it.transaction.isOneOff }.sumOf { it.transaction.amountMinor },
                         previousMonthTotalMinor = lastMonth
-                            .firstOrNull { it.categoryId == selection.categoryId }
-                            ?.totalMinor ?: 0L,
+                            .filter { it.categoryId in (selection.members ?: setOf(selection.categoryId)) }
+                            .sumOf { it.totalMinor },
                     )
                 }
             }
@@ -736,6 +741,11 @@ class DashboardViewModel @Inject constructor(
     /** Opens the breakdown for a tapped slice or legend row. */
     fun showCategoryDetail(categoryId: Long?, name: String, colorHex: String?) {
         selectedCategory.value = CategorySelection(categoryId, name, colorHex)
+    }
+
+    /** Opens the breakdown for a group: its own payments and every category's in it. */
+    fun showGroupDetail(groupId: Long, name: String, colorHex: String?, members: Set<Long>) {
+        selectedCategory.value = CategorySelection(groupId, name, colorHex, members)
     }
 
     fun clearCategoryDetail() {
@@ -1013,6 +1023,8 @@ private data class CategorySelection(
     val categoryId: Long?,
     val name: String,
     val colorHex: String?,
+    /** For a group: it and every category in it. */
+    val members: Set<Long>? = null,
 )
 
 /** The breakdown behind one category slice, for the month on screen. */

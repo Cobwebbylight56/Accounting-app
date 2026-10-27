@@ -36,6 +36,15 @@ class LedgerRequests @Inject constructor() {
         )
     }
 
+    /** A group's payments in [month]: the group and every category in it. */
+    fun openCategories(categoryIds: Set<Long>, month: YearMonth) {
+        pending.value = TransactionFilter(
+            categoryIds = categoryIds,
+            dateFrom = month.atDay(1),
+            dateTo = month.atEndOfMonth(),
+        )
+    }
+
     /** A search for [text] in [month] — one payee's payments, say. */
     fun openSearch(text: String, month: YearMonth) {
         pending.value = TransactionFilter(

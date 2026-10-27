@@ -96,6 +96,7 @@ fun DashboardScreen(
     val peopleYear by viewModel.peopleYear.collectAsStateWithLifecycle()
     val unsortedCount by viewModel.unsortedCount.collectAsStateWithLifecycle()
     val showBackupNudge by viewModel.showBackupNudge.collectAsStateWithLifecycle()
+    val categoryList by viewModel.categoryList.collectAsStateWithLifecycle()
     val resortNote by viewModel.resortNote.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
 
@@ -341,6 +342,8 @@ fun DashboardScreen(
                         onRecordCash = viewModel::recordCash,
                         onCountCash = viewModel::countCash,
                         onRemoveCash = viewModel::removeCashEntry,
+                        categoryList = categoryList,
+                        onGroupClick = viewModel::showGroupDetail,
                     )
                 }
 
@@ -440,6 +443,8 @@ private fun DashboardCard(
     onRecordCash: (String, String, Boolean) -> Boolean,
     onCountCash: (String) -> Boolean,
     onRemoveCash: (com.rhys.financetracker.data.local.entity.CashPotEntryEntity) -> Unit,
+    categoryList: List<com.rhys.financetracker.data.local.entity.CategoryEntity> = emptyList(),
+    onGroupClick: (Long, String, String?, Set<Long>) -> Unit = { _, _, _, _ -> },
 ) {
     when (widget) {
         DashboardWidget.ACCOUNT_ACTIVITY -> AccountActivityCard(state, onOpenAccounts)
@@ -456,7 +461,7 @@ private fun DashboardCard(
             CashInHandCard(state, onRecordCash, onCountCash, onRemoveCash)
         DashboardWidget.SAVINGS_PROGRESS -> SavingsProgressCard(state, onOpenSavings)
         DashboardWidget.SPENDING_BY_CATEGORY ->
-            SpendingByCategoryCard(state, onCategoryClick)
+            SpendingByCategoryCard(state, onCategoryClick, categoryList, onGroupClick)
         DashboardWidget.INCOME_VS_EXPENSE -> IncomeVsExpenseCard(state, onMonthClick)
         DashboardWidget.NET_WORTH -> NetWorthCard(state)
         DashboardWidget.ACCOUNTS_LIST -> AccountsListCard(state, onOpenAccounts)

@@ -27,6 +27,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -46,11 +48,13 @@ import com.rhys.financetracker.data.local.projection.IncomeExpenseTotals
 import com.rhys.financetracker.data.repository.PeopleRepository
 import com.rhys.financetracker.data.repository.TransactionRepository
 import com.rhys.financetracker.domain.model.TransactionType
+import com.rhys.financetracker.domain.report.CategoryRollUp
 import com.rhys.financetracker.domain.report.MonthPoint
 import com.rhys.financetracker.domain.report.SpendingSplit
 import com.rhys.financetracker.ui.components.BreakdownView
 import com.rhys.financetracker.ui.components.CATEGORY_VIEWS
 import com.rhys.financetracker.ui.components.CategoryBreakdown
+import com.rhys.financetracker.ui.components.GroupToggle
 import com.rhys.financetracker.ui.components.MonthTrend
 import com.rhys.financetracker.ui.components.PeriodBar
 import com.rhys.financetracker.ui.components.SectionCard
@@ -123,7 +127,12 @@ class SpendingViewModel @Inject constructor(
     peopleRepository: PeopleRepository,
     private val ledgerRequests: LedgerRequests,
     private val billFinder: com.rhys.financetracker.data.repository.BillFinderRepository,
+    categoryRepository: com.rhys.financetracker.data.repository.CategoryRepository,
 ) : ViewModel() {
+
+    /** Every category, for adding spending up by group. */
+    val categoryList: StateFlow<List<com.rhys.financetracker.data.local.entity.CategoryEntity>> =
+        categoryRepository.observeAll().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val month = MutableStateFlow(DateUtils.currentYearMonth())
     private val personId = MutableStateFlow<Long?>(null)
@@ -320,6 +329,11 @@ class SpendingViewModel @Inject constructor(
         ledgerRequests.openCategory(item.categoryId, month.value)
     }
 
+    /** A group's payments: the group's own and every category's in it. */
+    fun openGroup(categoryIds: Set<Long>) {
+        ledgerRequests.openCategories(categoryIds, month.value)
+    }
+
     /** Leaves the Money tab a search for this payee in this month. */
     fun openPayee(name: String) {
         ledgerRequests.openSearch(name, month.value)
@@ -351,6 +365,8 @@ fun SpendingScreen(
     val (whereView, setWhereView) = rememberCardView("spending_where", BreakdownView.CHART)
     val (trendView, setTrendView) = rememberCardView("spending_trend_line", BreakdownView.LINE)
     val (payeeView, setPayeeView) = rememberCardView("spending_payees", BreakdownView.BARS)
+    val categoryList by viewModel.categoryList.collectAsStateWithLifecycle()
+    var grouped by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(true) }
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Spending") }) },
@@ -418,12 +434,28 @@ fun SpendingScreen(
                     subtitle = "Tap one to see its payments",
                     action = { ViewSwitchButton(whereView, CATEGORY_VIEWS, setWhereView) },
                 ) {
+                    // By group — Food, Transport — unless every category is asked for.
+                    val canGroup = CategoryRollUp.anyGrouped(state.categories, categoryList)
+                    val showGrouped = grouped && canGroup
+                    if (canGroup) GroupToggle(grouped, onChange = { grouped = it })
                     CategoryBreakdown(
-                        totals = state.categories,
+                        totals = if (showGrouped) CategoryRollUp.byGroup(state.categories, categoryList) else state.categories,
                         view = whereView,
-                        previous = state.lastMonthByCategory,
+                        previous = if (showGrouped) {
+                            CategoryRollUp.byGroup(
+                                state.lastMonthByCategory.map { (id, pence) -> CategoryTotal(id, null, null, pence, 0) },
+                                categoryList,
+                            ).associate { it.categoryId to it.totalMinor }
+                        } else {
+                            state.lastMonthByCategory
+                        },
                         onOpen = { item ->
-                            viewModel.openCategory(item)
+                            val group = item.categoryId
+                            if (showGrouped && group != null) {
+                                viewModel.openGroup(CategoryRollUp.members(group, categoryList))
+                            } else {
+                                viewModel.openCategory(item)
+                            }
                             onOpenLedger()
                         },
                     )

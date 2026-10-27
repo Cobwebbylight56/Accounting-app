@@ -529,6 +529,16 @@ private fun SubscriptionRow(subscription: Subscription, accountName: String?, on
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        // Gone up lately: worth a second look at whether it's still worth it.
+        subscription.raisedFrom?.takeIf { going }?.let { was ->
+            Text(
+                text = "Up ${Money.format(subscription.amountMinor - was)} from ${Money.format(was)}" +
+                    (subscription.riseYearlyMinor?.let { " — ${Money.format(it)} more a year" } ?: ""),
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold,
+                color = colors.negative,
+            )
+        }
         Spacer(Modifier.height(6.dp))
         // A dot for each month: filled when it was paid that month.
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {

@@ -63,7 +63,15 @@ object SubscriptionTracker {
         val plan: SubscriptionPlan? = null,
         /** A direct debit or standing order, when the statement or the payee says so. */
         val paidBy: com.rhys.financetracker.domain.model.PaymentKind? = null,
+        /** Each payment's amount, oldest first. */
+        val amounts: List<Long> = emptyList(),
     ) {
+        /** What it cost before a recent price rise, or null; see [PriceRise]. */
+        val raisedFrom: Long? get() = PriceRise.from(amounts)
+
+        /** How much more a year that rise costs, or null without one. */
+        val riseYearlyMinor: Long? get() = raisedFrom?.let { (amountMinor - it) * paymentsPerYear(frequency) }
+
         val key: String get() = SubscriptionPlan.keyOf(name)
 
         /** The day it ends, if you said when. */
@@ -220,6 +228,7 @@ object SubscriptionTracker {
             paidBy = paidBy(sorted),
             paidByMonth = sorted.groupBy { YearMonth.from(it.date) }.mapValues { (_, rows) -> rows.sumOf { it.amountMinor } },
             paymentIds = sorted.map { it.id }.filter { it != 0L }.toSet(),
+            amounts = sorted.map { it.amountMinor },
         )
     }
 

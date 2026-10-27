@@ -113,6 +113,19 @@ fun ViewSwitchButton(
 /** The views a category breakdown can take. */
 val CATEGORY_VIEWS = listOf(BreakdownView.CHART, BreakdownView.BARS, BreakdownView.TILES, BreakdownView.LIST)
 
+/**
+ * Spending by group (Food, Transport…) or by every category, above a
+ * breakdown — shown only when grouping changes anything.
+ */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+fun GroupToggle(grouped: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+    Row(modifier = modifier.padding(bottom = 8.dp), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+        androidx.compose.material3.FilterChip(selected = grouped, onClick = { onChange(true) }, label = { Text("Groups") })
+        androidx.compose.material3.FilterChip(selected = !grouped, onClick = { onChange(false) }, label = { Text("Every category") })
+    }
+}
+
 /** The views a month-by-month card can take. */
 val TREND_VIEWS = listOf(BreakdownView.LINE, BreakdownView.BARS, BreakdownView.LIST)
 

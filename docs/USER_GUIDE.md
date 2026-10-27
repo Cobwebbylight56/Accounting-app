@@ -279,7 +279,8 @@ month's amount, which is why the tag is there.
 
 The search box at the top of **Payments** looks at names, notes, tags, categories,
 accounts and people — so "hannah fuel" or "birthday" will find it, whichever
-field you typed it in.
+field you typed it in. Type just an amount — 12.50 or £1,250 — and it finds
+every payment of exactly that, too.
 
 For anything more specific, tap the filter icon: date range, amount range, type,
 category, person, account, and whether to include archived entries. The number
@@ -1092,7 +1093,9 @@ The second tab is all about where the money goes, for one month at a time
 (the bar at the bottom, or a swipe, changes month), for everyone or one person:
 
 * **How much was spent**, what came in, and how that compares with last month.
-* **Where it went** — every category, tap one to see its payments.
+* **Where it went** — by group (Food, Transport, Shopping…), each with every
+  category in it; tap a group to see all its payments. **Every category**
+  shows them all apart. Home's **Spending by category** card works the same.
 * **Month by month** — money in against money out over six months; tap a month
   to look at it. Money out is split into three: spending from the bank (red),
   on credit cards (yellow) and subscriptions (purple), whichever account
@@ -1224,6 +1227,11 @@ already set up under a slightly different name: it isn't suggested again.
 When a bill's price changes, the copy the app added on its day (at the old
 price) is still matched to the statement's line, which puts in the new
 amount, so the month doesn't count the bill twice.
+**Price rises.** When something you pay regularly goes up — a steady price,
+then a higher one in the latest payment or two — its row says so in red: "Up
+£2.00 from £10.99 — £24.00 more a year". **Needs a look** says so once too;
+**OK** puts it away, and a later rise is said again.
+
 **Sort them out.** At the top, **Sort them out** says how many haven't been
 looked at, and goes through them one at a time:
 

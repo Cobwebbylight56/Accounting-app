@@ -97,6 +97,7 @@ class SettingsRepository @Inject constructor(
         val PROGRESS_POPUP = booleanPreferencesKey("progress_popup")
         val NEEDS_LOOK_POPUP = booleanPreferencesKey("needs_look_popup")
         val BACKUP_REMINDER = booleanPreferencesKey("backup_reminder")
+        val PRICE_RISES_SEEN = stringSetPreferencesKey("price_rises_seen")
     }
 
     /** Defaults chosen so a fresh install is immediately usable and private. */
@@ -196,6 +197,7 @@ class SettingsRepository @Inject constructor(
             progressPopup = prefs[Keys.PROGRESS_POPUP] ?: true,
             needsLookPopup = prefs[Keys.NEEDS_LOOK_POPUP] ?: true,
             backupReminder = prefs[Keys.BACKUP_REMINDER] ?: true,
+            priceRisesSeen = prefs[Keys.PRICE_RISES_SEEN].orEmpty(),
             liveAlertLog = LiveAlertLogEntry.parse(prefs[Keys.LIVE_ALERT_LOG]),
             subscriptionPlans = com.rhys.financetracker.data.importer.SubscriptionPlan.parse(prefs[Keys.SUBSCRIPTION_PLANS]),
             progressReports = com.rhys.financetracker.domain.report.ProgressReportCodec.read(prefs[Keys.PROGRESS_REPORTS]),
@@ -414,6 +416,11 @@ class SettingsRepository @Inject constructor(
 
     suspend fun setBackupReminder(on: Boolean) = put(Keys.BACKUP_REMINDER, on)
 
+    /** A price rise seen, so Needs a look stops saying so. */
+    suspend fun markPriceRiseSeen(key: String) {
+        context.dataStore.edit { it[Keys.PRICE_RISES_SEEN] = it[Keys.PRICE_RISES_SEEN].orEmpty() + key }
+    }
+
     /** Hides the Get set up checklist on Home for good. */
     suspend fun hideSetupChecklist() = put(Keys.SETUP_HIDDEN, true)
 
@@ -568,6 +575,8 @@ data class AppSettings(
     val needsLookPopup: Boolean = true,
     /** The reminder to back up, when nothing has been backed up for a while. */
     val backupReminder: Boolean = true,
+    /** Price rises already noted, as "subscription key:new amount". */
+    val priceRisesSeen: Set<String> = emptySet(),
     /** What the alert reader heard lately from banking apps and what came of it, newest first. */
     val liveAlertLog: List<LiveAlertLogEntry> = emptyList(),
     /** When each subscription started, how long it runs or that it was cancelled, by its key. */

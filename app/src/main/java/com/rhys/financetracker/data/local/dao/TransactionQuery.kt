@@ -78,6 +78,15 @@ enum class TransactionSort(val displayName: String, internal val orderBy: String
  */
 object TransactionQuery {
 
+    /**
+     * The amount [text] is, in pence, when it's only an amount — "12.50",
+     * "£1,250", "7" — so a search for it finds payments of that amount.
+     */
+    fun amountIn(text: String): Long? =
+        text.trim().takeIf { AMOUNT.matches(it) }?.let { com.rhys.financetracker.core.money.Money.parseOrNull(it) }
+
+    private val AMOUNT = Regex("""£?\s*\d{1,3}(,?\d{3})*(\.\d{1,2})?""")
+
     fun build(filter: TransactionFilter): SupportSQLiteQuery {
         val conditions = mutableListOf<String>()
         val args = mutableListOf<Any>()
@@ -88,15 +97,18 @@ object TransactionQuery {
 
         filter.text?.trim()?.takeIf { it.isNotEmpty() }?.let { text ->
             val pattern = "%$text%"
+            // "12.50" or "£12.50" finds payments of that amount too.
+            val amount = amountIn(text)
             conditions += """
                 (t.description LIKE ? COLLATE NOCASE
                  OR IFNULL(t.notes, '') LIKE ? COLLATE NOCASE
                  OR IFNULL(t.tags, '') LIKE ? COLLATE NOCASE
                  OR IFNULL(a.name, '') LIKE ? COLLATE NOCASE
                  OR IFNULL(c.name, '') LIKE ? COLLATE NOCASE
-                 OR IFNULL(p.name, '') LIKE ? COLLATE NOCASE)
-            """.trimIndent()
+                 OR IFNULL(p.name, '') LIKE ? COLLATE NOCASE
+            """.trimIndent() + if (amount != null) "\n OR t.amount_minor = ?)" else ")"
             repeat(6) { args += pattern }
+            amount?.let { args += it }
         }
 
         filter.dateFrom?.let {

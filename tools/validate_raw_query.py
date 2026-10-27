@@ -41,6 +41,8 @@ conditions = [
     "(a.is_shared = 1 OR IFNULL(p.is_shared, 0) = 1)",
     f"t.type IN ({ph})",
     "t.amount_minor >= ?", "t.amount_minor <= ?",
+    # A search that is only an amount also matches it exactly.
+    "(t.description LIKE ? COLLATE NOCASE OR t.amount_minor = ?)",
     "t.savings_goal_id = ?", "t.recurring_rule_id = ?",
     "t.is_confirmed = 0", "t.is_cleared = 0",
 ]

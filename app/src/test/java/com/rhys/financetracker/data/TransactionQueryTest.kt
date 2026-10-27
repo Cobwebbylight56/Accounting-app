@@ -99,4 +99,17 @@ class TransactionQueryTest {
         assertFalse(filter.isEmpty)
         assertEquals(3, filter.activeFilterCount)
     }
+
+    @Test
+    fun `a search that is only an amount finds that amount too`() {
+        assertEquals(1250L, TransactionQuery.amountIn("12.50"))
+        assertEquals(1250L, TransactionQuery.amountIn("£12.50"))
+        assertEquals(125000L, TransactionQuery.amountIn("1,250"))
+        assertEquals(700L, TransactionQuery.amountIn("7"))
+        assertEquals(null, TransactionQuery.amountIn("tesco"))
+        assertEquals(null, TransactionQuery.amountIn("12.5.0"))
+        val query = TransactionQuery.build(TransactionFilter(text = "12.50"))
+        assertTrue(query.sql.contains("t.amount_minor = ?"))
+        assertFalse(TransactionQuery.build(TransactionFilter(text = "tesco")).sql.contains("t.amount_minor = ?"))
+    }
 }

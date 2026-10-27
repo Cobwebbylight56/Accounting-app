@@ -297,6 +297,20 @@ class VisionShotsTest {
                 trailing = { com.rhys.financetracker.ui.components.NewMark() },
             )
         }
+        com.rhys.financetracker.ui.components.TipCardContent(book.first { it.id == "spending-groups" }, onGotIt = {}, onTipsOff = {})
+        SectionCard(title = "Where it went", subtitle = "Tap one to see its payments") {
+            com.rhys.financetracker.ui.components.GroupToggle(grouped = true, onChange = {})
+            com.rhys.financetracker.ui.components.CategoryBreakdown(
+                totals = listOf(
+                    com.rhys.financetracker.data.local.projection.CategoryTotal(1, "Food", "#F57C00", 612_40, 41),
+                    com.rhys.financetracker.data.local.projection.CategoryTotal(2, "Transport", "#C2185B", 284_10, 12),
+                    com.rhys.financetracker.data.local.projection.CategoryTotal(3, "Shopping", "#00695C", 198_75, 9),
+                    com.rhys.financetracker.data.local.projection.CategoryTotal(4, "Money", "#546E7A", 64_00, 3),
+                ),
+                view = com.rhys.financetracker.ui.components.BreakdownView.BARS,
+                onOpen = {},
+            )
+        }
         com.rhys.financetracker.ui.components.AmountField(
             label = "Balance (owed is a minus)",
             value = "-250.00",

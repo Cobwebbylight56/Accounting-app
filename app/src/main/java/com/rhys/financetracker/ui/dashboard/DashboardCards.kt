@@ -889,7 +889,10 @@ private fun GoalProgressRow(goal: SavingsGoalWithProgress) {
 internal fun SpendingByCategoryCard(
     state: DashboardState,
     onCategoryClick: (Long?, String, String?) -> Unit,
+    categoryList: List<com.rhys.financetracker.data.local.entity.CategoryEntity> = emptyList(),
+    onGroupClick: (Long, String, String?, Set<Long>) -> Unit = { _, _, _, _ -> },
 ) {
+    var grouped by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(true) }
     val (view, setView) = com.rhys.financetracker.ui.components.rememberCardView(
         "home_spending",
         com.rhys.financetracker.ui.components.BreakdownView.CHART,
@@ -905,11 +908,21 @@ internal fun SpendingByCategoryCard(
             )
         },
     ) {
+        val rollUp = com.rhys.financetracker.domain.report.CategoryRollUp
+        val canGroup = rollUp.anyGrouped(state.spendingByCategory, categoryList)
+        val showGrouped = grouped && canGroup
+        if (canGroup) com.rhys.financetracker.ui.components.GroupToggle(grouped, onChange = { grouped = it })
         com.rhys.financetracker.ui.components.CategoryBreakdown(
-            totals = state.spendingByCategory,
+            totals = if (showGrouped) rollUp.byGroup(state.spendingByCategory, categoryList) else state.spendingByCategory,
             view = view,
             onOpen = { entry ->
-                onCategoryClick(entry.categoryId, entry.categoryName ?: "Uncategorised", entry.categoryColor)
+                val group = entry.categoryId
+                val name = entry.categoryName ?: "Uncategorised"
+                if (showGrouped && group != null) {
+                    onGroupClick(group, name, entry.categoryColor, rollUp.members(group, categoryList))
+                } else {
+                    onCategoryClick(entry.categoryId, name, entry.categoryColor)
+                }
             },
         )
     }

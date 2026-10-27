@@ -25,6 +25,7 @@ import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.FactCheck
 import androidx.compose.material.icons.outlined.Subscriptions
+import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -48,6 +49,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import com.rhys.financetracker.core.money.Money
 import com.rhys.financetracker.core.time.DateUtils
 import com.rhys.financetracker.data.importer.SubscriptionTracker
 import com.rhys.financetracker.data.local.dao.TransactionDao
@@ -86,8 +88,10 @@ data class InboxItem(
     val accountId: Long? = null,
     /** The months a missing statement is for. */
     val months: List<java.time.YearMonth> = emptyList(),
+    /** For a price rise: "subscription key:new amount", to say it's been seen. */
+    val riseKey: String? = null,
 ) {
-    enum class Kind { RESORTED, UNSORTED, TO_CHECK, OLD_ALERTS, MISSING_STATEMENT, SUBSCRIPTION_MISSED, BACKUP }
+    enum class Kind { RESORTED, UNSORTED, TO_CHECK, OLD_ALERTS, MISSING_STATEMENT, SUBSCRIPTION_MISSED, PRICE_RISE, BACKUP }
 }
 
 /** Where an inbox item's action goes; the screen hands these to navigation. */
@@ -117,12 +121,12 @@ class InboxViewModel @Inject constructor(
     private val billFinder: BillFinderRepository,
 ) : ViewModel() {
 
-    private val missedSubscriptions = MutableStateFlow<List<SubscriptionTracker.Subscription>>(emptyList())
+    /** Regular payments found in the statements: for ones that stopped, and ones that went up. */
+    private val subscriptions = MutableStateFlow<List<SubscriptionTracker.Subscription>>(emptyList())
 
     init {
         viewModelScope.launch {
-            missedSubscriptions.value = runCatching { billFinder.subscriptions() }.getOrDefault(emptyList())
-                .filter { it.status == SubscriptionTracker.Status.MISSED }
+            subscriptions.value = runCatching { billFinder.subscriptions() }.getOrDefault(emptyList())
         }
     }
 
@@ -159,8 +163,14 @@ class InboxViewModel @Inject constructor(
         accountRepository.observeWithBalances(),
         counts,
         missingStatements,
-        missedSubscriptions,
-    ) { settings, balances, (unsorted, toCheck, oldAlerts), missing, missed ->
+        subscriptions,
+    ) { settings, balances, (unsorted, toCheck, oldAlerts), missing, regular ->
+        val missed = regular.filter { it.status == SubscriptionTracker.Status.MISSED }
+        // Gone up lately, and not yet said OK to.
+        val risen = regular.filter { sub ->
+            sub.status == SubscriptionTracker.Status.ACTIVE && sub.raisedFrom != null &&
+                "${sub.key}:${sub.amountMinor}" !in settings.priceRisesSeen
+        }
         buildList {
             ResortNote.decode(settings.lastResortSummary)?.let { note ->
                 add(
@@ -231,6 +241,21 @@ class InboxViewModel @Inject constructor(
                     ),
                 )
             }
+            risen.forEach { sub ->
+                val was = sub.raisedFrom ?: return@forEach
+                add(
+                    InboxItem(
+                        InboxItem.Kind.PRICE_RISE,
+                        title = "${sub.name} went up to ${Money.format(sub.amountMinor)}",
+                        detail = "It was ${Money.format(was)}" +
+                            (sub.riseYearlyMinor?.let { " — ${Money.format(it)} more a year" } ?: "") +
+                            ". Still worth it? Cancelling or switching is often easiest now.",
+                        action = "See",
+                        secondAction = "OK",
+                        riseKey = "${sub.key}:${sub.amountMinor}",
+                    ),
+                )
+            }
             val now = System.currentTimeMillis()
             val backupDue = settings.backupReminder && balances.isNotEmpty() && !settings.autoBackupEnabled &&
                 (settings.lastBackupAt == null || now - settings.lastBackupAt > BACKUP_AFTER_MS) &&
@@ -260,6 +285,11 @@ class InboxViewModel @Inject constructor(
             InboxItem.Kind.OLD_ALERTS -> routes.importStatement()
             InboxItem.Kind.MISSING_STATEMENT -> item.accountId?.let(routes.openAccount)
             InboxItem.Kind.SUBSCRIPTION_MISSED -> routes.openBills()
+            // Seen once looked at: it isn't news any more.
+            InboxItem.Kind.PRICE_RISE -> {
+                item.riseKey?.let { key -> viewModelScope.launch { settingsRepository.markPriceRiseSeen(key) } }
+                routes.openBills()
+            }
             InboxItem.Kind.BACKUP -> routes.openBackup()
         }
     }
@@ -286,6 +316,9 @@ class InboxViewModel @Inject constructor(
                 val id = item.accountId ?: return@launch
                 settingsRepository.markStatementGapsOk(item.months.map { StatementGaps.key(id, it) })
             }
+            InboxItem.Kind.PRICE_RISE -> viewModelScope.launch {
+                item.riseKey?.let { settingsRepository.markPriceRiseSeen(it) }
+            }
             else -> Unit
         }
     }
@@ -308,6 +341,7 @@ private fun iconFor(kind: InboxItem.Kind): ImageVector = when (kind) {
     InboxItem.Kind.OLD_ALERTS -> Icons.Outlined.Bolt
     InboxItem.Kind.MISSING_STATEMENT -> Icons.Outlined.CalendarMonth
     InboxItem.Kind.SUBSCRIPTION_MISSED -> Icons.Outlined.Subscriptions
+    InboxItem.Kind.PRICE_RISE -> Icons.AutoMirrored.Outlined.TrendingUp
     InboxItem.Kind.BACKUP -> Icons.Outlined.Backup
 }
 
