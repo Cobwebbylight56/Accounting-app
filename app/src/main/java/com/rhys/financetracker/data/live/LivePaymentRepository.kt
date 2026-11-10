@@ -142,14 +142,18 @@ class LivePaymentRepository @Inject constructor(
         if (transactionDao.countWithHash(hash) > 0) return Outcome.ALREADY_ADDED
 
         val accounts = accountDao.getAllActive()
-        val accountId = chooseAccount(app, bank, tapApp, alert.ending, settings, accounts) ?: return Outcome.NO_ACCOUNT
+        // The card a wallet names — "Zopa Credit Card" — is the surest sign
+        // of whose it is, short of the bank's own alert.
+        val byCard = alert.card?.let { BankApps.pickByCard(it, optionsOf(accounts)) }
+        val accountId = chooseAccount(app, bank, tapApp, alert.ending, settings, accounts, alert.card) ?: return Outcome.NO_ACCOUNT
         // Learn the card, so a Google Wallet tap on it finds this account. The
-        // bank's own alert knows the account; a wallet's is only a first guess.
+        // bank's own alert knows the account, and so does a wallet that names
+        // the card. A guess is never learned: one wrong first guess filed every
+        // tap on that card, from then on, under the first current account.
         alert.ending?.let { ending ->
-            if (tapApp) {
-                settingsRepository.rememberLiveCard(ending, accountId)
-            } else {
-                settingsRepository.setLiveCardAccount(ending, accountId)
+            when {
+                !tapApp -> settingsRepository.setLiveCardAccount(ending, accountId)
+                byCard != null -> settingsRepository.setLiveCardAccount(ending, byCard)
             }
         }
 
@@ -193,7 +197,9 @@ class LivePaymentRepository @Inject constructor(
         // Money paid to a mortgage, loan, card or pay-later plan — an
         // overpayment, a Klarna instalment — is a move into it: it comes off
         // what is owed, and is not spending.
-        val paidOff = if (alert.type == TransactionType.EXPENSE) {
+        // Never from a wallet: a tap is buying something with the card, even
+        // when the card is a Zopa or a Capital One.
+        val paidOff = if (alert.type == TransactionType.EXPENSE && !tapApp && alert.card == null) {
             BankApps.pickBorrowing(
                 kind = alert.toBorrowing,
                 payee = alert.payee,
@@ -328,24 +334,35 @@ class LivePaymentRepository @Inject constructor(
         ending: String?,
         settings: AppSettings,
         accounts: List<AccountEntity>,
+        card: String? = null,
     ): Long? {
         fun valid(id: Long?) = id?.takeIf { wanted -> accounts.any { it.id == wanted } }
+        val options = optionsOf(accounts)
         val forApp = valid(settings.liveAlertAccounts[app])
         val forCard = valid(ending?.let { settings.liveCardAccounts[it] })
+        if (tapApp && card != null) {
+            // What was learned for the card stands while its name fits that
+            // account — it may be the user's own choice. One that doesn't fit
+            // was a guess, and the card's name puts it right.
+            val learnedFits = forCard?.let { id -> options.firstOrNull { it.id == id }?.let { BankApps.cardFits(card, it) } } == true
+            if (!learnedFits) BankApps.pickByCard(card, options)?.let { return it }
+        }
         (if (tapApp) forCard ?: forApp else forApp ?: forCard)?.let { return it }
         return BankApps.pickAccount(
             bank = bank.takeUnless { tapApp },
             ending = ending,
-            accounts = accounts.map { account ->
-                BankApps.AccountOption(
-                    id = account.id,
-                    name = account.name,
-                    notes = account.notes,
-                    isSpending = account.holding == Holding.SPEND,
-                    isCard = account.type == AccountType.CREDIT_CARD,
-                )
-            },
+            accounts = options,
             defaultAccountId = settings.defaultAccountId,
+        )
+    }
+
+    private fun optionsOf(accounts: List<AccountEntity>): List<BankApps.AccountOption> = accounts.map { account ->
+        BankApps.AccountOption(
+            id = account.id,
+            name = account.name,
+            notes = account.notes,
+            isSpending = account.holding == Holding.SPEND,
+            isCard = account.type == AccountType.CREDIT_CARD,
         )
     }
 

@@ -60,12 +60,15 @@ internal fun LeftOverSheet(
                     Text("Biggest payments counted as spending", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     Text(
                         "A move between your own accounts, or paying off a card, isn't spending: tap it and change it " +
-                            "to a transfer. Something bought once — a car, say — tap One-off and it's left out.",
+                            "to a transfer. Something bought once — a car, say — tap One-off and it's left out. " +
+                            "Regular bills are marked Regular.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     explained.biggest.forEach { payment ->
-                        PaymentRow(payment, action = "One-off", onOpen = onOpenPayment) { onOneOff(payment.transaction.id, true) }
+                        // A regular bill is never a one-off: it just says so.
+                        val action = if (payment.transaction.id in explained.regularIds) null else "One-off"
+                        PaymentRow(payment, action = action, onOpen = onOpenPayment) { onOneOff(payment.transaction.id, true) }
                     }
                 }
                 if (explained.oneOffs.isNotEmpty()) {
@@ -90,7 +93,8 @@ internal fun LeftOverSheet(
 @Composable
 private fun PaymentRow(
     payment: com.rhys.financetracker.data.local.projection.TransactionWithDetails,
-    action: String,
+    /** The button beside the amount; null for a regular bill, which is labelled instead. */
+    action: String?,
     onOpen: (Long) -> Unit,
     onAction: () -> Unit,
 ) {
@@ -126,11 +130,20 @@ private fun PaymentRow(
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
             )
-            TextButton(
-                onClick = onAction,
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                modifier = Modifier.heightIn(min = 32.dp),
-            ) { Text(action, style = MaterialTheme.typography.labelMedium) }
+            if (action != null) {
+                TextButton(
+                    onClick = onAction,
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                    modifier = Modifier.heightIn(min = 32.dp),
+                ) { Text(action, style = MaterialTheme.typography.labelMedium) }
+            } else {
+                Text(
+                    "Regular",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                )
+            }
         }
     }
 }

@@ -28,6 +28,23 @@ added in a later update is always pointed out once.
 Pop-ups only open once each time the app starts, and never on top of each
 other.
 
+## Ask Claude
+
+**More → Ask Claude** puts the month in a few plain lines — money in, spent,
+left over, saved, spending by category, the biggest payments and where things
+stand — and shares it with the Claude app, starting with a question: what
+stands out, where could you cut back, and what's worth trying next month.
+Choose **This month so far** or **Last month**.
+
+You see exactly what's shared before anything leaves the phone. It's totals,
+categories and who payments went to — never an account number, sort code or
+card number — and you can change it in Claude before sending. **Copy instead**
+puts it on the clipboard to paste anywhere. Without the Claude app, the share
+sheet opens to choose where it goes.
+
+Claude's own personal finance feature, which links straight to your bank, is
+only in the US for now; this works anywhere, with no link to your bank.
+
 ## After an update
 
 The first time you open the app after an update, a note says which version
@@ -364,7 +381,9 @@ the biggest payments counted as spending. If one isn't spending — a move to
 your own saver, paying off a card — tap it and change it to a transfer, and
 the figure comes right. If it's something bought once, like a car, tap
 **One-off** beside it: it moves down to **Left out as one-offs**, and the
-figure is worked out without it. **Count it** puts it back.
+figure is worked out without it. **Count it** puts it back. A regular bill —
+paid by direct debit or standing order, or paid in more than one month — says
+**Regular** instead, since a bill is never a one-off.
 
 A bank payment that names one of your cards or loans ("CAPITAL ONE", "CAR
 FINANCE") is a move to it, not spending: the card's own spending is already
@@ -552,6 +571,17 @@ names and post gets forwarded, so two matches means it asks rather than guesses.
 
 Matching is on the **surname plus a first initial**, because statements almost
 never print a full first name.
+
+**The account number settles it.** A joint statement is addressed to one of
+you too, so the name alone can't tell the joint account from your own. Each
+statement's sort code and account number — or a card statement's last four
+digits — is remembered against the account it went to, and the next statement
+from that account goes there by itself. If one came from an account number
+that went somewhere else before, the import card says so, with **Put it
+there**. The bank named at the top ("Nationwide", "Lloyds") narrows the choice
+too, and with more than one account to choose from the app asks rather than
+picking the first. A statement filed in the wrong place before can be taken
+back out from the account's page and brought in again.
 
 ### Importing from a person's page
 
@@ -973,7 +1003,10 @@ never comes. If both arrive, it is added once. Wallet only says which card was
 used, so the app learns which account each card belongs to from your bank's
 alerts — see **Your cards** on the Live payments page, where you can set or
 change the account for each card. And if Wallet's alert came first and went to
-the wrong account, your bank's alert moves it to the right one.
+the wrong account, your bank's alert moves it to the right one. Wallet names
+the card too — "with Zopa Credit Card ••1486" — and the tap goes on the
+account whose name matches it, so a credit card tap goes on the card, never as
+paying it off. Taps older versions filed wrong are moved when Home opens.
 
 **Told by two apps at once.** Alerts are read one at a time, so Wallet's and
 your card app's alert for the same tap — often a second apart — are added
@@ -1310,11 +1343,19 @@ card.
 entry already in the app and puts it in the right place by today's rules, so
 you don't have to move things by hand:
 
+* card payments go on the card they were paid with — a Google Wallet tap on
+  the Zopa card goes on the Zopa card, not the current account;
+* mistakes older versions made — a payment added twice, a card payment on the
+  wrong account — are put right;
 * pay rises whose date has come are applied;
 * money in and out of savers is filed as savings;
-* payments that name another of your accounts become moves to it — the saver
-  goes up, the loan or card comes down (unless that account's own statement
-  already has the same movement, so nothing is counted twice);
+* payments that name another of your accounts — by its name, or by the sort
+  code and account number of a statement you've brought in ("Transfer to
+  070806 …") — become moves to it: the saver goes up, the loan or card comes
+  down (unless that account's own statement already has the same movement, so
+  nothing is counted twice);
+* money between the two of you by name — "EVANS RHYS" — is filed under
+  Transfers & payments, a move rather than spending;
 * unsorted payments and "Card spending" get a category from what you've filed
   before, then from the app's list of shops, websites and outings;
 * payments the app filed by itself follow how **you** filed the same payee —
@@ -1324,7 +1365,7 @@ you don't have to move things by hand:
 * paid-off loans are put away.
 
 Anything you filed yourself is left alone. It finishes with how many entries
-and accounts it checked, what it changed and
+and accounts it checked, only what it changed, and
 how many payments it couldn't place, with **Sort the rest** to file those by
 payee. Run it again any time — after importing old statements, or after
 teaching it a few payees.

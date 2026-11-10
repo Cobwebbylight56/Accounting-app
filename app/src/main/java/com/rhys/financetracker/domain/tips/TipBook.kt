@@ -44,6 +44,18 @@ object TipBook {
             newIn = "2.4.0",
         ),
         Tip(
+            "ask-claude", TipPlace.HOME, "Ask Claude about your month",
+            "More → Ask Claude shares a summary of the month with the Claude app, to ask what stands out. You see " +
+                "exactly what's shared first.",
+            newIn = "2.7.0",
+        ),
+        Tip(
+            "home-sort-everything", TipPlace.HOME, "Sort everything, reworked",
+            "Card payments go on the card they were paid with, and money between the two of you is a move, not " +
+                "spending. Run it from Needs a look → Sort everything again.",
+            newIn = "2.7.0",
+        ),
+        Tip(
             "home-add", TipPlace.HOME, "Add anything with +",
             "The + at the bottom adds a payment, scans a receipt, imports a statement or moves money between accounts.",
         ),

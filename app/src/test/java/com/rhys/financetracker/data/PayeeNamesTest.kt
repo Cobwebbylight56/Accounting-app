@@ -48,4 +48,26 @@ class PayeeNamesTest {
         // "Credit card" in a name is not money in.
         org.junit.Assert.assertFalse(PayeeNames.readsLikeMoneyIn("CREDITON GARAGE"))
     }
+
+    @Test
+    fun `money to one of the household by name is told however the bank writes it`() {
+        val household = listOf("Sam Jones", "Alex", "MR S T JONES")
+        assertTrue(PayeeNames.isOnlyName("JONES SAM", household))
+        assertTrue(PayeeNames.isOnlyName("S T JONES", household))
+        assertTrue(PayeeNames.isOnlyName("Faster payment to Sam Jones ref 1234", household))
+        // A one-word name takes the household's surname.
+        assertTrue(PayeeNames.isOnlyName("ALEX JONES", household))
+        assertTrue(PayeeNames.isOnlyName("A JONES", household))
+    }
+
+    @Test
+    fun `a business or somebody else with the surname is not the household`() {
+        val household = listOf("Sam Jones", "Alex")
+        org.junit.Assert.assertFalse(PayeeNames.isOnlyName("JONES GARAGE", household))
+        org.junit.Assert.assertFalse(PayeeNames.isOnlyName("S JONES LTD", household))
+        org.junit.Assert.assertFalse(PayeeNames.isOnlyName("P JONES", household))
+        org.junit.Assert.assertFalse(PayeeNames.isOnlyName("JONES", household))
+        org.junit.Assert.assertFalse(PayeeNames.isOnlyName("Transfer to 070806 21646684", household))
+        org.junit.Assert.assertFalse(PayeeNames.isOnlyName("SAM SMITH", household))
+    }
 }

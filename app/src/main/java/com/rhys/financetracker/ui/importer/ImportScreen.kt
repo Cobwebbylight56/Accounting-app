@@ -459,13 +459,18 @@ private fun DetectedStatementCard(state: ImportState, viewModel: ImportViewModel
     val whom = state.filingFor
     val ofThisKind = allAccounts.filter { found == null || it.holding == found.kind.holding }
     val theirsOfKind = ofThisKind.filter { whom == null || it.personName == whom }
+    val preselected = allAccounts.firstOrNull { it.id == state.preselectedAccountId }
+    // The account picked for it is always offered, even when it's someone
+    // else's — the joint account for a statement addressed to Rhys, say.
     val accounts = when {
         showEveryAccount -> allAccounts
-        else -> theirsOfKind
+        else -> (theirsOfKind + listOfNotNull(preselected)).distinct()
     }
-    val preselected = allAccounts.firstOrNull { it.id == state.preselectedAccountId }
+    // Never a guess: with several to choose from and nothing to go on, none
+    // is ticked — the first in the list was how statements landed on the
+    // wrong account without anyone deciding it.
     var chosen by remember(accounts, preselected) {
-        mutableStateOf(preselected?.takeIf { it in accounts } ?: accounts.firstOrNull())
+        mutableStateOf(preselected?.takeIf { it in accounts } ?: accounts.singleOrNull())
     }
 
     SectionCard(
@@ -523,6 +528,16 @@ private fun DetectedStatementCard(state: ImportState, viewModel: ImportViewModel
                 )
             }
         }
+        // Opened from one account, but statements with these numbers went to another.
+        allAccounts.firstOrNull { it.id == state.statementWentTo }?.let { before ->
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "Statements with this account number went to ${allAccounts.labelFor(before)} before.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
+            TextButton(onClick = { viewModel.preselectAccount(before.id) }) { Text("Put it there") }
+        }
         Spacer(Modifier.height(12.dp))
         // Whose, then which: the accounts under each person's name.
         if (accounts.isNotEmpty()) {
@@ -556,6 +571,15 @@ private fun DetectedStatementCard(state: ImportState, viewModel: ImportViewModel
             )
         }
         Spacer(Modifier.height(14.dp))
+        if (chosen == null && accounts.size > 1) {
+            Text(
+                text = "Tap the account this statement is for — it couldn't be told from the statement. " +
+                    "Next time one with the same account number goes there by itself.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+        }
         Button(
             onClick = { viewModel.useDetectedStatement(chosen) },
             // Not while it is still unsettled whose statement this is.

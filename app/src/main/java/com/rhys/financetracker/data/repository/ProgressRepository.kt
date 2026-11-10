@@ -91,6 +91,54 @@ class ProgressRepository @Inject constructor(
             .filter { scope.personId == null || (it.personId == scope.personId && !it.isShared) }
             .sumOf { -accountRepository.balanceAsOf(it.id, day) }
 
+    /**
+     * The month in a few plain lines to share with the Claude app: last
+     * month, or with [soFar] this month up to [today], for the whole
+     * household, against the same stretch of the month before.
+     */
+    suspend fun claudeSummary(soFar: Boolean, today: LocalDate = DateUtils.today()): String {
+        val month = if (soFar) java.time.YearMonth.from(today) else java.time.YearMonth.from(today).minusMonths(1)
+        val previous = month.minusMonths(1)
+        val now = if (soFar) month.atDay(1)..today else month.atDay(1)..month.atEndOfMonth()
+        val before = if (soFar) {
+            previous.atDay(1)..previous.atDay(minOf(today.dayOfMonth, previous.lengthOfMonth()))
+        } else {
+            previous.atDay(1)..previous.atEndOfMonth()
+        }
+        val everyone = Scope(OVERALL, "all", null, null)
+        val biggest = transactionRepository.searchOnce(
+            com.rhys.financetracker.data.local.dao.TransactionFilter(
+                dateFrom = now.start,
+                dateTo = now.endInclusive,
+                types = setOf(TransactionType.EXPENSE),
+                sort = com.rhys.financetracker.data.local.dao.TransactionSort.AMOUNT_DESC,
+                limit = BIGGEST_LOOKED_AT,
+            ),
+        ).filter {
+            it.categoryKind != CategoryKind.SAVING && it.categoryKind != CategoryKind.TRANSFER && !it.transaction.isOneOff
+        }.take(BIGGEST_SHARED).map { row ->
+            val description = row.transaction.description
+            com.rhys.financetracker.data.importer.PayeeNames.of(description).ifBlank { description.trim() } to
+                row.transaction.amountMinor
+        }
+        val accounts = accountRepository.getAll().filter { !it.isArchived }
+        val name = "${month.month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.UK)} ${month.year}"
+        val beforeName = previous.month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.UK)
+        return com.rhys.financetracker.domain.report.MoneySummary.text(
+            com.rhys.financetracker.domain.report.MoneySummary.Input(
+                periodName = if (soFar) "$name so far" else name,
+                figures = figures(now, everyone),
+                before = figures(before, everyone),
+                beforeName = if (soFar) "the same days of $beforeName" else "$beforeName ${previous.year}",
+                biggest = biggest,
+                owedNowMinor = accounts.filter { it.holding == Holding.OWED }.sumOf { -accountRepository.balanceAsOf(it.id, today) },
+                savedNowMinor = accounts.filter { it.holding == Holding.SET_ASIDE }.sumOf { accountRepository.balanceAsOf(it.id, today) },
+                availableNowMinor = accounts.filter { it.holding == Holding.SPEND }.sumOf { accountRepository.balanceAsOf(it.id, today) },
+                people = peopleRepository.activePeople().count { !it.isShared },
+            ),
+        )
+    }
+
     private data class Scope(val label: String, val key: String, val personIds: Set<Long>?, val personId: Long?)
 
     private companion object {
@@ -99,5 +147,9 @@ class ProgressRepository @Inject constructor(
 
         /** A stretch counts as in once there are payments from its last few days. */
         const val IN_BY_DAYS = 3L
+
+        /** Payments looked through for the biggest, and how many of those are shared. */
+        const val BIGGEST_LOOKED_AT = 40
+        const val BIGGEST_SHARED = 8
     }
 }

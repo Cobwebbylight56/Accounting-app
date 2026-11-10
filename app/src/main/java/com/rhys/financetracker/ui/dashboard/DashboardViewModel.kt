@@ -401,7 +401,7 @@ class DashboardViewModel @Inject constructor(
                     ).first(),
                 )
             }
-            val biggest = transactionRepository.searchOnce(
+            val looked = transactionRepository.searchOnce(
                 com.rhys.financetracker.data.local.dao.TransactionFilter(
                     dateFrom = from.atDay(1),
                     dateTo = last.atEndOfMonth(),
@@ -411,13 +411,16 @@ class DashboardViewModel @Inject constructor(
                     sort = com.rhys.financetracker.data.local.dao.TransactionSort.AMOUNT_DESC,
                     limit = BIGGEST_LOOKED_AT,
                 ),
-            ).filter {
+            )
+            val biggest = looked.filter {
                 it.categoryKind != CategoryKind.SAVING && it.categoryKind != CategoryKind.TRANSFER && !it.transaction.isOneOff
             }.take(BIGGEST_SHOWN)
             val oneOffs = transactionRepository.oneOffs(
                 from.atDay(1), last.atEndOfMonth(), currentScope.accountId, currentScope.personIds,
             )
-            leftOverOpen.value = com.rhys.financetracker.domain.report.LeftOverExplained(months, biggest, oneOffs)
+            leftOverOpen.value = com.rhys.financetracker.domain.report.LeftOverExplained(
+                months, biggest, oneOffs, regularIds = com.rhys.financetracker.domain.report.RegularPayments.among(looked),
+            )
         }
     }
 

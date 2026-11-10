@@ -15,7 +15,9 @@ class TipBookTest {
     fun `what's new comes before everyday tips, one at a time`() {
         assertEquals("home-tips", TipBook.next(TipPlace.HOME, emptySet(), tipsOn = true, newOffAt = null)?.id)
         assertEquals("home-left-over", TipBook.next(TipPlace.HOME, setOf("home-tips"), tipsOn = true, newOffAt = null)?.id)
-        assertEquals("home-add", TipBook.next(TipPlace.HOME, setOf("home-tips", "home-left-over"), tipsOn = true, newOffAt = null)?.id)
+        assertEquals("ask-claude", TipBook.next(TipPlace.HOME, setOf("home-tips", "home-left-over"), tipsOn = true, newOffAt = null)?.id)
+        val newOnes = setOf("home-tips", "home-left-over", "ask-claude", "home-sort-everything")
+        assertEquals("home-add", TipBook.next(TipPlace.HOME, newOnes, tipsOn = true, newOffAt = null)?.id)
     }
 
     @Test

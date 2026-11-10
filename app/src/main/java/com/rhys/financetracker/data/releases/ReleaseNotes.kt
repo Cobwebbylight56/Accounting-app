@@ -22,6 +22,16 @@ object ReleaseNotes {
     /** Every release, newest first. */
     val ALL: List<Release> = listOf(
         Release(
+            "2.7.0", LocalDate.of(2026, 11, 10), "Card payments on their card, statements where they belong",
+            listOf(
+                "Fixed: a Google Wallet tap — \"£31.38 with Zopa Credit Card ••1486\" — took the card's name for the shop, put the tap on the first current account, and with a Zopa or Capital One card called it paying the card off. Taps now go on the card they were paid with, and older ones are moved there when Home opens.",
+                "Fixed: statements went to whoever they were addressed to, so a joint Nationwide statement addressed to one of you could go to that person's Lloyds account. Each statement's sort code and account number, or card number, is now remembered against the account it went to, and the next one from that account goes there by itself. The bank named at the top is used too, and with more than one account to choose from the app asks rather than picking the first.",
+                "Fixed: \"One-off\" was offered beside regular bills like the energy and the TV licence. A bill paid by direct debit or standing order, or paid in more than one month, now says Regular instead.",
+                "Sort everything has been reworked: card payments go on their card, older mistakes are put right, money between the two of you — \"EVANS RHYS\" — is a move rather than spending, and a payment naming the sort code and account number of a statement you've brought in becomes a move to that account. The results list only what changed.",
+                "New: Ask Claude, under More, shares a summary of the month with the Claude app to ask what stands out and where you could cut back. You see exactly what's shared first — totals, categories and payees, never an account or card number.",
+            ),
+        ),
+        Release(
             "2.6.0", LocalDate.of(2026, 10, 27), "Spending by group, and price rises",
             listOf(
                 "\"Where it went\" on Spending, and Spending by category on Home, show your spending by group — Food, Transport, Shopping — each with everything in it, so the picture is clear at a glance. Tap a group to see all its payments, or Every category to see them all apart.",

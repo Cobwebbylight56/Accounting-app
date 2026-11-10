@@ -379,7 +379,12 @@ private fun NavGraphBuilder.topLevelDestinations(
             onOpenInbox = { navController.navigate(Routes.INBOX) },
             onOpenReports = { navController.navigate(Routes.REPORTS) },
             onOpenProgress = { navController.navigate(Routes.PROGRESS) },
+            onOpenAskClaude = { navController.navigate(Routes.ASK_CLAUDE) },
         )
+    }
+
+    composable(Routes.ASK_CLAUDE) {
+        com.rhys.financetracker.ui.claude.AskClaudeScreen(onBack = { navController.popBackStack() })
     }
 
     composable(Routes.PROGRESS) {

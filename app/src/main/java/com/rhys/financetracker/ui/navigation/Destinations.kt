@@ -58,6 +58,9 @@ object Routes {
 
     /** How each month went, and each half-month, against the one before. */
     const val PROGRESS = "progress"
+
+    /** A month's summary, shared with the Claude app to ask about. */
+    const val ASK_CLAUDE = "ask-claude"
     const val IMPORT = "import"
 
     /** Subscriptions and regular payments, and whether each is still being paid. */

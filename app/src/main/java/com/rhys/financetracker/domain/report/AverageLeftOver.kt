@@ -43,6 +43,8 @@ data class LeftOverExplained(
     val biggest: List<com.rhys.financetracker.data.local.projection.TransactionWithDetails>,
     /** Payments marked one-off in those months: left out of every figure above. */
     val oneOffs: List<com.rhys.financetracker.data.local.projection.TransactionWithDetails> = emptyList(),
+    /** Of [biggest], the regular bills: no "One-off" is offered for them. */
+    val regularIds: Set<Long> = emptySet(),
 ) {
     val averageMinor: Long get() = if (months.isEmpty()) 0L else months.sumOf { it.leftMinor } / months.size
 }

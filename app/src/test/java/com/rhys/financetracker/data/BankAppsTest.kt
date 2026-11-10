@@ -61,4 +61,21 @@ class BankAppsBorrowingTest {
         // Klarna's own alert, already in the Klarna account, is a purchase.
         assertNull(BankApps.pickBorrowing(null, "Klarna", listOf(klarna), fromAccountId = 12))
     }
+
+    @Test
+    fun `a wallet's card name picks its account`() {
+        val accounts = listOf(
+            BankApps.AccountOption(1, "Lloyds Current Account", null, isSpending = true, isCard = false),
+            BankApps.AccountOption(2, "Zopa", null, isSpending = false, isCard = true),
+            BankApps.AccountOption(3, "Nationwide Current Account", null, isSpending = true, isCard = false),
+            BankApps.AccountOption(4, "Capital One", null, isSpending = false, isCard = true),
+        )
+        assertEquals(2L, BankApps.pickByCard("Zopa Credit Card", accounts))
+        assertEquals(3L, BankApps.pickByCard("Nationwide FlexDirect", accounts))
+        assertEquals(4L, BankApps.pickByCard("Capital One Classic", accounts))
+        assertEquals(null, BankApps.pickByCard("Credit Card", accounts))
+        assertEquals(null, BankApps.pickByCard("Barclaycard", accounts))
+        assertEquals(true, BankApps.cardFits("Zopa Credit Card", accounts[1]))
+        assertEquals(false, BankApps.cardFits("Zopa Credit Card", accounts[0]))
+    }
 }

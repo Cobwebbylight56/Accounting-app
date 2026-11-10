@@ -118,6 +118,38 @@ object BankApps {
     )
 
     /**
+     * The account a card belongs to, from the name a wallet gives it — "Zopa
+     * Credit Card" is the Zopa account, "Nationwide FlexDirect" the
+     * Nationwide one. Null when no account, or more than one, could be it.
+     */
+    fun pickByCard(card: String, accounts: List<AccountOption>): Long? {
+        val said = wordsOf(card)
+        val words = said - CARD_WORDS
+        if (words.isEmpty()) return null
+        val named = accounts.filter { option -> (wordsOf(option.name) + wordsOf(option.notes.orEmpty())).any { it in words } }
+        if (named.size <= 1) return named.singleOrNull()?.id
+        // Several: a credit card's name points at the card, anything else at day-to-day money.
+        val credit = "credit" in said
+        val kind = named.filter { if (credit) it.isCard else it.isSpending }
+        if (kind.size == 1) return kind.single().id
+        // Then the one that shares the most of the card's words.
+        val scored = named.groupBy { option -> (wordsOf(option.name) + wordsOf(option.notes.orEmpty())).count { it in words } }
+        return scored.maxByOrNull { it.key }?.value?.singleOrNull()?.id
+    }
+
+    /** Whether [card]'s name could be [option]: they share a word that isn't just "card". */
+    fun cardFits(card: String, option: AccountOption): Boolean {
+        val words = wordsOf(card) - CARD_WORDS
+        return (wordsOf(option.name) + wordsOf(option.notes.orEmpty())).any { it in words }
+    }
+
+    /** Words in a card's name that say nothing about whose card it is. */
+    private val CARD_WORDS = setOf(
+        "credit", "card", "debit", "current", "account", "visa", "mastercard", "maestro", "bank", "the", "my",
+        "classic", "platinum", "gold", "rewards", "contactless", "personal", "joint", "plus", "premier", "select",
+    )
+
+    /**
      * The account a payment from [bank] belongs in, when nothing has been
      * chosen for it: one that names the card's last four digits, then one
      * that names the bank (a card for a card company), then the default

@@ -27,7 +27,7 @@ object MerchantCategoriser {
      * app re-sorts everything it filed by itself — never anything the user
      * filed — so old payments follow the improved rules too.
      */
-    const val RULES_VERSION = 5
+    const val RULES_VERSION = 6
 
     /**
      * The category for [description], or null when nothing matches.

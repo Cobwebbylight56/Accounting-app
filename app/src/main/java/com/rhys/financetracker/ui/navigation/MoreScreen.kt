@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Assessment
 import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.AccountBalance
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.AutoFixHigh
 import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.CreditCard
@@ -53,6 +54,7 @@ fun MoreScreen(
     onOpenInbox: () -> Unit = {},
     onOpenReports: () -> Unit = {},
     onOpenProgress: () -> Unit = {},
+    onOpenAskClaude: () -> Unit = {},
 ) {
     Scaffold(
         topBar = { TopAppBar(title = { Text("More") }) },
@@ -89,6 +91,13 @@ fun MoreScreen(
                 subtitle = "Each month and halfway through: doing better, or what needs improving",
                 icon = Icons.Outlined.Insights,
                 onClick = onOpenProgress,
+            )
+            SettingsItem(
+                title = "Ask Claude",
+                subtitle = "Share a summary of the month with the Claude app and ask what it makes of it",
+                icon = Icons.Outlined.AutoAwesome,
+                trailing = { com.rhys.financetracker.ui.components.NewBadge("ask-claude") },
+                onClick = onOpenAskClaude,
             )
             SettingsItem(
                 title = "Reports & exports",

@@ -6,9 +6,11 @@ import com.rhys.financetracker.data.importer.OwnAccountMatcher
 import com.rhys.financetracker.data.importer.PayeeNames
 import com.rhys.financetracker.data.importer.Refiling
 import com.rhys.financetracker.data.importer.SpreadsheetImporter
+import com.rhys.financetracker.data.importer.StatementIdentity
 import com.rhys.financetracker.data.importer.TransactionFingerprint
 import com.rhys.financetracker.data.local.dao.AccountDao
 import com.rhys.financetracker.data.local.dao.CategoryDao
+import com.rhys.financetracker.data.local.dao.PersonDao
 import com.rhys.financetracker.data.local.dao.TransactionDao
 import com.rhys.financetracker.data.local.entity.TransactionEntity
 import com.rhys.financetracker.data.local.seed.DefaultData
@@ -58,9 +60,16 @@ data class TidyUpResult(
     val loansCleared: List<String> = emptyList(),
     /** Money out that still has no proper category. */
     val stillUnsorted: Int = 0,
+    /** Mistakes older versions made, put right: payments told twice, and the like. */
+    val putRight: Int = 0,
+    /** Payments made with a card put on that card. */
+    val cardPayments: Int = 0,
+    /** Money between the household — "EVANS RHYS" — filed as moves, not spending. */
+    val betweenYou: Int = 0,
 ) {
     val changedAnything: Boolean
-        get() = payRisesApplied + filedAsSavings + linkedToAccounts + categorised + refiled > 0 ||
+        get() = payRisesApplied + filedAsSavings + linkedToAccounts + categorised + refiled + putRight +
+            cardPayments + betweenYou > 0 ||
             loansCleared.isNotEmpty() || billsAdded.isNotEmpty()
 }
 
@@ -72,11 +81,15 @@ data class TidyUpResult(
  * after its payments, a loan payment that came in as spending — stays where
  * it landed until moved by hand. This runs the same rules over the lot:
  *
- * 1. Pay rises whose day has come are applied.
+ * 1. Pay rises whose day has come are applied, and what older versions got
+ *    wrong is put right — payments told twice, card payments filed on the
+ *    wrong account. Every payment made with a card goes on that card.
  * 2. Every movement on a saver is filed as savings.
  * 3. Payments that name another of the person's own accounts become moves to
  *    it, so the saver goes up and the loan comes down — unless the other
  *    account's own statement already has the same movement.
+ *    So do payments naming an account number a statement came from. Money
+ *    to or from one of the household by name — "EVANS RHYS" — is a move.
  * 4. Unfiled payments, and ones filed only as "Card spending", are given a
  *    category from what has been filed before, then the built-in shop list.
  * 5. Everything the app filed by itself is re-sorted: to where the user
@@ -100,19 +113,25 @@ class TidyUpRepository @Inject constructor(
     private val billFinder: BillFinderRepository,
     private val settingsRepository: com.rhys.financetracker.data.prefs.SettingsRepository,
     private val transactionRepository: TransactionRepository,
+    private val repairs: StatementRepairRepository,
+    private val personDao: PersonDao,
 ) {
 
     suspend fun sortEverything(): TidyUpResult {
         val payRises = incomeRepository.applyDue()
+        val putRight = runCatching { repairs.putRight() }.getOrDefault(0)
+        val cardPayments = repairs.putCardPaymentsOnCards(since = java.time.LocalDate.of(EARLIEST_YEAR, 1, 1))
 
         val accounts = accountDao.getAllActive()
         val filed = accounts.filter { it.holding == Holding.SET_ASIDE }
             .sumOf { accountRepository.fileAsSavings(it.id) }
 
+        val numbers = settingsRepository.settings.first().statementAccounts
         val linked = accounts.sumOf { account ->
-            linkOwnAccounts(account.id, isSaver = account.holding == Holding.SET_ASIDE)
+            linkOwnAccounts(account.id, isSaver = account.holding == Holding.SET_ASIDE, numbers = numbers)
         }
 
+        val betweenYou = moneyBetweenYou()
         val turned = turnRoundCredits() + moveMoneyWithPeople()
         val categorised = categoriseUnsorted()
         val refiled = resort(remember = false) + turned
@@ -133,11 +152,38 @@ class TidyUpRepository @Inject constructor(
             accountsChecked = accounts.size,
             loansCleared = cleared,
             stillUnsorted = transactionDao.countUnsorted(VAGUE),
+            putRight = putRight,
+            cardPayments = cardPayments,
+            betweenYou = betweenYou,
         )
     }
 
+    /**
+     * Money to or from one of the household by name — "EVANS RHYS" on the
+     * Lloyds account, Rhys paying into his own other account or the joint
+     * one — filed under "Transfers & payments", which spending and income
+     * leave out. Only from where nobody chose: unfiled, "Card spending",
+     * or the payment-apps category. Returns how many.
+     */
+    private suspend fun moneyBetweenYou(): Int {
+        val people = personDao.getAll().filterNot { it.isShared }
+        val names = people.flatMap { listOf(it.name) + it.knownStatementNames }
+        if (names.isEmpty()) return 0
+        val transfer = categoryRepository.peopleTransfers()
+        val loose = (VAGUE + MerchantCategoriser.PAYMENT_APPS)
+            .flatMap { name -> listOfNotNull(categoryDao.getByNameAndKind(name, CategoryKind.EXPENSE)?.id) }
+            .toSet()
+        val rows = transactionDao.getIncomeAndExpenseNotMoves().filter { row ->
+            !row.categoryByUser && (row.categoryId == null || row.categoryId in loose) &&
+                PayeeNames.isOnlyName(row.description, names)
+        }
+        val now = Instant.now().toEpochMilli()
+        rows.map { it.id }.chunked(BATCH).forEach { transactionDao.setCategory(it, transfer.id, now) }
+        return rows.size
+    }
+
     /** Turns [accountId]'s payments to and from its owner's other accounts into moves. */
-    private suspend fun linkOwnAccounts(accountId: Long, isSaver: Boolean): Int {
+    private suspend fun linkOwnAccounts(accountId: Long, isSaver: Boolean, numbers: Map<String, Long> = emptyMap()): Int {
         val targets = importer.ownAccountTargets(accountId)
         if (targets.isEmpty()) return 0
         val rows = transactionDao.looseOnAccount(accountId, LOOSE)
@@ -172,7 +218,11 @@ class TidyUpRepository @Inject constructor(
                 return@forEach
             }
 
-            val target = OwnAccountMatcher.match(
+            // "Transfer to 070806 21646684": the account a statement with
+            // that sort code and number went to.
+            val numbered = StatementIdentity.numbersIn(row.description)?.let { numbers[it] }
+                ?.let { id -> targets.firstOrNull { it.id == id } }
+            val target = numbered ?: OwnAccountMatcher.match(
                 description = row.description,
                 amountMinor = row.amountMinor,
                 date = row.date,
@@ -286,7 +336,7 @@ class TidyUpRepository @Inject constructor(
     suspend fun resortIfRulesChanged() {
         if (settingsRepository.settings.first().resortedRulesVersion >= MerchantCategoriser.RULES_VERSION) return
         val turned = turnRoundCredits()
-        val people = moveMoneyWithPeople()
+        val people = moveMoneyWithPeople() + moneyBetweenYou()
         categoriseUnsorted()
         resort(remember = true, alsoNote = turned + people)
     }
@@ -388,6 +438,9 @@ class TidyUpRepository @Inject constructor(
         val LOOSE = listOf("Transfers & payments", "Payment apps", "Credit & loans", "Car finance", "Mortgage")
 
         private const val BATCH = 400
+
+        /** Sort everything looks at payments from this year on: all of them. */
+        private const val EARLIEST_YEAR = 2000
 
         /** Wording that only ever means money arriving, at the start of a statement line. */
         private val MONEY_IN_WORDING = Regex(

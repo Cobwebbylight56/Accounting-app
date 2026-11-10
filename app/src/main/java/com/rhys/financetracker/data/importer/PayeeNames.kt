@@ -74,6 +74,50 @@ object PayeeNames {
         return MerchantCategoriser.ruleCategory(name) == null
     }
 
+    /**
+     * True when [description] is nothing but the name of one of [names] and
+     * the bank's paperwork — "EVANS RHYS", "R M W EVANS", "Faster payment to
+     * Hannah Evans" — however the bank writes it: the surname, and the first
+     * name or its initial, in either order. Money to or from one of the
+     * household is a move between your own money, not spending.
+     *
+     * A one-word name — "Hannah" — is tried with each surname the other
+     * names carry. Any other word — "Evans Garage", "R Evans Ltd" — and it
+     * is somebody else.
+     */
+    fun isOnlyName(description: String, names: List<String>): Boolean {
+        val words = TransactionFingerprint.normaliseDescription(description).split(' ')
+            // An initial is kept even where it is paperwork elsewhere: "S" in "S T JONES".
+            .filter { word -> word.isNotBlank() && word.none { it.isDigit() } && (word.length == 1 || word !in NOISE) && word !in TITLES }
+        if (words.isEmpty() || words.size > MAX_NAME_WORDS) return false
+        val split = names.map { name ->
+            TransactionFingerprint.normaliseDescription(name).split(' ').filter { it.isNotBlank() && it !in TITLES }
+        }.filter { it.isNotEmpty() }
+        val surnames = split.filter { it.size >= 2 }.map { it.last() }.filter { it.length >= MIN_SURNAME }.toSet()
+        val full = split.flatMap { parts -> if (parts.size >= 2) listOf(parts) else surnames.map { parts + it } }
+        return full.any { parts -> namedBy(words, parts) }
+    }
+
+    /** True when [words] are [parts] — a first name, initials, a surname — and nothing else. */
+    private fun namedBy(words: List<String>, parts: List<String>): Boolean {
+        val surname = parts.last()
+        val first = parts.first()
+        if (surname.length < MIN_SURNAME || surname !in words) return false
+        val initials = parts.dropLast(1).filter { it.length == 1 }.toSet()
+        val firstThere = first in words || first.take(1) in words ||
+            (first.length == 1 && words.any { it.length > 1 && it != surname && it.startsWith(first) })
+        if (!firstThere) return false
+        return words.all { word ->
+            word == surname || word in parts || word.length == 1 || initials.any { word.startsWith(it) }
+        }
+    }
+
+    /** A name and its initials: more than this is an address or a business. */
+    private const val MAX_NAME_WORDS = 5
+
+    /** Shorter than this is not a surname worth acting on. */
+    private const val MIN_SURNAME = 3
+
     /** True when money in reads like it came from somebody: a transfer, or "from" a name. */
     fun looksLikeFromAPerson(description: String): Boolean {
         val text = " ${TransactionFingerprint.normaliseDescription(description)} "

@@ -16,6 +16,7 @@ import com.rhys.financetracker.data.importer.SpreadsheetImporter
 import com.rhys.financetracker.data.importer.OwnAccountMatcher
 import com.rhys.financetracker.data.importer.RecurringDetector
 import com.rhys.financetracker.data.importer.StatementCheck
+import com.rhys.financetracker.data.importer.StatementIdentity
 import com.rhys.financetracker.data.importer.StatementKind
 import com.rhys.financetracker.data.importer.StatementOwner
 import com.rhys.financetracker.data.importer.WorkbookData
@@ -34,6 +35,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -53,6 +55,7 @@ class ImportViewModel @Inject constructor(
     private val incomeRepository: com.rhys.financetracker.data.repository.IncomeRepository,
     private val repayments: com.rhys.financetracker.data.repository.RepaymentRepository,
     private val repairs: com.rhys.financetracker.data.repository.StatementRepairRepository,
+    private val settingsRepository: com.rhys.financetracker.data.prefs.SettingsRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ImportState())
@@ -149,6 +152,34 @@ class ImportViewModel @Inject constructor(
             // statement being filed against a current account.
             val kind = StatementKind.detect(lines, fileName)
             _state.value = _state.value.copy(statementKind = kind)
+
+            // Its own numbers first: a statement from an account seen before
+            // goes back to that account, whoever it's addressed to.
+            val ids = StatementIdentity.of(lines)
+            val remembered = settingsRepository.settings.first().statementAccounts
+                .let { known -> ids.firstNotNullOfOrNull { known[it] } }
+                ?.let { id -> accounts.value.firstOrNull { it.id == id } }
+            _state.value = _state.value.copy(statementIds = ids)
+            if (remembered != null) {
+                val chosen = _state.value.preselectedAccountId
+                _state.value = if (chosen == null || chosen == remembered.id) {
+                    _state.value.copy(preselectedAccountId = remembered.id, filingPersonName = remembered.personName)
+                } else {
+                    // Opened from another account: say so, and leave the choice.
+                    _state.value.copy(statementWentTo = remembered.id)
+                }
+                return@launch
+            }
+            // Then the bank it's from: a Nationwide statement is never the
+            // Lloyds account, whoever it's addressed to.
+            val ofThisKind = accounts.value.filter { kind == null || it.holding == kind.kind.holding }
+            val byBank = StatementIdentity.bankOf(lines)
+                ?.let { bank -> ofThisKind.filter { it.name.contains(bank, ignoreCase = true) } }
+                .orEmpty()
+            if (byBank.size == 1 && _state.value.preselectedAccountId == null) {
+                _state.value = _state.value.copy(preselectedAccountId = byBank.single().id, filingPersonName = byBank.single().personName)
+                return@launch
+            }
             val people = peopleRepository.activePeople()
             val owner = if (lines.isEmpty()) null else StatementOwner.detect(lines, people)
             _state.value = _state.value.copy(printedName = StatementOwner.nameOnStatement(lines))
@@ -169,7 +200,7 @@ class ImportViewModel @Inject constructor(
             }
             val theirs = accounts.value.filter {
                 it.personName == owner.name && (kind == null || it.holding == kind.kind.holding)
-            }
+            }.let { mine -> mine.filter { it in byBank }.ifEmpty { mine } }
             _state.value = _state.value.copy(
                 statementOwnerName = owner.name,
                 unknownOwnerName = null,
@@ -322,6 +353,8 @@ class ImportViewModel @Inject constructor(
         }
         viewModelScope.launch {
             _state.value = current.copy(isBusy = true)
+            // Next time a statement with these numbers goes here by itself.
+            if (account != null) settingsRepository.rememberStatementAccount(current.statementIds, account.id)
             _ownTargets.value = account?.let { importer.ownAccountTargets(it.id) }.orEmpty()
             val read = importer.buildCandidatesWithDuplicates(sheet, mapping)
             // On a set-aside account every movement is money moved to or from
@@ -834,6 +867,10 @@ data class ImportState(
 
     /** What kind of account the statement is for, when its heading says. */
     val statementKind: StatementKind.Found? = null,
+    /** The statement's own numbers: StatementIdentity keys, remembered with the account it goes to. */
+    val statementIds: List<String> = emptyList(),
+    /** The account statements with these numbers went to before, when this one was opened from another. */
+    val statementWentTo: Long? = null,
 
     /** Who the statement is addressed to, when the name on it settles it. */
     val statementOwnerName: String? = null,

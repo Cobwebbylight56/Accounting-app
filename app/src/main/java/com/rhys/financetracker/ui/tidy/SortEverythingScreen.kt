@@ -102,30 +102,32 @@ fun SortEverythingScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text = "Goes through everything in the app and puts it where it belongs, " +
-                    "using everything the app knows now — so entries imported before a rule " +
-                    "existed are sorted too. Anything you have filed yourself is left alone. " +
-                    "It also happens by itself after an update that teaches the app more shops.",
+                text = "Goes through every payment in the app and puts it where it belongs, using " +
+                    "everything the app knows now. Anything you filed yourself is left alone.",
                 style = MaterialTheme.typography.bodyMedium,
             )
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Step("Pay rises whose date has come are applied.")
+                    Text("Which account", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    Step(
+                        "Card payments go on the card they were paid with — a Google Wallet tap on the " +
+                            "Zopa card goes on the Zopa card, not the current account.",
+                    )
+                    Step("Payments added twice, or on the wrong account, by an older version are put right.")
+                    Text("Moves, not spending", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    Step(
+                        "Payments that name another of your accounts — by its name, or its sort code and " +
+                            "account number — become moves to it: the saver goes up, the card comes down.",
+                    )
+                    Step("Money between the two of you — \"EVANS RHYS\" — is a move, not spending.")
                     Step("Money in and out of savers is filed as savings.")
+                    Text("Categories", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                     Step(
-                        "Payments that name another of your accounts become moves to it — the " +
-                            "saver goes up, the loan or card comes down.",
+                        "Unsorted payments get a category from what you've filed before, then from the " +
+                            "app's list of shops — and ones the app filed move to where you filed that payee.",
                     )
-                    Step(
-                        "Unsorted payments and \"Card spending\" get a category from what you " +
-                            "have filed before, then from the app's list of shops, websites and outings.",
-                    )
-                    Step(
-                        "Payments the app filed by itself are moved to where you filed the same " +
-                            "payee, or else to where its list of shops says — Tesco PFS to Fuel.",
-                    )
-                    Step("Regular payments seen at least twice and still being paid are set up as bills.")
-                    Step("Loans that are paid off are put away.")
+                    Text("Bills and loans", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    Step("Regular payments still being paid become bills; paid-off loans are put away.")
                 }
             }
 
@@ -174,10 +176,14 @@ private fun ResultCard(result: TidyUpResult, onOpenSortSpending: () -> Unit) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            // Only what changed: a list of noughts hid the one line that mattered.
+            Line("Card payments put on their card", result.cardPayments)
+            Line("Older mistakes put right", result.putRight)
+            Line("Turned into moves between your accounts", result.linkedToAccounts)
+            Line("Money between you filed as moves", result.betweenYou)
+            Line("Filed as savings", result.filedAsSavings)
             Line("Given a category", result.categorised)
             Line("Moved to a better category", result.refiled)
-            Line("Turned into moves between your accounts", result.linkedToAccounts)
-            Line("Filed as savings", result.filedAsSavings)
             Line("Pay rises applied", result.payRisesApplied)
             Line("Regular payments set up as bills", result.billsAdded.size)
             if (result.billsAdded.isNotEmpty()) {
@@ -212,6 +218,7 @@ private fun ResultCard(result: TidyUpResult, onOpenSortSpending: () -> Unit) {
 
 @Composable
 private fun Line(label: String, count: Int) {
+    if (count == 0) return
     Row(modifier = Modifier.fillMaxWidth()) {
         Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
         Text("$count", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)

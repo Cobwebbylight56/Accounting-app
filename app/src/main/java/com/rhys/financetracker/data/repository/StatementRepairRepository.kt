@@ -15,6 +15,8 @@ import com.rhys.financetracker.data.local.dao.AccountDao
 import com.rhys.financetracker.data.local.dao.CategoryDao
 import com.rhys.financetracker.data.local.dao.RecurringRuleDao
 import com.rhys.financetracker.data.local.dao.TransactionDao
+import com.rhys.financetracker.data.live.BankAlertParser
+import com.rhys.financetracker.data.live.BankApps
 import com.rhys.financetracker.data.live.LiveTwins
 import com.rhys.financetracker.data.local.entity.TransactionEntity
 import com.rhys.financetracker.domain.model.CategoryKind
@@ -59,12 +61,58 @@ class StatementRepairRepository @Inject constructor(
     private val accountDao: AccountDao,
     private val categoryDao: CategoryDao,
     private val recurringRuleDao: RecurringRuleDao,
+    private val settingsRepository: com.rhys.financetracker.data.prefs.SettingsRepository,
 ) {
 
     /** Puts right whatever needs it; returns how many entries changed. */
     suspend fun putRight(today: LocalDate = DateUtils.today()): Int =
         owedAccounts() + backFromTheFuture(today) + cardStatementText(today) + cardSpendingReadAsIn(today) + repeatedHeadings(today) +
-            liveTwins(today) + recurringRuleDao.cardPaymentsAsCard(Instant.now().toEpochMilli())
+            liveTwins(today) + putCardPaymentsOnCards(today.minusDays(LIVE_LOOK_BACK_DAYS)) + recurringRuleDao.cardPaymentsAsCard(Instant.now().toEpochMilli())
+
+    /**
+     * Google Wallet taps an older version read wrong: "£31.38 with Zopa
+     * Credit Card ••1486" took the card for the shop, so the tap was filed
+     * under the first current account — and a Zopa or Capital One card's
+     * name made it "paying the card off". Each goes back to its card (or
+     * account), as the spending it was, and the card is learned.
+     */
+    suspend fun putCardPaymentsOnCards(since: LocalDate): Int {
+        val rows = transactionDao.liveSince(since).filter { row ->
+            row.source == RecordSource.LIVE &&
+                BankApps.CARD_TAP_APPS.any { app -> row.importHash?.startsWith("live:$app:") == true }
+        }
+        if (rows.isEmpty()) return 0
+        val options = accountDao.getAllActive().map { account ->
+            BankApps.AccountOption(
+                id = account.id,
+                name = account.name,
+                notes = account.notes,
+                isSpending = account.holding == Holding.SPEND,
+                isCard = account.type == com.rhys.financetracker.domain.model.AccountType.CREDIT_CARD,
+            )
+        }
+        val now = Instant.now().toEpochMilli()
+        val fixed = rows.mapNotNull { row ->
+            val card = BankAlertParser.cardIn(row.description, "") ?: return@mapNotNull null
+            val cardAccount = BankApps.pickByCard(card, options) ?: return@mapNotNull null
+            val repaid = row.type == TransactionType.TRANSFER && row.transferAccountId == cardAccount
+            val elsewhere = row.type == TransactionType.EXPENSE && row.accountId != cardAccount
+            if (!repaid && !elsewhere) return@mapNotNull null
+            WALLET_ENDING.find(row.description)?.groupValues?.get(1)?.let { settingsRepository.setLiveCardAccount(it, cardAccount) }
+            row.copy(
+                type = TransactionType.EXPENSE,
+                accountId = cardAccount,
+                transferAccountId = null,
+                categoryId = if (repaid) null else row.categoryId,
+                description = "Card payment (${row.description})",
+                notes = noted(row.notes, WALLET_CARD),
+                updatedAt = now,
+            )
+        }
+        if (fixed.isEmpty()) return 0
+        database.withTransaction { fixed.forEach { transactionDao.update(it) } }
+        return fixed.size
+    }
 
     /**
      * Payments from alerts added twice before 2.4.1 — two apps telling of one
@@ -254,6 +302,9 @@ class StatementRepairRepository @Inject constructor(
         /** Alerts from before a statement replaces them: a few months is plenty. */
         const val LIVE_LOOK_BACK_DAYS = 120L
         const val TOLD_TWICE = "Told by two apps at once, and added twice by mistake: the other one is kept."
+        const val WALLET_CARD = "A Google Wallet tap on this card. An older version took the card's name for the shop " +
+            "and filed it elsewhere — or as paying the card off. The statement will name the shop."
+        val WALLET_ENDING = Regex("""(?:•+|\*{2,})\s?(\d{4})\b""")
         const val TOLD_BY_BOTH = "Told by both banks: money out of one and into the other, so one move between your accounts."
     }
 }

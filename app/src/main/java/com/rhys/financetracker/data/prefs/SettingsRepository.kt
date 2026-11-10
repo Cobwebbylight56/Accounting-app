@@ -98,6 +98,7 @@ class SettingsRepository @Inject constructor(
         val NEEDS_LOOK_POPUP = booleanPreferencesKey("needs_look_popup")
         val BACKUP_REMINDER = booleanPreferencesKey("backup_reminder")
         val PRICE_RISES_SEEN = stringSetPreferencesKey("price_rises_seen")
+        val STATEMENT_ACCOUNTS = stringPreferencesKey("statement_accounts")
     }
 
     /** Defaults chosen so a fresh install is immediately usable and private. */
@@ -198,6 +199,7 @@ class SettingsRepository @Inject constructor(
             needsLookPopup = prefs[Keys.NEEDS_LOOK_POPUP] ?: true,
             backupReminder = prefs[Keys.BACKUP_REMINDER] ?: true,
             priceRisesSeen = prefs[Keys.PRICE_RISES_SEEN].orEmpty(),
+            statementAccounts = cardAccountsOf(prefs[Keys.STATEMENT_ACCOUNTS]),
             liveAlertLog = LiveAlertLogEntry.parse(prefs[Keys.LIVE_ALERT_LOG]),
             subscriptionPlans = com.rhys.financetracker.data.importer.SubscriptionPlan.parse(prefs[Keys.SUBSCRIPTION_PLANS]),
             progressReports = com.rhys.financetracker.domain.report.ProgressReportCodec.read(prefs[Keys.PROGRESS_REPORTS]),
@@ -364,16 +366,6 @@ class SettingsRepository @Inject constructor(
         }
     }
 
-    /** Learns that card [ending] is [accountId]'s, unless it is already known. */
-    suspend fun rememberLiveCard(ending: String, accountId: Long) {
-        context.dataStore.edit { prefs ->
-            val current = cardAccountsOf(prefs[Keys.LIVE_CARD_ACCOUNTS])
-            if (ending !in current) {
-                prefs[Keys.LIVE_CARD_ACCOUNTS] = (current + (ending to accountId)).entries
-                    .joinToString(";") { "${it.key}=${it.value}" }
-            }
-        }
-    }
 
     private fun cardAccountsOf(stored: String?): Map<String, Long> =
         stored.orEmpty().split(';').mapNotNull { pair ->
@@ -415,6 +407,15 @@ class SettingsRepository @Inject constructor(
     suspend fun setNeedsLookPopup(on: Boolean) = put(Keys.NEEDS_LOOK_POPUP, on)
 
     suspend fun setBackupReminder(on: Boolean) = put(Keys.BACKUP_REMINDER, on)
+
+    /** Remembers that statements with these [keys] (StatementIdentity) are [accountId]'s. */
+    suspend fun rememberStatementAccount(keys: List<String>, accountId: Long) {
+        if (keys.isEmpty()) return
+        context.dataStore.edit { prefs ->
+            val updated = cardAccountsOf(prefs[Keys.STATEMENT_ACCOUNTS]) + keys.associateWith { accountId }
+            prefs[Keys.STATEMENT_ACCOUNTS] = updated.entries.joinToString(";") { "${it.key}=${it.value}" }
+        }
+    }
 
     /** A price rise seen, so Needs a look stops saying so. */
     suspend fun markPriceRiseSeen(key: String) {
@@ -577,6 +578,8 @@ data class AppSettings(
     val backupReminder: Boolean = true,
     /** Price rises already noted, as "subscription key:new amount". */
     val priceRisesSeen: Set<String> = emptySet(),
+    /** The account each statement went to, by its numbers; see StatementIdentity. */
+    val statementAccounts: Map<String, Long> = emptyMap(),
     /** What the alert reader heard lately from banking apps and what came of it, newest first. */
     val liveAlertLog: List<LiveAlertLogEntry> = emptyList(),
     /** When each subscription started, how long it runs or that it was cancelled, by its key. */

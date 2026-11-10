@@ -30,6 +30,12 @@ object BankAlertParser {
          * overpayment. Null for an ordinary payment.
          */
         val toBorrowing: String? = null,
+        /**
+         * The card as a wallet names it — "Zopa Credit Card", "Nationwide
+         * FlexDirect" — from "£31.38 with Zopa Credit Card ••1486". Says
+         * which account it is; never who was paid.
+         */
+        val card: String? = null,
     )
 
     /**
@@ -53,13 +59,28 @@ object BankAlertParser {
         val payee = payeeIn(body, type) ?: payeeIn(all, type) ?: titleAsPayee(heading)
             ?: if (type == TransactionType.INCOME) MONEY_IN_NAME else CARD_PAYMENT_NAME
         val ending = ENDING.find(all)?.groupValues?.get(1)
-        val borrowing = if (type == TransactionType.EXPENSE) borrowingIn(lower) else null
+        // A wallet's card is how it was paid: never a card being paid off.
+        val card = cardIn(heading, body)
+        val borrowing = if (type == TransactionType.EXPENSE && card == null) borrowingIn(lower) else null
         val named = if (borrowing != null && payee in FALLBACK_NAMES) {
             (if (OVERPAY.containsMatchIn(lower)) "Overpayment to " else "Payment to ") + borrowing
         } else {
             payee
         }
-        return Alert(amount, type, named, ending, borrowing)
+        return Alert(amount, type, named, ending, borrowing, card)
+    }
+
+    /**
+     * The card an alert says was used, by name: "with Zopa Credit Card
+     * ••1486" in the text, or a title that is only the card. Null when it
+     * names only the network (Visa, Mastercard) or nothing at all.
+     */
+    internal fun cardIn(heading: String, body: String): String? {
+        val all = listOf(heading, body).filter { it.isNotEmpty() }.joinToString(". ").replace(SPACES, " ")
+        val label = CARD_WITH.find(all)?.groupValues?.get(1)
+            ?: heading.takeIf { ENDING.containsMatchIn(it) }?.let { ENDING.split(it).first() }
+        return label?.trim()?.trimEnd('.', ',', ':', '-')?.trim()
+            ?.takeIf { it.isNotEmpty() && it.split(' ').any { word -> word.lowercase() !in HOW_PAID && word.length > 1 } }
     }
 
     /**
@@ -161,6 +182,10 @@ object BankAlertParser {
         if (lower.startsWith("your ") || lower == "you" || lower == "your" || !lower.first().isLetter()) return null
         // "with Visa •••• 1234", "with Apple Pay": how it was paid, not who to.
         if (lower.split(' ').first() in HOW_PAID) return null
+        // "with Zopa Credit Card ••1486": a card, by its last four digits —
+        // the card it was paid with, not the shop. Taken for the shop, it
+        // made every Google Wallet tap on a Zopa card "paying Zopa off".
+        if (ENDING.containsMatchIn(name)) return null
         return name
     }
 
@@ -239,6 +264,12 @@ object BankAlertParser {
         Regex("""\s(card|account)\s+ending\b.*""", RegexOption.IGNORE_CASE),
         Regex("""\s£.*"""),
         Regex("""\sat\s+\d.*"""),
+    )
+
+    /** "with Zopa Credit Card ••1486": the card's name, before its digits. */
+    private val CARD_WITH = Regex(
+        """\bwith\s+([A-Za-z][^.•*£]{1,40}?)\s*(?:•+|\*{2,}|x{2,}|\.{3}|ending(?: in)?)\s?\d{4}\b""",
+        RegexOption.IGNORE_CASE,
     )
 
     private val ENDING = Regex("""(?:ending(?: in)?|\*{2,}|•+|x{2,}|\.{3})\s?(\d{4})\b""", RegexOption.IGNORE_CASE)

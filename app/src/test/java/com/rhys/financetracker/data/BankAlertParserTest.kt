@@ -164,4 +164,20 @@ class BankAlertParserTest {
         assertEquals(false, BankAlertParser.isStatementReady("Lloyds", "You spent £4.20 at Costa"))
         assertNull(read("Nationwide", "Your statement is ready to view"))
     }
+
+    @Test
+    fun `a wallet tap names the card it was paid with, never as the shop`() {
+        val zopa = BankAlertParser.parse("Tesco Express", "£31.38 with Zopa Credit Card ••1486", assumeSpending = true)!!
+        assertEquals("Tesco Express", zopa.payee)
+        assertEquals("Zopa Credit Card", zopa.card)
+        assertEquals("1486", zopa.ending)
+        assertEquals(TransactionType.EXPENSE, zopa.type)
+        // Spending on a Zopa card is not paying Zopa off.
+        assertEquals(null, zopa.toBorrowing)
+        val flex = BankAlertParser.parse("Greggs", "£1.25 with Nationwide FlexDirect ••1302", assumeSpending = true)!!
+        assertEquals("Greggs", flex.payee)
+        assertEquals("Nationwide FlexDirect", flex.card)
+        // A network alone names no card.
+        assertEquals(null, BankAlertParser.parse("Costa Coffee", "£3.10 with Mastercard ••1234", assumeSpending = true)!!.card)
+    }
 }
