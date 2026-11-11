@@ -30,20 +30,40 @@ other.
 
 ## Ask Claude
 
-**More → Ask Claude** puts the month in a few plain lines — money in, spent,
-left over, saved, spending by category, the biggest payments and where things
-stand — and shares it with the Claude app, starting with a question: what
-stands out, where could you cut back, and what's worth trying next month.
-Choose **This month so far** or **Last month**.
+**More → Ask Claude** is a conversation with Claude about your money. Ask
+anything — "where did our money go last month?", "what subscriptions do we
+pay for?", "how could we save £200 a month?", "is our food shopping going
+up?" — and Claude looks through your accounts and balances, payments,
+spending by category, month-by-month totals and regular bills in the app to
+answer, with the figures to back it up. Ask a follow-up and it carries on
+from there; the refresh button starts a new conversation.
 
-You see exactly what's shared before anything leaves the phone. It's totals,
-categories and who payments went to — never an account number, sort code or
-card number — and you can change it in Claude before sending. **Copy instead**
-puts it on the clipboard to paste anywhere. Without the Claude app, the share
-sheet opens to choose where it goes.
+**Setting it up.** It needs your own key for the Claude API, which is
+separate from a Claude Pro or Max plan:
+
+1. Sign up at platform.claude.com.
+2. Add some credit under Billing — $5 goes a long way.
+3. Create an API key and paste it into Ask Claude.
+
+You pay Anthropic only for what you ask, usually a few pence a question, and
+each answer shows roughly what it cost. In Ask Claude's settings (the cog)
+you can choose **Claude Opus 5.5** (the best answers), **Sonnet 5.5** (about
+half the cost) or **Haiku 5.5** (a fraction of the cost), and remove the key.
+
+**What Claude sees.** Account names and balances, payees, amounts, dates and
+categories — looked up only when you ask, and sent to Anthropic to answer.
+Never account, sort code or card numbers: they're masked before anything
+leaves the phone. Claude can only look; it can't move money or change a
+thing. Anthropic doesn't train its models on API conversations. Your key is
+kept encrypted on the phone, never backed up and never exported.
+
+**Without a key**, Ask Claude's settings can still share a summary of the
+month — money in, spent, left over, saved, spending by category, the biggest
+payments — with the Claude app, or copy it. You see it in full first.
 
 Claude's own personal finance feature, which links straight to your bank, is
-only in the US for now; this works anywhere, with no link to your bank.
+only in the US for now; Ask Claude works anywhere, using the payments already
+in the app.
 
 ## After an update
 

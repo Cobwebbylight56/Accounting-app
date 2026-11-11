@@ -94,9 +94,9 @@ fun MoreScreen(
             )
             SettingsItem(
                 title = "Ask Claude",
-                subtitle = "Share a summary of the month with the Claude app and ask what it makes of it",
+                subtitle = "Ask anything about your money — Claude looks through your payments to answer",
                 icon = Icons.Outlined.AutoAwesome,
-                trailing = { com.rhys.financetracker.ui.components.NewBadge("ask-claude") },
+                trailing = { com.rhys.financetracker.ui.components.NewBadge("claude-chat") },
                 onClick = onOpenAskClaude,
             )
             SettingsItem(

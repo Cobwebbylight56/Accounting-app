@@ -5,7 +5,8 @@
     <!--
         The app is fully offline-capable.  INTERNET is only used by the optional
         "external data" feature (exchange rates / bank holidays) which the user
-        can disable in Settings.
+        can disable in Settings, and by Ask Claude, which sends nothing until the
+        user adds their own API key and asks a question.
     -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />

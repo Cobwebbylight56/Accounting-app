@@ -42,3 +42,13 @@
 # Font boxes and encodings are looked up by name from PDFBox's own assets.
 -keep class com.tom_roush.fontbox.** { *; }
 -keep class com.tom_roush.pdfbox.pdmodel.font.** { *; }
+
+# Ask Claude: the Claude API SDK ships its own rules for Jackson and Kotlin
+# reflection (META-INF/proguard in its jar). Jackson and OpenTelemetry refer
+# to JDK classes Android doesn't have, and look for them only when present.
+-dontwarn java.beans.**
+-dontwarn java.lang.management.**
+-dontwarn javax.lang.model.**
+-dontwarn org.slf4j.**
+-dontwarn org.ietf.jgss.**
+-dontwarn javax.naming.**

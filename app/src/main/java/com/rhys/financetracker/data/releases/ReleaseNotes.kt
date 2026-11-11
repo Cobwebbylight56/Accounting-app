@@ -22,6 +22,15 @@ object ReleaseNotes {
     /** Every release, newest first. */
     val ALL: List<Release> = listOf(
         Release(
+            "2.8.0", LocalDate.of(2026, 11, 11), "Ask Claude about your money",
+            listOf(
+                "Ask Claude, under More, is now a conversation: ask anything about your money — where it went last month, what subscriptions you pay, how to save £200 a month — and Claude looks through your accounts, payments and bills in the app to answer, with the figures to back it up.",
+                "Claude can only look: it can't move money or change anything, and account, sort code and card numbers are never sent. Each answer shows roughly what it cost.",
+                "It uses your own Claude API key from platform.claude.com, kept encrypted on the phone, paid for by what you ask — usually a few pence a question. The page explains how to get one. Choose Opus, Sonnet or Haiku in its settings.",
+                "Sharing a month's summary with the Claude app is still there, in Ask Claude's settings, and needs no key.",
+            ),
+        ),
+        Release(
             "2.7.0", LocalDate.of(2026, 11, 10), "Card payments on their card, statements where they belong",
             listOf(
                 "Fixed: a Google Wallet tap — \"£31.38 with Zopa Credit Card ••1486\" — took the card's name for the shop, put the tap on the first current account, and with a Zopa or Capital One card called it paying the card off. Taps now go on the card they were paid with, and older ones are moved there when Home opens.",

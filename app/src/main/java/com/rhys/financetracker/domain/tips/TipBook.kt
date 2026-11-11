@@ -44,10 +44,10 @@ object TipBook {
             newIn = "2.4.0",
         ),
         Tip(
-            "ask-claude", TipPlace.HOME, "Ask Claude about your month",
-            "More → Ask Claude shares a summary of the month with the Claude app, to ask what stands out. You see " +
-                "exactly what's shared first.",
-            newIn = "2.7.0",
+            "claude-chat", TipPlace.HOME, "Ask Claude about your money",
+            "More → Ask Claude: ask anything — where the money went, what to cut back — and Claude looks through your " +
+                "payments to answer. It needs your own Claude API key; the page shows how.",
+            newIn = "2.8.0",
         ),
         Tip(
             "home-sort-everything", TipPlace.HOME, "Sort everything, reworked",

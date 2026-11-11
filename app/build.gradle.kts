@@ -153,6 +153,13 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            // Duplicated across the Claude SDK's Jackson and OkHttp jars, and
+            // not needed on Android.
+            excludes += "/META-INF/versions/9/module-info.class"
+            excludes += "/META-INF/DEPENDENCIES"
+            excludes += "/META-INF/INDEX.LIST"
+            excludes += "/META-INF/{LICENSE,LICENSE.txt,LICENSE.md,NOTICE,NOTICE.txt,NOTICE.md}"
+            excludes += "/META-INF/native-image/**"
         }
     }
 
@@ -184,6 +191,10 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material3.window)
     implementation(libs.androidx.compose.material.icons.extended)
+    // Ask Claude: the official Claude API SDK. Its Jackson reflection needs
+    // kotlin-reflect, kept in step with the Kotlin the app is built with.
+    implementation(libs.anthropic.java)
+    implementation(libs.kotlin.reflect)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
