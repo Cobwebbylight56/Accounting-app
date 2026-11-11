@@ -6,8 +6,10 @@ import com.rhys.financetracker.data.claude.ClaudeTools
 import com.rhys.financetracker.data.claude.FinanceToolbox
 import com.rhys.financetracker.data.claude.ToolOutput
 import com.rhys.financetracker.domain.claude.ClaudeModel
-import com.sun.net.httpserver.HttpServer
-import java.net.InetSocketAddress
+import java.io.IOException
+import java.net.InetAddress
+import java.net.ServerSocket
+import kotlin.concurrent.thread
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -25,7 +27,7 @@ class ClaudeChatTest {
 
     private val requests = mutableListOf<String>()
     private val replies = ArrayDeque<Pair<Int, String>>()
-    private lateinit var server: HttpServer
+    private lateinit var server: ServerSocket
     private val calls = mutableListOf<Pair<String, Map<*, *>>>()
 
     private val access = object : ClaudeAccess {
@@ -42,22 +44,54 @@ class ClaudeChatTest {
         override suspend fun household() = "Sam and Alex"
     }
 
+    /**
+     * The smallest web server that will do: one request a connection, the
+     * next reply in the queue sent back. Plain sockets, since Android's test
+     * classpath has no HTTP server of its own.
+     */
     @Before
     fun start() {
-        server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
-        server.createContext("/") { exchange ->
-            requests += exchange.requestBody.readBytes().decodeToString()
-            val (status, body) = replies.removeFirst()
-            val bytes = body.toByteArray()
-            exchange.responseHeaders.add("content-type", "application/json")
-            exchange.sendResponseHeaders(status, bytes.size.toLong())
-            exchange.responseBody.use { it.write(bytes) }
+        server = ServerSocket(0, 50, InetAddress.getByName("127.0.0.1"))
+        thread(isDaemon = true) {
+            while (!server.isClosed) {
+                val client = try {
+                    server.accept()
+                } catch (_: IOException) {
+                    break
+                }
+                client.use { connection ->
+                    val input = connection.getInputStream().buffered()
+                    val head = StringBuilder()
+                    while (!head.endsWith("\r\n\r\n")) {
+                        val byte = input.read()
+                        if (byte < 0) break
+                        head.append(byte.toChar())
+                    }
+                    val length = Regex("(?i)content-length:\\s*(\\d+)").find(head)?.groupValues?.get(1)?.toInt() ?: 0
+                    val body = ByteArray(length)
+                    var read = 0
+                    while (read < length) {
+                        val n = input.read(body, read, length - read)
+                        if (n < 0) break
+                        read += n
+                    }
+                    requests += body.decodeToString()
+                    val (status, reply) = replies.removeFirst()
+                    val bytes = reply.toByteArray()
+                    val output = connection.getOutputStream()
+                    output.write(
+                        ("HTTP/1.1 $status ${if (status == 200) "OK" else "Unauthorized"}\r\nContent-Type: application/json\r\n" +
+                            "Content-Length: ${bytes.size}\r\nConnection: close\r\n\r\n").toByteArray(),
+                    )
+                    output.write(bytes)
+                    output.flush()
+                }
+            }
         }
-        server.start()
     }
 
     @After
-    fun stop() = server.stop(0)
+    fun stop() = server.close()
 
     private fun reply(content: String, stop: String) = 200 to
         """{"id":"msg_x","type":"message","role":"assistant","model":"claude-opus-5-5","content":[$content],"stop_reason":"$stop","stop_sequence":null,"usage":{"input_tokens":1200,"output_tokens":80,"cache_creation_input_tokens":900,"cache_read_input_tokens":0}}"""
@@ -73,7 +107,7 @@ class ClaudeChatTest {
         replies += 401 to """{"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}"""
         replies += reply("""{"type":"text","text":"About the same."}""", "end_turn")
 
-        val chat = ClaudeChat(access, tools, "http://127.0.0.1:${server.address.port}")
+        val chat = ClaudeChat(access, tools, "http://127.0.0.1:${server.localPort}")
         chat.ask("How much can we spend?")
         chat.ask("Is that enough?")
         chat.ask("And next month?")
@@ -116,7 +150,7 @@ class ClaudeChatTest {
     fun `a new conversation starts with nothing carried over`() = runBlocking {
         replies += reply("""{"type":"text","text":"One."}""", "end_turn")
         replies += reply("""{"type":"text","text":"Two."}""", "end_turn")
-        val chat = ClaudeChat(access, tools, "http://127.0.0.1:${server.address.port}")
+        val chat = ClaudeChat(access, tools, "http://127.0.0.1:${server.localPort}")
         chat.ask("First question")
         chat.newChat()
         assertTrue(chat.turns.value.isEmpty())
