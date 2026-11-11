@@ -44,6 +44,18 @@ data class ChatTurn(
     val isError: Boolean = false,
 )
 
+/** What a conversation needs to reach Claude: the user's key, and which model to ask. */
+interface ClaudeAccess {
+    suspend fun apiKey(): String?
+    fun model(): ClaudeModel
+}
+
+/** What Claude can look up while answering. */
+interface ClaudeTools {
+    suspend fun run(name: String, input: Map<*, *>): ToolOutput
+    suspend fun household(): String
+}
+
 /**
  * A conversation with Claude about the household's money, asked through the
  * Claude API with the user's own key.
@@ -56,10 +68,14 @@ data class ChatTurn(
  * starts, and changing model starts a new one.
  */
 @Singleton
-class ClaudeChat @Inject constructor(
-    private val settings: ClaudeSettings,
-    private val toolbox: FinanceToolbox,
+class ClaudeChat internal constructor(
+    private val settings: ClaudeAccess,
+    private val toolbox: ClaudeTools,
+    /** Where the API is; only a test points this anywhere else. */
+    private val baseUrl: String?,
 ) {
+
+    @Inject constructor(settings: ClaudeSettings, toolbox: FinanceToolbox) : this(settings, toolbox, null)
 
     private val _turns = MutableStateFlow<List<ChatTurn>>(emptyList())
     val turns: StateFlow<List<ChatTurn>> = _turns.asStateFlow()
@@ -102,7 +118,7 @@ class ClaudeChat @Inject constructor(
 
     private suspend fun answer(question: String): ChatTurn {
         val key = settings.apiKey() ?: return ChatTurn(nextId++, false, "Add your API key first.", isError = true)
-        val chosen = settings.setup.value.model
+        val chosen = settings.model()
         if (model != chosen) {
             // Another model can't read this one's reasoning: start again rather than carry it over.
             history.clear()
@@ -190,6 +206,7 @@ class ClaudeChat @Inject constructor(
         client?.close()
         return AnthropicOkHttpClient.builder()
             .apiKey(key)
+            .apply { baseUrl?.let { baseUrl(it) } }
             .timeout(Duration.ofMinutes(TIMEOUT_MINUTES))
             .maxRetries(2)
             .build()

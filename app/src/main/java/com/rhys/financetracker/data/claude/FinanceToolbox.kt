@@ -46,10 +46,12 @@ class FinanceToolbox @Inject constructor(
     private val peopleRepository: PeopleRepository,
     private val categoryDao: CategoryDao,
     private val recurringRuleDao: RecurringRuleDao,
-) {
+) : ClaudeTools {
+
+    override suspend fun run(name: String, input: Map<*, *>): ToolOutput = run(name, input, DateUtils.today())
 
     /** Runs the tool called [name] with [input]; a bad input is an error Claude can correct. */
-    suspend fun run(name: String, input: Map<*, *>, today: LocalDate = DateUtils.today()): ToolOutput = try {
+    suspend fun run(name: String, input: Map<*, *>, today: LocalDate): ToolOutput = try {
         when (name) {
             ACCOUNTS -> ToolOutput(accounts(today))
             MONTHS -> ToolOutput(months(input, today))
@@ -63,7 +65,7 @@ class FinanceToolbox @Inject constructor(
     }
 
     /** One line about who's who, for the instructions Claude starts with. */
-    suspend fun household(): String {
+    override suspend fun household(): String {
         val people = peopleRepository.activePeople()
         val named = people.filterNot { it.isShared }.map { it.name.substringBefore(' ') }
         val shared = people.filter { it.isShared }.map { it.name }

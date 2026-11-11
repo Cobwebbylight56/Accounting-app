@@ -84,6 +84,12 @@ object PayeeNames {
      * A one-word name — "Hannah" — is tried with each surname the other
      * names carry. Any other word — "Evans Garage", "R Evans Ltd" — and it
      * is somebody else.
+     *
+     * When no surname is known at all — everyone is down by first name only
+     * and no statement has taught one — a first name with one other
+     * name-like word beside it ("EVANS RHYS") is taken to be that person.
+     * A namesake would land in the same place: money with people is filed
+     * under Transfers & payments either way.
      */
     fun isOnlyName(description: String, names: List<String>): Boolean {
         val words = TransactionFingerprint.normaliseDescription(description).split(' ')
@@ -95,7 +101,11 @@ object PayeeNames {
         }.filter { it.isNotEmpty() }
         val surnames = split.filter { it.size >= 2 }.map { it.last() }.filter { it.length >= MIN_SURNAME }.toSet()
         val full = split.flatMap { parts -> if (parts.size >= 2) listOf(parts) else surnames.map { parts + it } }
-        return full.any { parts -> namedBy(words, parts) }
+        if (full.any { parts -> namedBy(words, parts) }) return true
+        if (surnames.isNotEmpty()) return false
+        val firstNames = split.filter { it.size == 1 }.map { it.single() }.filter { it.length >= MIN_SURNAME }
+        return words.size == 2 && words.any { it in firstNames } && words.all { it.length >= 2 } &&
+            isPersonName(words.joinToString(" "))
     }
 
     /** True when [words] are [parts] — a first name, initials, a surname — and nothing else. */

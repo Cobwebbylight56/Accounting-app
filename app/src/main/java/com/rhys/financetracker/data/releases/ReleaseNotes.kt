@@ -22,6 +22,15 @@ object ReleaseNotes {
     /** Every release, newest first. */
     val ALL: List<Release> = listOf(
         Release(
+            "2.8.1", LocalDate.of(2026, 11, 11), "Fixes",
+            listOf(
+                "Money between the two of you — \"EVANS RHYS\" — is recognised as a move even when the app only knows your first names.",
+                "A statement recognised by its account number still keeps the name it's addressed to, so filing it under someone teaches the app that name.",
+                "Sort everything counts card payments it moves under \"Card payments put on their card\", not as older mistakes.",
+                "Ask Claude: if the phone's secure storage can't be read — after restoring a phone, say — it asks for the key again instead of not opening. The whole conversation, look-ups and follow-ups included, is now tested on every build.",
+            ),
+        ),
+        Release(
             "2.8.0", LocalDate.of(2026, 11, 11), "Ask Claude about your money",
             listOf(
                 "Ask Claude, under More, is now a conversation: ask anything about your money — where it went last month, what subscriptions you pay, how to save £200 a month — and Claude looks through your accounts, payments and bills in the app to answer, with the figures to back it up.",

@@ -32,15 +32,25 @@ data class ClaudeSetup(
 @Singleton
 class ClaudeSettings @Inject constructor(
     private val context: Context,
-) {
+) : ClaudeAccess {
 
     private val _setup = MutableStateFlow(ClaudeSetup())
     val setup: StateFlow<ClaudeSetup> = _setup.asStateFlow()
 
     /** Touches the keystore, so built on first use, away from the main thread. */
     private val prefs: SharedPreferences by lazy {
+        // Storage that can no longer be opened — a phone restored from a
+        // backup has a new keystore — is started afresh: the key is asked
+        // for again, rather than Ask Claude never opening.
+        runCatching { open() }.getOrElse {
+            context.deleteSharedPreferences(FILE_NAME)
+            open()
+        }
+    }
+
+    private fun open(): SharedPreferences {
         val masterKey = MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
-        EncryptedSharedPreferences.create(
+        return EncryptedSharedPreferences.create(
             context,
             FILE_NAME,
             masterKey,
@@ -51,8 +61,10 @@ class ClaudeSettings @Inject constructor(
 
     suspend fun load() = withContext(Dispatchers.IO) { publish() }
 
+    override fun model(): ClaudeModel = _setup.value.model
+
     /** The key, for the request only. */
-    suspend fun apiKey(): String? = withContext(Dispatchers.IO) { prefs.getString(KEY_API, null)?.takeIf { it.isNotBlank() } }
+    override suspend fun apiKey(): String? = withContext(Dispatchers.IO) { prefs.getString(KEY_API, null)?.takeIf { it.isNotBlank() } }
 
     suspend fun saveKey(key: String) = withContext(Dispatchers.IO) {
         prefs.edit().putString(KEY_API, key.trim()).apply()

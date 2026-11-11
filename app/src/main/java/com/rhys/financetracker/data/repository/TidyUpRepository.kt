@@ -119,8 +119,10 @@ class TidyUpRepository @Inject constructor(
 
     suspend fun sortEverything(): TidyUpResult {
         val payRises = incomeRepository.applyDue()
+        // Cards first, so they're counted as what they are and not as "older mistakes".
+        val cardPayments = runCatching { repairs.putCardPaymentsOnCards(since = java.time.LocalDate.of(EARLIEST_YEAR, 1, 1)) }
+            .getOrDefault(0)
         val putRight = runCatching { repairs.putRight() }.getOrDefault(0)
-        val cardPayments = repairs.putCardPaymentsOnCards(since = java.time.LocalDate.of(EARLIEST_YEAR, 1, 1))
 
         val accounts = accountDao.getAllActive()
         val filed = accounts.filter { it.holding == Holding.SET_ASIDE }

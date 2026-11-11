@@ -70,4 +70,18 @@ class PayeeNamesTest {
         org.junit.Assert.assertFalse(PayeeNames.isOnlyName("Transfer to 070806 21646684", household))
         org.junit.Assert.assertFalse(PayeeNames.isOnlyName("SAM SMITH", household))
     }
+
+    @Test
+    fun `with no surname known, a first name beside one other name is that person`() {
+        val household = listOf("Sam", "Alex")
+        assertTrue(PayeeNames.isOnlyName("JONES SAM", household))
+        assertTrue(PayeeNames.isOnlyName("Faster payment to Alex Jones", household))
+        // A shop, a business or a lone first name is not.
+        org.junit.Assert.assertFalse(PayeeNames.isOnlyName("SAM", household))
+        org.junit.Assert.assertFalse(PayeeNames.isOnlyName("SAM MOTORS", household))
+        org.junit.Assert.assertFalse(PayeeNames.isOnlyName("SAM JONES LTD", household))
+        org.junit.Assert.assertFalse(PayeeNames.isOnlyName("PAT JONES", household))
+        // Once a surname is known, only that surname will do.
+        org.junit.Assert.assertFalse(PayeeNames.isOnlyName("SMITH SAM", listOf("Sam", "Alex Jones")))
+    }
 }

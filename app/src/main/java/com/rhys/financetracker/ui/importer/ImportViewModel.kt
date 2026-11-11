@@ -151,7 +151,9 @@ class ImportViewModel @Inject constructor(
             // accounts of the same kind, which is what stops a saver's
             // statement being filed against a current account.
             val kind = StatementKind.detect(lines, fileName)
-            _state.value = _state.value.copy(statementKind = kind)
+            // The name it's addressed to is kept whichever way the account is
+            // found, so filing it under someone still teaches the app the name.
+            _state.value = _state.value.copy(statementKind = kind, printedName = StatementOwner.nameOnStatement(lines))
 
             // Its own numbers first: a statement from an account seen before
             // goes back to that account, whoever it's addressed to.
@@ -182,7 +184,6 @@ class ImportViewModel @Inject constructor(
             }
             val people = peopleRepository.activePeople()
             val owner = if (lines.isEmpty()) null else StatementOwner.detect(lines, people)
-            _state.value = _state.value.copy(printedName = StatementOwner.nameOnStatement(lines))
             if (owner == null) {
                 // Nobody here is called that. Worth saying: staying quiet
                 // looked exactly like not having read the statement at all,
