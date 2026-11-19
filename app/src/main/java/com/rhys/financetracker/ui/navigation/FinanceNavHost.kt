@@ -282,13 +282,13 @@ private fun NavGraphBuilder.topLevelDestinations(
             inboxRoutes = inboxRoutes(navController),
             setupRoutes = com.rhys.financetracker.ui.setup.SetupRoutes(
                 people = { navController.navigate(Routes.SETUP) },
-                accounts = { navController.navigateToTab(Routes.ACCOUNTS) },
+                accounts = { navController.navigate(Routes.ACCOUNTS) },
                 statement = { navController.navigate(Routes.importForAccount()) },
                 live = { navController.navigate(Routes.SETTINGS_LIVE_PAYMENTS) },
                 backup = { navController.navigate(Routes.SETTINGS_BACKUP) },
             ),
             onOpenInbox = { navController.navigate(Routes.INBOX) },
-            onOpenAccounts = { navController.navigateToTab(Routes.ACCOUNTS) },
+            onOpenAccounts = { navController.navigate(Routes.ACCOUNTS) },
             onOpenRecurring = { navController.navigate(Routes.RECURRING) },
             onOpenSavings = { navController.navigate(Routes.SAVINGS) },
             onOpenSettings = { navController.navigate(Routes.SETTINGS) },
@@ -364,7 +364,7 @@ private fun NavGraphBuilder.topLevelDestinations(
     composable(Routes.MORE) {
         MoreScreen(
             onOpenInsights = { navController.navigate(Routes.INSIGHTS) },
-            onOpenAccounts = { navController.navigateToTab(Routes.ACCOUNTS) },
+            onOpenAccounts = { navController.navigate(Routes.ACCOUNTS) },
             onOpenPeople = { navController.navigate(Routes.PEOPLE) },
             onOpenRecurring = { navController.navigate(Routes.RECURRING) },
             onOpenCategories = { navController.navigate(Routes.CATEGORIES) },
@@ -380,12 +380,12 @@ private fun NavGraphBuilder.topLevelDestinations(
             onOpenReports = { navController.navigate(Routes.REPORTS) },
             onOpenProgress = { navController.navigate(Routes.PROGRESS) },
             onOpenAskClaude = { navController.navigate(Routes.ASK_CLAUDE) },
-            onOpenBudget = { navController.navigate(Routes.BUDGET) },
         )
     }
 
     composable(Routes.BUDGET) {
-        com.rhys.financetracker.ui.budget.BudgetScreen(onBack = { navController.popBackStack() })
+        // A tab: nothing to go back to.
+        com.rhys.financetracker.ui.budget.BudgetScreen(onBack = null)
     }
 
     composable(Routes.ASK_CLAUDE) {
@@ -529,8 +529,8 @@ private fun NavGraphBuilder.editorDestinations(
 
     composable(Routes.ACCOUNTS) {
         AccountsScreen(
-            // A tab now: nothing to go back to.
-            onBack = null,
+            // Under More now, so there is somewhere to go back to.
+            onBack = { navController.popBackStack() },
             onEditAccount = { navController.navigate(Routes.accountEdit(it)) },
             onAddAccount = { navController.navigate(Routes.accountEdit()) },
             onOpenPeople = { navController.navigate(Routes.PEOPLE) },

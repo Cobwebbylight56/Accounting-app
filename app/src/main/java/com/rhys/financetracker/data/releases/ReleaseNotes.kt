@@ -22,6 +22,16 @@ object ReleaseNotes {
     /** Every release, newest first. */
     val ALL: List<Release> = listOf(
         Release(
+            "2.10.0", LocalDate.of(2026, 11, 19), "The budget as a sheet, and its own tab",
+            listOf(
+                "Budget is now the fourth tab along the bottom, and Accounts has moved to More → Accounts.",
+                "The budget is laid out like your spreadsheet: a row for each line, a column for each of you and one for the total. Each figure is what was spent, with the budget under it, green, amber or red by how it's going — with the spent and score rows at the bottom.",
+                "Set up from your spreadsheet, each person's column goes to them by name, so Rhys's figures are Rhys's. Each of you is measured against your own part by your own accounts' spending. Joint account spending is shared between you; the menu can give it a column of its own instead.",
+                "Tap someone's figure to change their part of a line; the total follows.",
+                "A graph of each month's budget against what was spent, the months that went over in red. Tap a month to see it.",
+            ),
+        ),
+        Release(
             "2.9.0", LocalDate.of(2026, 11, 19), "A budget, from your spreadsheet",
             listOf(
                 "New: More → Budget. Choose the household spreadsheet you started with and its outgoings become your monthly budget — everyone's figures added up, each matched to the category its spending lands in, or the loan or saver it's paid into. You check them all before anything is saved. Or start from what you've spent lately.",

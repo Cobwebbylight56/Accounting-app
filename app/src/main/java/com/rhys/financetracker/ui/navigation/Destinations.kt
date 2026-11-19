@@ -1,11 +1,11 @@
 package com.rhys.financetracker.ui.navigation
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.PieChart
 import androidx.compose.material.icons.outlined.ReceiptLong
+import androidx.compose.material.icons.outlined.TableChart
 import androidx.compose.ui.graphics.vector.ImageVector
 
 /**
@@ -145,7 +145,7 @@ object Routes {
 
 /**
  * The tabs along the bottom: how the month is going, where the money went,
- * every payment, where the money is kept, and everything else.
+ * every payment, the budget, and everything else — the accounts among it.
  */
 enum class TopLevelDestination(
     val route: String,
@@ -155,7 +155,7 @@ enum class TopLevelDestination(
     DASHBOARD(Routes.DASHBOARD, "Home", Icons.Outlined.Home),
     SPENDING(Routes.SPENDING, "Spending", Icons.Outlined.PieChart),
     TRANSACTIONS(Routes.TRANSACTIONS, "Payments", Icons.Outlined.ReceiptLong),
-    ACCOUNTS(Routes.ACCOUNTS, "Accounts", Icons.Outlined.AccountBalanceWallet),
+    BUDGET(Routes.BUDGET, "Budget", Icons.Outlined.TableChart),
     MORE(Routes.MORE, "More", Icons.Outlined.MoreHoriz),
     ;
 

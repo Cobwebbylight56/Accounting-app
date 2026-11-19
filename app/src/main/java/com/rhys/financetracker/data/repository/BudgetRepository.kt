@@ -8,12 +8,15 @@ import com.rhys.financetracker.data.importer.SpreadsheetImporter
 import com.rhys.financetracker.data.local.dao.AccountDao
 import com.rhys.financetracker.data.local.dao.BudgetDao
 import com.rhys.financetracker.data.local.dao.CategoryDao
+import com.rhys.financetracker.data.local.dao.PersonDao
 import com.rhys.financetracker.data.local.entity.BudgetChangeEntity
 import com.rhys.financetracker.data.local.entity.BudgetLineEntity
 import com.rhys.financetracker.data.local.entity.CategoryEntity
 import com.rhys.financetracker.data.prefs.SettingsRepository
 import com.rhys.financetracker.domain.budget.BudgetMaths
 import com.rhys.financetracker.domain.budget.BudgetPlan
+import com.rhys.financetracker.domain.budget.BudgetShares
+import com.rhys.financetracker.domain.budget.LineStatus
 import com.rhys.financetracker.domain.budget.LineGoal
 import com.rhys.financetracker.domain.budget.LineResult
 import com.rhys.financetracker.domain.budget.MonthScore
@@ -26,7 +29,15 @@ import java.time.YearMonth
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+
+/** A column of the budget sheet: one person, or the joint money (no person). */
+data class BudgetColumn(val personId: Long?, val name: String)
+
+/** One person's cell of a line: their part of its budget, and what they spent. */
+data class BudgetCell(val budgetMinor: Long, val actualMinor: Long, val status: LineStatus)
 
 /** A line of the budget for the page: how it did, and what counts towards it. */
 data class BudgetLineView(
@@ -36,6 +47,10 @@ data class BudgetLineView(
     val countsLabel: String?,
     /** What it usually comes to: the average of the last few finished months; null with none. */
     val usualMinor: Long?,
+    /** One per column of [BudgetOverview.columns]. */
+    val cells: List<BudgetCell> = emptyList(),
+    /** Each person's usual part, by person; empty when the line isn't split. */
+    val shares: Map<Long, Long> = emptyMap(),
 )
 
 /** Everything the budget page shows for one month. */
@@ -49,6 +64,12 @@ data class BudgetOverview(
     /** Finished months in a row within the spending budget. */
     val streak: Int,
     val suggestions: List<Suggestion>,
+    /** The sheet's person columns, before the total; empty with only one person. */
+    val columns: List<BudgetColumn> = emptyList(),
+    /** How each column did, one per column. */
+    val columnScores: List<MonthScore> = emptyList(),
+    /** Joint spending shared between the people, rather than a column of its own. */
+    val splitJoint: Boolean = true,
 )
 
 /** A line offered when setting the budget up, to keep, change or leave out. */
@@ -60,6 +81,10 @@ data class DraftLine(
     val isAim: Boolean = false,
     val isPutAside: Boolean = false,
     val include: Boolean = true,
+    /** Each person's part, from the sheet's columns: person id to pence. */
+    val shares: Map<Long, Long> = emptyMap(),
+    /** "Rhys £60.75 · Hannah £80.59", to show who it's for. */
+    val sharesText: String? = null,
 )
 
 /**
@@ -77,10 +102,15 @@ class BudgetRepository @Inject constructor(
     private val transactionRepository: TransactionRepository,
     private val importer: SpreadsheetImporter,
     private val settingsRepository: SettingsRepository,
+    private val personDao: PersonDao,
 ) {
 
     val lines: Flow<List<BudgetLineEntity>> = budgetDao.observeLines()
     val changes: Flow<List<BudgetChangeEntity>> = budgetDao.observeChanges()
+    val shares: Flow<List<com.rhys.financetracker.data.local.entity.BudgetShareEntity>> = budgetDao.observeShares()
+
+    /** Whether joint spending is shared between the people on the sheet. */
+    val splitJoint: Flow<Boolean> = settingsRepository.settings.map { it.budgetSplitJoint }.distinctUntilChanged()
 
     /** [month] in full, with the months before it scored. Months after today have nothing in yet. */
     suspend fun overview(month: YearMonth, today: LocalDate = DateUtils.today(), historyMonths: Int = HISTORY_MONTHS): BudgetOverview {
@@ -133,13 +163,59 @@ class BudgetRepository @Inject constructor(
             BudgetMaths.suggestion(plan, history)?.takeIf { "${it.lineId}:${it.toMinor}" !in seen }
         }
 
+        // The sheet: a column for each person, their part of each line and
+        // what they spent on it, joint spending shared between them or in a
+        // column of its own.
+        val people = personDao.getAll().filter { !it.isArchived }
+        val individuals = people.filterNot { it.isShared }.sortedBy { it.sortOrder }
+        val splitJoint = settingsRepository.settings.first().budgetSplitJoint
+        val sharesByLine = budgetDao.getShares().groupBy { it.lineId }.mapValues { (_, list) -> list.associate { it.personId to it.amountMinor } }
+        val ids = individuals.map { it.id }
+        val columns = if (individuals.size < 2) emptyList() else {
+            individuals.map { BudgetColumn(it.id, it.name.substringBefore(' ')) } +
+                if (splitJoint) emptyList() else listOf(BudgetColumn(null, people.firstOrNull { it.isShared }?.name ?: "Joint"))
+        }
+        val byPerson = if (columns.isEmpty()) emptyMap() else ids.associateWith { id -> personActuals(lines, categories, month, today, id) }
+
         val views = lines.zip(shown).map { (line, result) ->
             val usual = finished.mapNotNull { actual[it]?.byLine?.get(line.id) }.filter { it > 0 }
+            val shares = sharesByLine[line.id].orEmpty()
+            val cells = if (columns.isEmpty()) emptyList() else {
+                val budgets = BudgetShares.forMonth(shares, line.amountMinor, result.budgetMinor, ids)
+                val jointBudget = if (shares.isEmpty()) 0L else Math.round(
+                    BudgetShares.unassigned(shares, line.amountMinor, ids).toDouble() * result.budgetMinor / line.amountMinor.coerceAtLeast(1L),
+                )
+                val own = ids.associateWith { id -> byPerson[id]?.get(line.id) ?: 0L }
+                val joint = (result.actualMinor - own.values.sum()).coerceAtLeast(0L)
+                val jointSpent = BudgetShares.evenly(joint, ids)
+                val jointBudgets = BudgetShares.evenly(jointBudget, ids)
+                val inProgress = month == thisMonth
+                val personCells = ids.map { id ->
+                    val budget = (budgets[id] ?: 0L) + if (splitJoint) jointBudgets[id] ?: 0L else 0L
+                    val spent = (own[id] ?: 0L) + if (splitJoint) jointSpent[id] ?: 0L else 0L
+                    BudgetCell(budget, spent, BudgetMaths.status(result.plan, budget, spent, inProgress))
+                }
+                personCells + if (splitJoint) emptyList() else listOf(
+                    BudgetCell(jointBudget, joint, BudgetMaths.status(result.plan, jointBudget, joint, inProgress)),
+                )
+            }
             BudgetLineView(
                 line = line,
                 result = result,
                 countsLabel = countsLabel(line, categories, accounts.mapValues { it.value.name }),
                 usualMinor = if (usual.isEmpty()) null else usual.sum() / usual.size,
+                cells = cells,
+                shares = shares,
+            )
+        }
+        val columnScores = columns.indices.map { c ->
+            BudgetMaths.score(
+                month,
+                views.map { view ->
+                    val cell = view.cells[c]
+                    view.result.copy(budgetMinor = cell.budgetMinor, actualMinor = cell.actualMinor, status = cell.status)
+                },
+                inProgress = month == thisMonth,
             )
         }
         return BudgetOverview(
@@ -150,7 +226,40 @@ class BudgetRepository @Inject constructor(
             history = history,
             streak = BudgetMaths.streak(recent),
             suggestions = suggestions,
+            columns = columns,
+            columnScores = columnScores,
+            splitJoint = splitJoint,
         )
+    }
+
+    /** What [personId]'s own accounts put towards each line in [month]. */
+    private suspend fun personActuals(
+        lines: List<BudgetLineEntity>,
+        categories: List<CategoryEntity>,
+        month: YearMonth,
+        today: LocalDate,
+        personId: Long,
+    ): Map<Long, Long> {
+        val start = month.atDay(1)
+        if (start.isAfter(today)) return emptyMap()
+        val end = minOf(month.atEndOfMonth(), today)
+        val people = setOf(personId)
+        val byCategory = transactionRepository.observeCategoryTotals(TransactionType.EXPENSE, start, end, null, people).first()
+            .mapNotNull { total -> total.categoryId?.let { it to total.totalMinor } }.toMap()
+        val kinds = categories.associate { it.id to it.kind }
+        val saved = if (lines.any { it.accountId == null && kinds[it.categoryId] == CategoryKind.SAVING }) {
+            transactionRepository.observePotFlow(CategoryKind.SAVING, start, end, null, people).first().netMinor
+        } else {
+            0L
+        }
+        return lines.associate { line ->
+            line.id to when {
+                line.accountId != null -> budgetDao.paidIntoBy(line.accountId, personId, start, end)
+                line.categoryId != null && kinds[line.categoryId] == CategoryKind.SAVING -> saved
+                line.categoryId != null -> withinCategory(line.categoryId, categories).sumOf { byCategory[it] ?: 0L }
+                else -> 0L
+            }
+        }
     }
 
     /** What each line came to in [month]: its category's spending, or what was paid into its account. */
@@ -219,9 +328,15 @@ class BudgetRepository @Inject constructor(
             "That doesn't look like a household budget sheet — a column of figures for each person, under a heading like OUTGOINGS.",
         )
         val (categories, accounts) = matchingLists()
+        // Each column of the sheet is someone in the app: "Rhys" is Rhys Evans.
+        val people = personDao.getAll().filter { !it.isArchived && !it.isShared }
+        fun personFor(heading: String) = people.firstOrNull { it.name.equals(heading, true) }
+            ?: people.firstOrNull { it.name.substringBefore(' ').equals(heading.substringBefore(' '), true) }
         return AppResult.Success(
             rows.map { row ->
                 val match = BudgetFromSheet.match(row.name, categories, accounts)
+                val shares = row.byPerson.mapNotNull { (heading, amount) -> personFor(heading)?.let { it.id to amount } }
+                    .groupBy({ it.first }, { it.second }).mapValues { it.value.sum() }
                 DraftLine(
                     name = row.name,
                     amountMinor = row.amountMinor,
@@ -229,6 +344,10 @@ class BudgetRepository @Inject constructor(
                     accountId = match.accountId,
                     isAim = match.aim,
                     isPutAside = match.goal == LineGoal.PUT_ASIDE_AT_LEAST,
+                    shares = shares,
+                    sharesText = people.filter { it.id in shares }
+                        .joinToString(" · ") { "${it.name.substringBefore(' ')} ${com.rhys.financetracker.core.money.Money.format(shares.getValue(it.id))}" }
+                        .ifBlank { null },
                 )
             },
         )
@@ -284,8 +403,9 @@ class BudgetRepository @Inject constructor(
 
     /** Saves the chosen [drafts] as the budget, in place of what was there. */
     suspend fun saveSetup(drafts: List<DraftLine>, fromSheet: Boolean) {
+        val kept = drafts.filter { it.include && it.amountMinor > 0 }
         budgetDao.replaceLines(
-            drafts.filter { it.include && it.amountMinor > 0 }.mapIndexed { i, draft ->
+            kept.mapIndexed { i, draft ->
                 BudgetLineEntity(
                     name = draft.name.trim(),
                     categoryId = draft.categoryId.takeIf { draft.accountId == null },
@@ -297,18 +417,48 @@ class BudgetRepository @Inject constructor(
                     fromSheet = fromSheet,
                 )
             },
+            // A total changed while checking: everyone's part changes alike.
+            kept.map { draft ->
+                val shares = draft.shares.filterValues { amount -> amount > 0 }
+                val sum = shares.values.sum()
+                if (sum > 0 && sum != draft.amountMinor && shares.size == draft.shares.size) {
+                    BudgetShares.scaled(shares, sum, draft.amountMinor)
+                } else {
+                    shares
+                }
+            },
         )
     }
 
     // -------------------------------------------------------------- editing
 
-    suspend fun saveLine(line: BudgetLineEntity): Long =
+    suspend fun saveLine(line: BudgetLineEntity): Long {
         if (line.id == 0L) {
-            budgetDao.insertLine(line.copy(sortOrder = (budgetDao.getLines().maxOfOrNull { it.sortOrder } ?: -1) + 1))
+            return budgetDao.insertLine(line.copy(sortOrder = (budgetDao.getLines().maxOfOrNull { it.sortOrder } ?: -1) + 1))
+        }
+        // A new total for a split line: everyone's part goes up or down alike.
+        val before = budgetDao.getLine(line.id)
+        val shares = budgetDao.getShares().filter { it.lineId == line.id }.associate { it.personId to it.amountMinor }
+        if (before != null && shares.isNotEmpty() && before.amountMinor != line.amountMinor) {
+            budgetDao.updateLine(line)
+            budgetDao.setShares(line.id, BudgetShares.scaled(shares, before.amountMinor, line.amountMinor), line.amountMinor)
         } else {
             budgetDao.updateLine(line)
-            line.id
         }
+        return line.id
+    }
+
+    /** [personId]'s usual part of [lineId] becomes [amountMinor]; the line's total follows. */
+    suspend fun setPersonShare(lineId: Long, personId: Long, amountMinor: Long) {
+        val line = budgetDao.getLine(lineId) ?: return
+        val people = personDao.getAll().filter { !it.isArchived && !it.isShared }.map { it.id }
+        val shares = budgetDao.getShares().filter { it.lineId == lineId }.associate { it.personId to it.amountMinor }
+        val (updated, total) = BudgetShares.withPerson(shares, line.amountMinor, people, personId, amountMinor)
+        budgetDao.setShares(lineId, updated, total)
+    }
+
+    /** Joint spending shared between the people on the sheet, or a column of its own. */
+    suspend fun setSplitJoint(on: Boolean) = settingsRepository.setBudgetSplitJoint(on)
 
     suspend fun deleteLine(id: Long) = budgetDao.deleteLine(id)
 

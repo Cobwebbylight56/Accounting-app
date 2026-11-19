@@ -30,8 +30,26 @@ other.
 
 ## Budget
 
-**More → Budget** is the household budget: what each thing should cost a
-month, and how well you keep to it.
+The **Budget** tab — the fourth along the bottom — is the household budget:
+what each thing should cost a month, and how well you keep to it. (Accounts,
+which used to be that tab, are under **More → Accounts**.)
+
+**The sheet.** It's laid out like your spreadsheet: a row for each line, a
+column for each of you, and one for the total. Each figure is what was spent,
+with the budget under it ("£58 of £60"), green when it's fine, amber for an
+aim gone a little over or money still to put aside, red when a limit is
+broken. The **Spent** row adds the spending up, and the **Score** row says how
+well each of you kept to it. Tap a line's name to change it, or someone's
+figure to change their part — the total follows.
+
+**Whose is whose.** Set up from your spreadsheet, each person's column goes to
+them by name — Rhys's figures to Rhys — and each of you is measured against
+your own part by what your own accounts spent. Spending from a joint account
+is shared between you; **Give joint money its own column** in the menu shows
+it apart instead. A line set up without a split is shared evenly.
+
+**The graph.** Each month's budget beside what was spent, the months that went
+over in red, and a line naming them. Tap a month to look at it.
 
 **Setting it up from your spreadsheet.** Tap **Choose my spreadsheet** and
 pick the household spreadsheet you started with. Its outgoings block becomes
@@ -140,8 +158,8 @@ Along the bottom of the screen are five tabs:
 | **Home** | This month at a glance: what you have, what came in and went out, what needs a look, who you sent money to, what is coming up |
 | **Spending** | Where the money went — by category (split payments counted part by part), month by month, who it went to — with shortcuts to **Bills & subscriptions**, **Money with people** and **Ideas to save** |
 | **Payments** | Every payment, searchable and filterable. Tabs along the top show **Everyone**, one person, or **Joint** (what's held jointly) |
-| **Accounts** | Where the money is kept: current accounts, savings, cards, loans and the mortgage, with shortcuts to **Savings goals** and **Credit cards** |
-| **More** | People, Bills & subscriptions, Needs a look, Progress reports, Reports & exports, Settings |
+| **Budget** | The household budget as a sheet — a column for each of you — with each month's score and a graph of the months that went over. See **Budget** below |
+| **More** | **Accounts** (where the money is kept: current accounts, savings, cards, loans and the mortgage), People, Bills & subscriptions, Needs a look, Progress reports, Reports & exports, Settings |
 
 **The + button** on Home, Spending and Payments opens one **Add** sheet with
 every way to add money: **A payment**, **Scan a receipt or screenshot**,

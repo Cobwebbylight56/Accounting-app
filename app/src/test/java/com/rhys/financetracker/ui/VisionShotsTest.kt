@@ -111,6 +111,60 @@ class VisionShotsTest {
 
     @Test fun tipsLight() = shoot("11-tips-light", ThemeMode.LIGHT) { Tips() }
 
+    @Test fun budgetDark() = shoot("12-budget-dark", ThemeMode.DARK) { Budget() }
+
+    @Test fun budgetLight() = shoot("13-budget-light", ThemeMode.LIGHT) { Budget() }
+
+    /** The Budget tab's sheet and graph: a column each, the months that went over in red. */
+    @Composable
+    private fun Budget() {
+        val maths = com.rhys.financetracker.domain.budget.BudgetMaths
+        val goal = com.rhys.financetracker.domain.budget.LineGoal
+        fun line(id: Long, name: String, budget: Long, spent: Long, aim: Boolean = false, putAside: Boolean = false, cells: List<Pair<Long, Long>>): com.rhys.financetracker.data.repository.BudgetLineView {
+            val plan = com.rhys.financetracker.domain.budget.BudgetPlan(id, name, budget, aim = aim, goal = if (putAside) goal.PUT_ASIDE_AT_LEAST else goal.SPEND_AT_MOST)
+            return com.rhys.financetracker.data.repository.BudgetLineView(
+                line = com.rhys.financetracker.data.local.entity.BudgetLineEntity(id = id, name = name, amountMinor = budget, isAim = aim, isPutAside = putAside, categoryId = id),
+                result = maths.result(plan, month, spent, null, emptyList(), inProgress = false),
+                countsLabel = name,
+                usualMinor = null,
+                cells = cells.map { (b, a) -> com.rhys.financetracker.data.repository.BudgetCell(b, a, maths.status(plan, b, a, inProgress = false)) },
+            )
+        }
+        val lines = listOf(
+            line(1, "Car", 14_134, 14_134, cells = listOf(6_075L to 6_075L, 8_059L to 8_059L)),
+            line(2, "Road tax", 6_168, 6_168, cells = listOf(3_762L to 3_762L, 2_406L to 2_406L)),
+            line(3, "Phone", 2_000, 2_499, cells = listOf(2_000L to 2_499L, 0L to 0L)),
+            line(4, "Fuel", 20_000, 23_100, aim = true, cells = listOf(12_000L to 15_600L, 8_000L to 7_500L)),
+            line(5, "Food shop", 30_000, 28_650, aim = true, cells = listOf(15_000L to 14_000L, 15_000L to 14_650L)),
+            line(6, "Lloyds Saver", 20_000, 20_000, putAside = true, cells = listOf(10_000L to 10_000L, 10_000L to 10_000L)),
+        )
+        val score = maths.score(month, lines.map { it.result }, inProgress = false)
+        val columnScores = (0..1).map { c ->
+            maths.score(month, lines.map { v -> v.result.copy(budgetMinor = v.cells[c].budgetMinor, actualMinor = v.cells[c].actualMinor, status = v.cells[c].status) }, inProgress = false)
+        }
+        val history = months.reversed().mapIndexed { i, m ->
+            if (m == month) score else com.rhys.financetracker.domain.budget.MonthScore(
+                m, false, 5, 6, 72_302, listOf(68_100L, 76_900L, 70_250L, 81_400L, 71_000L)[i - 1], listOf(92, 75, 83, 58, 92)[i - 1], null,
+            )
+        }
+        val overview = com.rhys.financetracker.data.repository.BudgetOverview(
+            month = month,
+            inProgress = false,
+            lines = lines,
+            score = score,
+            history = history,
+            streak = 1,
+            suggestions = emptyList(),
+            columns = listOf(
+                com.rhys.financetracker.data.repository.BudgetColumn(1, "Rhys"),
+                com.rhys.financetracker.data.repository.BudgetColumn(2, "Hannah"),
+            ),
+            columnScores = columnScores,
+        )
+        com.rhys.financetracker.ui.budget.BudgetSheet(overview, onLine = {}, onCell = { _, _ -> })
+        com.rhys.financetracker.ui.budget.BudgetGraph(overview.history, month, onMonth = {})
+    }
+
     /**
      * [hold] stops the clock at [advanceMs] rather than letting every
      * animation run to its end — for the intro, which ends by fading away.

@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
@@ -95,7 +94,11 @@ import java.util.Locale
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BudgetScreen(onBack: () -> Unit, viewModel: BudgetViewModel = hiltViewModel()) {
+fun BudgetScreen(
+    /** Null when Budget is a tab, with nothing to go back to. */
+    onBack: (() -> Unit)? = null,
+    viewModel: BudgetViewModel = hiltViewModel(),
+) {
     val month by viewModel.month.collectAsStateWithLifecycle()
     val overview by viewModel.overview.collectAsStateWithLifecycle()
     val setup by viewModel.setup.collectAsStateWithLifecycle()
@@ -103,10 +106,13 @@ fun BudgetScreen(onBack: () -> Unit, viewModel: BudgetViewModel = hiltViewModel(
     val message by viewModel.message.collectAsStateWithLifecycle()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
     val accounts by viewModel.accounts.collectAsStateWithLifecycle()
+    val splitJoint by viewModel.splitJoint.collectAsStateWithLifecycle()
 
     var menuOpen by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<BudgetLineView?>(null) }
     var adding by remember { mutableStateOf(false) }
+    /** A person's cell being changed: the line, and which column. */
+    var cell by remember { mutableStateOf<Pair<BudgetLineView, Int>?>(null) }
 
     val pickSheet = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         uri?.let(viewModel::setUpFromSheet)
@@ -121,8 +127,10 @@ fun BudgetScreen(onBack: () -> Unit, viewModel: BudgetViewModel = hiltViewModel(
             TopAppBar(
                 title = { Text(if (current == null) "Budget" else "Set up your budget") },
                 navigationIcon = {
-                    IconButton(onClick = { if (current != null) viewModel.cancelSetup() else onBack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    if (current != null || onBack != null) {
+                        IconButton(onClick = { if (current != null) viewModel.cancelSetup() else onBack?.invoke() }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
                     }
                 },
                 actions = {
@@ -133,6 +141,10 @@ fun BudgetScreen(onBack: () -> Unit, viewModel: BudgetViewModel = hiltViewModel(
                                 DropdownMenuItem(text = { Text("Add a line") }, onClick = { menuOpen = false; adding = true })
                                 DropdownMenuItem(text = { Text("Set up from my spreadsheet") }, onClick = { menuOpen = false; openSheet() })
                                 DropdownMenuItem(text = { Text("Set up from what we spend") }, onClick = { menuOpen = false; viewModel.setUpFromSpending() })
+                                DropdownMenuItem(
+                                    text = { Text(if (splitJoint) "Give joint money its own column" else "Share joint money between you") },
+                                    onClick = { menuOpen = false; viewModel.setSplitJoint(!splitJoint) },
+                                )
                             }
                         }
                     }
@@ -159,6 +171,7 @@ fun BudgetScreen(onBack: () -> Unit, viewModel: BudgetViewModel = hiltViewModel(
                     onNext = viewModel::nextMonth,
                     onMonth = viewModel::showMonth,
                     onLine = { editing = it },
+                    onCell = { view, index -> cell = view to index },
                     onAdd = { adding = true },
                     onAccept = viewModel::accept,
                     onDismiss = viewModel::dismiss,
@@ -188,6 +201,27 @@ fun BudgetScreen(onBack: () -> Unit, viewModel: BudgetViewModel = hiltViewModel(
                 editing = null
             },
         )
+    }
+
+    cell?.let { (view, index) ->
+        val column = overview?.columns?.getOrNull(index)
+        val personId = column?.personId
+        if (column == null || personId == null) {
+            // The joint column: its part is what's left of the line's total.
+            cell = null
+            editing = view
+        } else {
+            ShareDialog(
+                person = column.name,
+                line = view.line.name,
+                current = view.shares[personId] ?: view.cells.getOrNull(index)?.budgetMinor ?: 0L,
+                onDismiss = { cell = null },
+                onSave = { amount ->
+                    viewModel.setPersonShare(view.line.id, personId, amount)
+                    cell = null
+                },
+            )
+        }
     }
 
     message?.let { text ->
@@ -241,16 +275,11 @@ private fun BudgetPage(
     onNext: () -> Unit,
     onMonth: (YearMonth) -> Unit,
     onLine: (BudgetLineView) -> Unit,
+    onCell: (BudgetLineView, Int) -> Unit,
     onAdd: () -> Unit,
     onAccept: (Suggestion) -> Unit,
     onDismiss: (Suggestion) -> Unit,
 ) {
-    val groups = listOf(
-        "Limits" to overview.lines.filter { !it.line.isAim && !it.line.isPutAside },
-        "Aims" to overview.lines.filter { it.line.isAim && !it.line.isPutAside },
-        "Putting aside" to overview.lines.filter { it.line.isPutAside },
-    ).filter { it.second.isNotEmpty() }
-
     LazyColumn(
         Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 32.dp),
@@ -269,34 +298,20 @@ private fun BudgetPage(
             }
         }
         item { ScoreCard(overview.score, overview.streak) }
+        item { BudgetSheet(overview, onLine = onLine, onCell = onCell) }
         if (overview.history.size > 1) {
-            item {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(overview.history.reversed()) { score ->
-                        MonthChip(score, selected = score.month == overview.month, onClick = { onMonth(score.month) })
-                    }
-                }
-            }
+            item { BudgetGraph(overview.history, overview.month, onMonth) }
         }
         items(overview.suggestions, key = { "s${it.lineId}" }) { suggestion ->
             SuggestionCard(suggestion, onAccept = { onAccept(suggestion) }, onDismiss = { onDismiss(suggestion) })
         }
-        groups.forEach { (title, lines) ->
-            item(key = "h$title") {
-                Column {
-                    Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                    Text(
-                        when (title) {
-                            "Limits" -> "Keep under these."
-                            "Aims" -> "Something to aim for — going over isn't a big problem."
-                            else -> "Reach these."
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            items(lines, key = { it.line.id }) { view -> LineRow(view, onClick = { onLine(view) }) }
+        item {
+            Text(
+                "Limits: keep under them. Aims, like fuel: going over isn't a big problem, so it only costs half marks. " +
+                    "Putting aside: reach it. Tap a line to change it, or someone's figure to change their part.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         item { OutlinedButton(onClick = onAdd, modifier = Modifier.fillMaxWidth()) { Text("Add a line") } }
     }
@@ -311,7 +326,7 @@ private fun ScoreCard(score: MonthScore, streak: Int) {
                     score.percent?.let { "$it%" } ?: "—",
                     style = MaterialTheme.typography.displaySmall,
                     fontWeight = FontWeight.Bold,
-                    color = gradeColour(score.grade),
+                    color = gradeColourOf(score.grade),
                 )
                 Spacer(Modifier.width(12.dp))
                 Column {
@@ -357,25 +372,6 @@ private fun ScoreCard(score: MonthScore, streak: Int) {
 }
 
 @Composable
-private fun MonthChip(score: MonthScore, selected: Boolean, onClick: () -> Unit) {
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-        modifier = Modifier.clickable(onClick = onClick),
-    ) {
-        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(score.month.month.getDisplayName(TextStyle.SHORT, Locale.UK), style = MaterialTheme.typography.labelMedium)
-            Text(
-                score.percent?.let { "$it%" } ?: "—",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = gradeColour(score.grade),
-            )
-        }
-    }
-}
-
-@Composable
 private fun SuggestionCard(suggestion: Suggestion, onAccept: () -> Unit, onDismiss: () -> Unit) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -393,78 +389,24 @@ private fun SuggestionCard(suggestion: Suggestion, onAccept: () -> Unit, onDismi
     }
 }
 
+/** One person's usual part of a line. */
 @Composable
-private fun LineRow(view: BudgetLineView, onClick: () -> Unit) {
-    val result = view.result
-    val budget = result.budgetMinor
-    val fraction = if (budget <= 0) 0f else (result.actualMinor.toFloat() / budget).coerceIn(0f, 1f)
-    Card(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(view.line.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(
-                        listOfNotNull(
-                            view.countsLabel ?: "Choose what counts",
-                            when (result.source) {
-                                BudgetSource.THIS_MONTH_ONLY -> "changed for this month"
-                                BudgetSource.AVERAGE -> "following your average"
-                                BudgetSource.SET -> null
-                            },
-                            view.usualMinor?.takeIf { view.line.isAim }?.let { "usually ${Money.format(it)}" },
-                        ).joinToString(" · "),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (view.countsLabel == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text("${Money.format(result.actualMinor)} of ${Money.format(budget)}", style = MaterialTheme.typography.bodyMedium)
-                    Text(statusText(view), style = MaterialTheme.typography.bodySmall, color = statusColour(result.status), fontWeight = FontWeight.SemiBold)
-                }
+private fun ShareDialog(person: String, line: String, current: Long, onDismiss: () -> Unit, onSave: (Long) -> Unit) {
+    var amount by remember { mutableStateOf(Money.formatPlain(current)) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("$person — $line") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("$person's part, a month. The line's total changes with it.", style = MaterialTheme.typography.bodyMedium)
+                AmountField(label = "A month", value = amount, onValueChange = { amount = it })
             }
-            LinearProgressIndicator(
-                progress = { fraction },
-                modifier = Modifier.fillMaxWidth(),
-                color = statusColour(result.status),
-            )
-        }
-    }
-}
-
-private fun statusText(view: BudgetLineView): String {
-    val r = view.result
-    return when (r.status) {
-        LineStatus.UNDER -> "${Money.format(r.leftMinor)} left"
-        LineStatus.ABOUT_RIGHT -> "${Money.format(-r.leftMinor)} over — fine"
-        LineStatus.OVER -> "${Money.format(-r.leftMinor)} over"
-        LineStatus.OVER_AIM -> "${Money.format(-r.leftMinor)} over the aim"
-        LineStatus.MET -> "Done"
-        LineStatus.SHORT -> "${Money.format(r.leftMinor)} short"
-        LineStatus.NOT_YET -> "${Money.format(r.leftMinor)} to go"
-        LineStatus.NO_BUDGET -> "No budget"
-    }
-}
-
-private val GREEN = Color(0xFF2E7D32)
-private val AMBER = Color(0xFFEF6C00)
-private val RED = Color(0xFFC62828)
-
-@Composable
-private fun statusColour(status: LineStatus): Color = when (status) {
-    LineStatus.UNDER, LineStatus.MET -> GREEN
-    LineStatus.ABOUT_RIGHT, LineStatus.OVER_AIM, LineStatus.NOT_YET -> AMBER
-    LineStatus.OVER, LineStatus.SHORT -> RED
-    LineStatus.NO_BUDGET -> MaterialTheme.colorScheme.onSurfaceVariant
-}
-
-@Composable
-private fun gradeColour(grade: Grade?): Color = when (grade) {
-    Grade.EXCELLENT, Grade.GOOD -> GREEN
-    Grade.GETTING_THERE -> AMBER
-    Grade.NEEDS_WORK -> RED
-    null -> MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        confirmButton = {
+            TextButton(onClick = { Money.parseOrNull(amount)?.let(onSave) }) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 /** The kind of line, as chosen when setting one up. */
@@ -656,7 +598,12 @@ private fun DraftRow(draft: DraftLine, categories: List<CategoryEntity>, account
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(checked = draft.include, onCheckedChange = { onChange(draft.copy(include = it)) })
-                Text(draft.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                Column(Modifier.weight(1f)) {
+                    Text(draft.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    draft.sharesText?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
             }
             if (draft.include) {
                 AmountField(label = "A month", value = amount, onValueChange = { text ->

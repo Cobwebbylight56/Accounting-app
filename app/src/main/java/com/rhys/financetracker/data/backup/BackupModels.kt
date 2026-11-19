@@ -37,6 +37,7 @@ object BackupFormat {
     const val KEY_SPLITS = "splits"
     const val KEY_BUDGET_LINES = "budgetLines"
     const val KEY_BUDGET_CHANGES = "budgetChanges"
+    const val KEY_BUDGET_SHARES = "budgetShares"
 }
 
 /** What a backup contains, shown before a restore so the user knows what they are about to load. */

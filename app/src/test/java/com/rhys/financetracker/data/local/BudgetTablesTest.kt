@@ -52,13 +52,14 @@ class BudgetTablesTest {
             .also { database = it }
 
     @Test
-    fun `a version 15 database is upgraded with the budget tables`() = runBlocking {
+    fun `a version 15 database is upgraded with the budget tables, shares and all`() = runBlocking {
         context.deleteDatabase(name)
         // The current schema, exactly as Room makes it, taken back to 15.
         Room.databaseBuilder(context, AppDatabase::class.java, name).allowMainThreadQueries().build()
             .also { it.openHelper.writableDatabase }
             .close()
         SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use { db ->
+            db.execSQL("DROP TABLE budget_shares")
             db.execSQL("DROP TABLE budget_changes")
             db.execSQL("DROP TABLE budget_lines")
             db.version = 15
@@ -68,6 +69,13 @@ class BudgetTablesTest {
         val id = db.budgetDao().insertLine(BudgetLineEntity(name = "Fuel", amountMinor = 15_000, isAim = true))
         assertEquals(listOf("Fuel"), db.budgetDao().getLines().map { it.name })
         assertTrue(db.budgetDao().getLine(id)!!.isAim)
+        val person = db.personDao().insert(com.rhys.financetracker.data.local.entity.PersonEntity(name = "Sam", colorHex = "#000000"))
+        db.budgetDao().setShares(id, mapOf(person to 9_000L), 15_000)
+        assertEquals(listOf(9_000L), db.budgetDao().getShares().map { it.amountMinor })
+        assertEquals(15_000L, db.budgetDao().getLine(id)!!.amountMinor)
+        // A line's shares go with it.
+        db.budgetDao().deleteLine(id)
+        assertTrue(db.budgetDao().getShares().isEmpty())
     }
 
     @Test

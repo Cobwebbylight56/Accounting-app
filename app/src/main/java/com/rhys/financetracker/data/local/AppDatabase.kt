@@ -62,6 +62,7 @@ import com.rhys.financetracker.data.local.entity.TransactionEntity
         com.rhys.financetracker.data.local.entity.ReceiptItemChoiceEntity::class,
         com.rhys.financetracker.data.local.entity.BudgetLineEntity::class,
         com.rhys.financetracker.data.local.entity.BudgetChangeEntity::class,
+        com.rhys.financetracker.data.local.entity.BudgetShareEntity::class,
     ],
     version = AppDatabase.DATABASE_VERSION,
     exportSchema = true,
@@ -87,7 +88,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun budgetDao(): com.rhys.financetracker.data.local.dao.BudgetDao
 
     companion object {
-        const val DATABASE_VERSION = 16
+        const val DATABASE_VERSION = 17
         const val DATABASE_NAME = "finance_tracker.db"
     }
 }

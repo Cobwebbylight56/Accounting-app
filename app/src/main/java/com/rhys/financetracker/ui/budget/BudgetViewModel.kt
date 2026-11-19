@@ -71,9 +71,14 @@ class BudgetViewModel @Inject constructor(
         .mapLatest { all -> all.filter { it.holding != Holding.SPEND } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /** Joint spending shared between the people on the sheet. */
+    val splitJoint: StateFlow<Boolean> = budget.splitJoint
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+
     init {
-        // Worked out again whenever the month, a line or a month's change does.
-        combine(_month, budget.lines, budget.changes) { month, _, _ -> month }
+        // Worked out again whenever the month, a line, a month's change, a
+        // person's part or how joint money is shown does.
+        combine(_month, budget.lines, budget.changes, budget.shares, budget.splitJoint) { month, _, _, _, _ -> month }
             .mapLatest { month -> runCatching { budget.overview(month) }.getOrNull() }
             .onEach { _overview.value = it }
             .launchIn(viewModelScope)
@@ -145,6 +150,15 @@ class BudgetViewModel @Inject constructor(
                 clearThisMonth -> budget.changeForMonth(id, _month.value, null)
             }
         }
+    }
+
+    /** [personId]'s usual part of [lineId]. */
+    fun setPersonShare(lineId: Long, personId: Long, amountMinor: Long) {
+        viewModelScope.launch { budget.setPersonShare(lineId, personId, amountMinor) }
+    }
+
+    fun setSplitJoint(on: Boolean) {
+        viewModelScope.launch { budget.setSplitJoint(on) }
     }
 
     fun deleteLine(id: Long) {

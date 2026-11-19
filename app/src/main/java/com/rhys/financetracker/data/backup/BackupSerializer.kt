@@ -252,6 +252,20 @@ class BackupSerializer @Inject constructor() {
             amountMinor = json.optLong("amountMinor", 0L),
         )
 
+    fun budgetShareToJson(share: com.rhys.financetracker.data.local.entity.BudgetShareEntity): JSONObject =
+        JSONObject().apply {
+            put("lineId", share.lineId)
+            put("personId", share.personId)
+            put("amountMinor", share.amountMinor)
+        }
+
+    fun budgetShareFromJson(json: JSONObject): com.rhys.financetracker.data.local.entity.BudgetShareEntity =
+        com.rhys.financetracker.data.local.entity.BudgetShareEntity(
+            lineId = json.optLong("lineId", 0L),
+            personId = json.optLong("personId", 0L),
+            amountMinor = json.optLong("amountMinor", 0L),
+        )
+
     // ----------------------------------------------------------- cash pot
 
     fun cashPotEntryToJson(entry: CashPotEntryEntity): JSONObject = JSONObject().apply {

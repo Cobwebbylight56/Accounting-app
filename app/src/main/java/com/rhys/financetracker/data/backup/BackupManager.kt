@@ -108,6 +108,10 @@ class BackupManager @Inject constructor(
                 serializer.writeArray(database.budgetDao().getChanges(), serializer::budgetChangeToJson),
             )
             put(
+                BackupFormat.KEY_BUDGET_SHARES,
+                serializer.writeArray(database.budgetDao().getShares(), serializer::budgetShareToJson),
+            )
+            put(
                 BackupFormat.KEY_CASH_POT,
                 serializer.writeArray(
                     database.cashPotDao().getAll(),
@@ -287,6 +291,11 @@ class BackupManager @Inject constructor(
                 json.optJSONArray(BackupFormat.KEY_BUDGET_CHANGES),
                 serializer::budgetChangeFromJson,
             ).filter { it.lineId in budgetLineIds && it.month.isNotBlank() }
+            val personIds = people.map { it.id }.toSet()
+            val budgetShares = serializer.readArray(
+                json.optJSONArray(BackupFormat.KEY_BUDGET_SHARES),
+                serializer::budgetShareFromJson,
+            ).filter { it.lineId in budgetLineIds && it.personId in personIds }
 
             if (accounts.isEmpty() && transactions.isEmpty()) {
                 error("That file does not look like a Finance Tracker backup")
@@ -325,6 +334,7 @@ class BackupManager @Inject constructor(
                 database.incomeChangeDao().insertAll(payHistory)
                 database.budgetDao().insertLines(budgetLines)
                 database.budgetDao().insertChanges(budgetChanges)
+                database.budgetDao().insertShares(budgetShares)
             }
 
             // A backup from before categories existed would leave the app

@@ -8,6 +8,7 @@ import androidx.room.Transaction
 import androidx.room.Update
 import com.rhys.financetracker.data.local.entity.BudgetChangeEntity
 import com.rhys.financetracker.data.local.entity.BudgetLineEntity
+import com.rhys.financetracker.data.local.entity.BudgetShareEntity
 import java.time.LocalDate
 import kotlinx.coroutines.flow.Flow
 
@@ -38,11 +39,38 @@ interface BudgetDao {
     @Query("DELETE FROM budget_lines")
     suspend fun deleteAllLines()
 
-    /** Swaps the whole budget for [lines] in one go. */
+    /** Swaps the whole budget for [lines] in one go; [shares] by each line's place in [lines]. */
     @Transaction
-    suspend fun replaceLines(lines: List<BudgetLineEntity>) {
+    suspend fun replaceLines(lines: List<BudgetLineEntity>, shares: List<Map<Long, Long>> = emptyList()) {
         deleteAllLines()
-        insertLines(lines)
+        val ids = insertLines(lines)
+        insertShares(
+            ids.zip(shares).flatMap { (lineId, byPerson) ->
+                byPerson.map { (personId, amount) -> BudgetShareEntity(lineId, personId, amount) }
+            },
+        )
+    }
+
+    /** Each person's part of each line. */
+    @Query("SELECT * FROM budget_shares")
+    fun observeShares(): Flow<List<BudgetShareEntity>>
+
+    @Query("SELECT * FROM budget_shares")
+    suspend fun getShares(): List<BudgetShareEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertShares(shares: List<BudgetShareEntity>)
+
+    @Query("DELETE FROM budget_shares WHERE line_id = :lineId")
+    suspend fun clearShares(lineId: Long)
+
+    /** [lineId]'s shares and total together, so they never disagree. */
+    @Transaction
+    suspend fun setShares(lineId: Long, shares: Map<Long, Long>, totalMinor: Long) {
+        val line = getLine(lineId) ?: return
+        updateLine(line.copy(amountMinor = totalMinor))
+        clearShares(lineId)
+        insertShares(shares.map { (personId, amount) -> BudgetShareEntity(lineId, personId, amount) })
     }
 
     /** Every line's changes for one month or another, to know any month's budget. */
@@ -75,4 +103,17 @@ interface BudgetDao {
         """,
     )
     suspend fun paidInto(accountId: Long, start: LocalDate, end: LocalDate): Long
+
+    /** The same, for what came from [personId]'s own accounts. */
+    @Query(
+        """
+        SELECT IFNULL(SUM(t.amount_minor), 0) FROM transactions t
+        LEFT JOIN accounts a ON a.id = t.account_id
+        WHERE t.is_archived = 0 AND t.date BETWEEN :start AND :end
+          AND COALESCE(t.person_id, a.person_id) = :personId
+          AND ((t.type = 'TRANSFER' AND t.transfer_account_id = :accountId)
+               OR (t.type = 'INCOME' AND t.account_id = :accountId))
+        """,
+    )
+    suspend fun paidIntoBy(accountId: Long, personId: Long, start: LocalDate, end: LocalDate): Long
 }
