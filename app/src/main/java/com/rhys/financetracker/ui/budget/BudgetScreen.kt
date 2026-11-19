@@ -297,7 +297,14 @@ private fun BudgetPage(
                 IconButton(onClick = onNext, enabled = canGoForward) { Icon(Icons.Filled.ChevronRight, contentDescription = "Month after") }
             }
         }
-        item { ScoreCard(overview.score, overview.streak) }
+        item {
+            ScoreCard(
+                overview.score,
+                overview.streak,
+                people = overview.columns.zip(overview.columnScores).filter { it.first.personId != null }
+                    .map { (column, score) -> column.name to score },
+            )
+        }
         item { BudgetSheet(overview, onLine = onLine, onCell = onCell) }
         if (overview.history.size > 1) {
             item { BudgetGraph(overview.history, overview.month, onMonth) }
@@ -318,7 +325,7 @@ private fun BudgetPage(
 }
 
 @Composable
-private fun ScoreCard(score: MonthScore, streak: Int) {
+private fun ScoreCard(score: MonthScore, streak: Int, people: List<Pair<String, MonthScore>> = emptyList()) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -355,6 +362,19 @@ private fun ScoreCard(score: MonthScore, streak: Int) {
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
+            // Each of you, against your own part.
+            if (people.isNotEmpty()) {
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    people.forEach { (name, theirs) ->
+                        Text(
+                            "$name ${theirs.percent?.let { "$it%" } ?: "—"}",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = gradeColourOf(theirs.grade),
+                        )
+                    }
+                }
+            }
             if (streak > 0) {
                 Text(
                     "Within budget $streak ${if (streak == 1) "month" else "months in a row"}",
@@ -388,6 +408,14 @@ private fun SuggestionCard(suggestion: Suggestion, onAccept: () -> Unit, onDismi
         }
     }
 }
+
+/** The month's score card, with each person's, as the top of the Budget tab shows it. */
+@Composable
+internal fun BudgetScoreCard(overview: BudgetOverview) = ScoreCard(
+    overview.score,
+    overview.streak,
+    people = overview.columns.zip(overview.columnScores).filter { it.first.personId != null }.map { (column, score) -> column.name to score },
+)
 
 /** One person's usual part of a line. */
 @Composable

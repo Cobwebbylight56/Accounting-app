@@ -160,6 +160,7 @@ class VisionShotsTest {
             ),
             columnScores = columnScores,
         )
+        com.rhys.financetracker.ui.budget.BudgetScoreCard(overview)
         com.rhys.financetracker.ui.budget.BudgetSheet(overview, onLine = {}, onCell = { _, _ -> })
         com.rhys.financetracker.ui.budget.BudgetGraph(overview.history, month, onMonth = {})
     }
