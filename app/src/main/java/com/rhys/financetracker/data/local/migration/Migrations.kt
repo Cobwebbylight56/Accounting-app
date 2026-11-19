@@ -530,9 +530,38 @@ object Migrations {
         if (!has) db.execSQL("ALTER TABLE `transactions` ADD COLUMN `is_one_off` INTEGER NOT NULL DEFAULT 0")
     }
 
+    /** Version 16 adds the budget: its lines, and lines changed for one month. */
+    val MIGRATION_15_16 = Migration(15, 16) { db ->
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `budget_lines` (" +
+                "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "`name` TEXT NOT NULL, " +
+                "`category_id` INTEGER, " +
+                "`account_id` INTEGER, " +
+                "`amount_minor` INTEGER NOT NULL, " +
+                "`is_aim` INTEGER NOT NULL DEFAULT 0, " +
+                "`follow_average` INTEGER NOT NULL DEFAULT 0, " +
+                "`is_put_aside` INTEGER NOT NULL DEFAULT 0, " +
+                "`sort_order` INTEGER NOT NULL DEFAULT 0, " +
+                "`from_sheet` INTEGER NOT NULL DEFAULT 0, " +
+                "FOREIGN KEY(`category_id`) REFERENCES `categories`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL, " +
+                "FOREIGN KEY(`account_id`) REFERENCES `accounts`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL)",
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_budget_lines_category_id` ON `budget_lines` (`category_id`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_budget_lines_account_id` ON `budget_lines` (`account_id`)")
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `budget_changes` (" +
+                "`line_id` INTEGER NOT NULL, " +
+                "`month` TEXT NOT NULL, " +
+                "`amount_minor` INTEGER NOT NULL, " +
+                "PRIMARY KEY(`line_id`, `month`), " +
+                "FOREIGN KEY(`line_id`) REFERENCES `budget_lines`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
+    }
+
     val ALL: Array<Migration> = arrayOf(
         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
         MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
-        MIGRATION_13_14, MIGRATION_14_15,
+        MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16,
     )
 }

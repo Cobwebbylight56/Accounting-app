@@ -44,6 +44,12 @@ object TipBook {
             newIn = "2.4.0",
         ),
         Tip(
+            "budget", TipPlace.HOME, "A budget, from your spreadsheet",
+            "More → Budget turns the spreadsheet you started with into a monthly budget, and scores how well you keep " +
+                "to it. Fuel and the food shop are aims: going over isn't a big problem.",
+            newIn = "2.9.0",
+        ),
+        Tip(
             "claude-chat", TipPlace.HOME, "Ask Claude about your money",
             "More → Ask Claude: ask anything — where the money went, what to cut back — and Claude looks through your " +
                 "payments to answer. It needs your own Claude API key; the page shows how.",

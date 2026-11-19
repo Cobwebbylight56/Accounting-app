@@ -22,6 +22,17 @@ object ReleaseNotes {
     /** Every release, newest first. */
     val ALL: List<Release> = listOf(
         Release(
+            "2.9.0", LocalDate.of(2026, 11, 19), "A budget, from your spreadsheet",
+            listOf(
+                "New: More → Budget. Choose the household spreadsheet you started with and its outgoings become your monthly budget — everyone's figures added up, each matched to the category its spending lands in, or the loan or saver it's paid into. You check them all before anything is saved. Or start from what you've spent lately.",
+                "Each month gets a score for how well you kept to it, with the months before alongside, a streak for months within budget, and what's left to spend.",
+                "Bills are limits: keep under them. Fuel and the food shop are aims: going over isn't a big problem — a fifth over still counts, and more than that only costs half marks. An aim can follow what you usually spend, and any line can be changed for one month only — a long trip, Christmas.",
+                "When a budget keeps not fitting — a bill that's gone up, an aim that's always beaten — the page suggests a better amount, to take or leave.",
+                "Saving and paying off count too: a line for the saver or the car loan is met when the money goes in.",
+                "Ask Claude can see the budget, so you can ask how you're doing against it.",
+            ),
+        ),
+        Release(
             "2.8.1", LocalDate.of(2026, 11, 11), "Fixes",
             listOf(
                 "Money between the two of you — \"EVANS RHYS\" — is recognised as a move even when the app only knows your first names.",

@@ -100,6 +100,14 @@ class BackupManager @Inject constructor(
                 serializer.writeArray(database.splitDao().getAll(), serializer::splitToJson),
             )
             put(
+                BackupFormat.KEY_BUDGET_LINES,
+                serializer.writeArray(database.budgetDao().getLines(), serializer::budgetLineToJson),
+            )
+            put(
+                BackupFormat.KEY_BUDGET_CHANGES,
+                serializer.writeArray(database.budgetDao().getChanges(), serializer::budgetChangeToJson),
+            )
+            put(
                 BackupFormat.KEY_CASH_POT,
                 serializer.writeArray(
                     database.cashPotDao().getAll(),
@@ -262,6 +270,23 @@ class BackupManager @Inject constructor(
                 serializer::splitFromJson,
             ).filter { it.transactionId in transactionIds }
                 .map { part -> part.copy(categoryId = part.categoryId?.takeIf { it in categoryIds }) }
+            // The budget: lines keep what they count only if it came back too.
+            val accountIds = accounts.map { it.id }.toSet()
+            val budgetLines = serializer.readArray(
+                json.optJSONArray(BackupFormat.KEY_BUDGET_LINES),
+                serializer::budgetLineFromJson,
+            ).filter { it.name.isNotBlank() }
+                .map { line ->
+                    line.copy(
+                        categoryId = line.categoryId?.takeIf { it in categoryIds },
+                        accountId = line.accountId?.takeIf { it in accountIds },
+                    )
+                }
+            val budgetLineIds = budgetLines.map { it.id }.toSet()
+            val budgetChanges = serializer.readArray(
+                json.optJSONArray(BackupFormat.KEY_BUDGET_CHANGES),
+                serializer::budgetChangeFromJson,
+            ).filter { it.lineId in budgetLineIds && it.month.isNotBlank() }
 
             if (accounts.isEmpty() && transactions.isEmpty()) {
                 error("That file does not look like a Finance Tracker backup")
@@ -275,6 +300,7 @@ class BackupManager @Inject constructor(
                 // Children before parents when deleting, parents before children
                 // when inserting, so foreign keys hold at every step.
                 database.splitDao().deleteAll()
+                database.budgetDao().deleteAllLines()
                 database.transactionDao().deleteAll()
                 database.recurringRuleDao().deleteAll()
                 database.savingsGoalDao().deleteAll()
@@ -297,6 +323,8 @@ class BackupManager @Inject constructor(
                 database.externalDataDao().upsertAll(external)
                 database.cashPotDao().insertAll(cashPot)
                 database.incomeChangeDao().insertAll(payHistory)
+                database.budgetDao().insertLines(budgetLines)
+                database.budgetDao().insertChanges(budgetChanges)
             }
 
             // A backup from before categories existed would leave the app

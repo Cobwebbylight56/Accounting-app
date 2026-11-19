@@ -98,6 +98,7 @@ class SettingsRepository @Inject constructor(
         val NEEDS_LOOK_POPUP = booleanPreferencesKey("needs_look_popup")
         val BACKUP_REMINDER = booleanPreferencesKey("backup_reminder")
         val PRICE_RISES_SEEN = stringSetPreferencesKey("price_rises_seen")
+        val BUDGET_SUGGESTIONS_SEEN = stringSetPreferencesKey("budget_suggestions_seen")
         val STATEMENT_ACCOUNTS = stringPreferencesKey("statement_accounts")
     }
 
@@ -199,6 +200,7 @@ class SettingsRepository @Inject constructor(
             needsLookPopup = prefs[Keys.NEEDS_LOOK_POPUP] ?: true,
             backupReminder = prefs[Keys.BACKUP_REMINDER] ?: true,
             priceRisesSeen = prefs[Keys.PRICE_RISES_SEEN].orEmpty(),
+            budgetSuggestionsSeen = prefs[Keys.BUDGET_SUGGESTIONS_SEEN].orEmpty(),
             statementAccounts = cardAccountsOf(prefs[Keys.STATEMENT_ACCOUNTS]),
             liveAlertLog = LiveAlertLogEntry.parse(prefs[Keys.LIVE_ALERT_LOG]),
             subscriptionPlans = com.rhys.financetracker.data.importer.SubscriptionPlan.parse(prefs[Keys.SUBSCRIPTION_PLANS]),
@@ -422,6 +424,11 @@ class SettingsRepository @Inject constructor(
         context.dataStore.edit { it[Keys.PRICE_RISES_SEEN] = it[Keys.PRICE_RISES_SEEN].orEmpty() + key }
     }
 
+    /** A budget suggestion turned down, as "line id:amount", so it isn't offered again. */
+    suspend fun markBudgetSuggestionSeen(key: String) {
+        context.dataStore.edit { it[Keys.BUDGET_SUGGESTIONS_SEEN] = it[Keys.BUDGET_SUGGESTIONS_SEEN].orEmpty() + key }
+    }
+
     /** Hides the Get set up checklist on Home for good. */
     suspend fun hideSetupChecklist() = put(Keys.SETUP_HIDDEN, true)
 
@@ -578,6 +585,8 @@ data class AppSettings(
     val backupReminder: Boolean = true,
     /** Price rises already noted, as "subscription key:new amount". */
     val priceRisesSeen: Set<String> = emptySet(),
+    /** Budget suggestions turned down, as "line id:amount". */
+    val budgetSuggestionsSeen: Set<String> = emptySet(),
     /** The account each statement went to, by its numbers; see StatementIdentity. */
     val statementAccounts: Map<String, Long> = emptyMap(),
     /** What the alert reader heard lately from banking apps and what came of it, newest first. */

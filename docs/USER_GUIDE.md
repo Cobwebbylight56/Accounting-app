@@ -28,6 +28,45 @@ added in a later update is always pointed out once.
 Pop-ups only open once each time the app starts, and never on top of each
 other.
 
+## Budget
+
+**More → Budget** is the household budget: what each thing should cost a
+month, and how well you keep to it.
+
+**Setting it up from your spreadsheet.** Tap **Choose my spreadsheet** and
+pick the household spreadsheet you started with. Its outgoings block becomes
+the budget: each row is a line, with everyone's figures added together (never
+the "both" column, which already is that). Each line is matched to where its
+money goes — "fuel" to Fuel, "food shop" to Groceries, "car" to the car loan
+if you have one — and you see them all before anything is saved: untick what
+you don't want, change an amount, or choose a different category. **Start
+from what we spend** does the same from your last few months instead.
+
+**Three kinds of line.**
+
+* **Limits** — bills and the like. Keep under them; over is over.
+* **Aims** — fuel, the food shop: something to aim for that changes month to
+  month, where going over isn't a big problem. Up to a fifth over still
+  counts as hit; more than that only costs half marks. An aim can **follow
+  what we usually spend**: its amount each month is the average of the last
+  three.
+* **Putting aside** — a saver or a loan. Met when the money goes in.
+
+**The score.** Each month shows a percentage — every line kept to scores in
+full, an aim gone over scores half — with Excellent, Good, Getting there or
+Needs work, what was spent against the budget, and how many months in a row
+you've stayed within it. The months before are along the top; tap one to
+look back. The month you're in says **so far**.
+
+**Changing things.** Tap a line to change its amount, its kind or what counts
+towards it, or to change it **just for this month** — a long trip, Christmas
+— after which the usual amount comes back. When a line keeps not fitting — a
+bill that's gone up, an aim you always beat — the page suggests a better
+amount: **Raise it**, **Lower it**, or **Leave it**.
+
+Ask Claude can see the budget too, so you can ask "how are we doing against
+the budget?"
+
 ## Ask Claude
 
 **More → Ask Claude** is a conversation with Claude about your money. Ask

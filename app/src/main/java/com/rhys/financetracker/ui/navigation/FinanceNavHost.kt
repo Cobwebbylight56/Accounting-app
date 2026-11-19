@@ -380,7 +380,12 @@ private fun NavGraphBuilder.topLevelDestinations(
             onOpenReports = { navController.navigate(Routes.REPORTS) },
             onOpenProgress = { navController.navigate(Routes.PROGRESS) },
             onOpenAskClaude = { navController.navigate(Routes.ASK_CLAUDE) },
+            onOpenBudget = { navController.navigate(Routes.BUDGET) },
         )
+    }
+
+    composable(Routes.BUDGET) {
+        com.rhys.financetracker.ui.budget.BudgetScreen(onBack = { navController.popBackStack() })
     }
 
     composable(Routes.ASK_CLAUDE) {

@@ -59,6 +59,9 @@ object Routes {
     /** How each month went, and each half-month, against the one before. */
     const val PROGRESS = "progress"
 
+    /** The household budget, and how well each month kept to it. */
+    const val BUDGET = "budget"
+
     /** A month's summary, shared with the Claude app to ask about. */
     const val ASK_CLAUDE = "ask-claude"
     const val IMPORT = "import"

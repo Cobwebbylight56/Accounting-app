@@ -208,6 +208,50 @@ class BackupSerializer @Inject constructor() {
             position = json.optInt("position", 0),
         )
 
+    // ------------------------------------------------------------- budget
+
+    fun budgetLineToJson(line: com.rhys.financetracker.data.local.entity.BudgetLineEntity): JSONObject =
+        JSONObject().apply {
+            put("id", line.id)
+            put("name", line.name)
+            putOpt("categoryId", line.categoryId)
+            putOpt("accountId", line.accountId)
+            put("amountMinor", line.amountMinor)
+            put("isAim", line.isAim)
+            put("followAverage", line.followAverage)
+            put("isPutAside", line.isPutAside)
+            put("sortOrder", line.sortOrder)
+            put("fromSheet", line.fromSheet)
+        }
+
+    fun budgetLineFromJson(json: JSONObject): com.rhys.financetracker.data.local.entity.BudgetLineEntity =
+        com.rhys.financetracker.data.local.entity.BudgetLineEntity(
+            id = json.optLong("id", 0L),
+            name = json.optString("name", ""),
+            categoryId = json.optLongOrNull("categoryId"),
+            accountId = json.optLongOrNull("accountId"),
+            amountMinor = json.optLong("amountMinor", 0L),
+            isAim = json.optBoolean("isAim", false),
+            followAverage = json.optBoolean("followAverage", false),
+            isPutAside = json.optBoolean("isPutAside", false),
+            sortOrder = json.optInt("sortOrder", 0),
+            fromSheet = json.optBoolean("fromSheet", false),
+        )
+
+    fun budgetChangeToJson(change: com.rhys.financetracker.data.local.entity.BudgetChangeEntity): JSONObject =
+        JSONObject().apply {
+            put("lineId", change.lineId)
+            put("month", change.month)
+            put("amountMinor", change.amountMinor)
+        }
+
+    fun budgetChangeFromJson(json: JSONObject): com.rhys.financetracker.data.local.entity.BudgetChangeEntity =
+        com.rhys.financetracker.data.local.entity.BudgetChangeEntity(
+            lineId = json.optLong("lineId", 0L),
+            month = json.optString("month", ""),
+            amountMinor = json.optLong("amountMinor", 0L),
+        )
+
     // ----------------------------------------------------------- cash pot
 
     fun cashPotEntryToJson(entry: CashPotEntryEntity): JSONObject = JSONObject().apply {

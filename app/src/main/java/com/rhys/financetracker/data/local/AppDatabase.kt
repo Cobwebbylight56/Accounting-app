@@ -60,6 +60,8 @@ import com.rhys.financetracker.data.local.entity.TransactionEntity
         com.rhys.financetracker.data.local.entity.ReceiptEntity::class,
         com.rhys.financetracker.data.local.entity.TransactionSplitEntity::class,
         com.rhys.financetracker.data.local.entity.ReceiptItemChoiceEntity::class,
+        com.rhys.financetracker.data.local.entity.BudgetLineEntity::class,
+        com.rhys.financetracker.data.local.entity.BudgetChangeEntity::class,
     ],
     version = AppDatabase.DATABASE_VERSION,
     exportSchema = true,
@@ -82,9 +84,10 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun importBatchDao(): com.rhys.financetracker.data.local.dao.ImportBatchDao
     abstract fun receiptDao(): com.rhys.financetracker.data.local.dao.ReceiptDao
     abstract fun splitDao(): com.rhys.financetracker.data.local.dao.SplitDao
+    abstract fun budgetDao(): com.rhys.financetracker.data.local.dao.BudgetDao
 
     companion object {
-        const val DATABASE_VERSION = 15
+        const val DATABASE_VERSION = 16
         const val DATABASE_NAME = "finance_tracker.db"
     }
 }

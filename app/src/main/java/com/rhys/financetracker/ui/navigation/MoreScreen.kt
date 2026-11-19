@@ -17,6 +17,7 @@ import androidx.compose.material.icons.outlined.EventRepeat
 import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.People
+import androidx.compose.material.icons.outlined.Savings
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.UploadFile
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -55,6 +56,7 @@ fun MoreScreen(
     onOpenReports: () -> Unit = {},
     onOpenProgress: () -> Unit = {},
     onOpenAskClaude: () -> Unit = {},
+    onOpenBudget: () -> Unit = {},
 ) {
     Scaffold(
         topBar = { TopAppBar(title = { Text("More") }) },
@@ -80,6 +82,13 @@ fun MoreScreen(
             )
 
             SettingsGroupHeader("Tools")
+            SettingsItem(
+                title = "Budget",
+                subtitle = "What each thing should cost a month, from your spreadsheet — and how well you keep to it",
+                icon = Icons.Outlined.Savings,
+                trailing = { com.rhys.financetracker.ui.components.NewBadge("budget") },
+                onClick = onOpenBudget,
+            )
             SettingsItem(
                 title = "Needs a look",
                 subtitle = "Payments to sort or check, missing statements, tidying up",

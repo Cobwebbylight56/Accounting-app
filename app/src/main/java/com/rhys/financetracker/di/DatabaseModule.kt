@@ -67,6 +67,7 @@ object DatabaseModule {
         db.importProfileDao()
     @Provides fun provideCashPotDao(db: AppDatabase): CashPotDao = db.cashPotDao()
     @Provides fun provideSplitDao(db: AppDatabase): com.rhys.financetracker.data.local.dao.SplitDao = db.splitDao()
+    @Provides fun provideBudgetDao(db: AppDatabase): com.rhys.financetracker.data.local.dao.BudgetDao = db.budgetDao()
     @Provides fun provideReceiptDao(db: AppDatabase): com.rhys.financetracker.data.local.dao.ReceiptDao =
         db.receiptDao()
     @Provides fun provideImportBatchDao(db: AppDatabase): com.rhys.financetracker.data.local.dao.ImportBatchDao =

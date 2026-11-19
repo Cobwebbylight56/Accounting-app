@@ -46,6 +46,7 @@ class FinanceToolbox @Inject constructor(
     private val peopleRepository: PeopleRepository,
     private val categoryDao: CategoryDao,
     private val recurringRuleDao: RecurringRuleDao,
+    private val budgetRepository: com.rhys.financetracker.data.repository.BudgetRepository,
 ) : ClaudeTools {
 
     override suspend fun run(name: String, input: Map<*, *>): ToolOutput = run(name, input, DateUtils.today())
@@ -58,6 +59,7 @@ class FinanceToolbox @Inject constructor(
             CATEGORIES -> ToolOutput(categories(input, today))
             SEARCH -> ToolOutput(search(input, today))
             BILLS -> ToolOutput(bills())
+            BUDGET -> ToolOutput(budget(input, today))
             else -> ToolOutput("There's no tool called $name.", isError = true)
         }
     } catch (e: BadInput) {
@@ -236,6 +238,44 @@ class FinanceToolbox @Inject constructor(
             }
     }
 
+    private suspend fun budget(input: Map<*, *>, today: LocalDate): String {
+        val month = input.string("month")?.takeIf { it.isNotBlank() }?.let {
+            runCatching { YearMonth.parse(it.take(7)) }.getOrElse { throw BadInput("month should be like 2026-10.") }
+        } ?: YearMonth.from(today)
+        val overview = budgetRepository.overview(month, today)
+        if (overview.lines.isEmpty()) return "No budget is set up yet. It can be made under More → Budget, from their spreadsheet or their spending."
+        val score = overview.score
+        val lines = overview.lines.joinToString("\n") { view ->
+            val r = view.result
+            val kind = when {
+                view.line.isPutAside -> "put aside (reach it)"
+                view.line.isAim -> "aim (over isn't a big problem)"
+                else -> "limit"
+            }
+            listOfNotNull(
+                "- ${view.line.name}",
+                kind,
+                "budget ${pounds(r.budgetMinor)}" + when (r.source) {
+                    com.rhys.financetracker.domain.budget.BudgetSource.THIS_MONTH_ONLY -> " (changed for this month)"
+                    com.rhys.financetracker.domain.budget.BudgetSource.AVERAGE -> " (follows their average)"
+                    com.rhys.financetracker.domain.budget.BudgetSource.SET -> ""
+                },
+                "actual ${pounds(r.actualMinor)}",
+                r.status.name.lowercase().replace('_', ' '),
+                view.countsLabel ?: "nothing chosen to count",
+                view.usualMinor?.let { "usually ${pounds(it)}" },
+            ).joinToString(" · ")
+        }
+        val history = overview.history.joinToString(", ") { s -> "${s.month}: ${s.percent?.let { "$it%" } ?: "—"}" }
+        val suggestions = overview.suggestions.joinToString("\n") { "- ${it.name}: ${pounds(it.fromMinor)} → ${pounds(it.toMinor)} (${it.why})" }
+        return "Budget for ${month.format(MONTH)}" + (if (overview.inProgress) " (so far, to ${day(today)})" else "") +
+            ": score ${score.percent?.let { "$it%" } ?: "—"} (${score.grade?.label ?: "nothing to score"}), kept to ${score.kept} of ${score.counted} lines; " +
+            "spending lines ${pounds(score.spentMinor)} of ${pounds(score.budgetMinor)}. " +
+            "Limits count in full; an aim gone over by more than a fifth earns half marks.\n" + lines +
+            "\nScores by month: $history. Finished months in a row within budget: ${overview.streak}." +
+            (if (suggestions.isNotEmpty()) "\nThe app suggests:\n$suggestions" else "")
+    }
+
     /** Whose money [input] asks about: everyone, or one person, or the joint pot. */
     private suspend fun person(input: Map<*, *>): Pair<String, Set<Long>?> {
         val wanted = input.string("person")?.trim()?.takeIf { it.isNotEmpty() && !it.equals("everyone", true) }
@@ -284,6 +324,7 @@ class FinanceToolbox @Inject constructor(
         const val CATEGORIES = "get_spending_by_category"
         const val SEARCH = "search_payments"
         const val BILLS = "get_regular_payments"
+        const val BUDGET = "get_budget"
 
         private const val DEFAULT_MONTHS = 6
         private const val MAX_MONTHS = 36
@@ -356,6 +397,13 @@ class FinanceToolbox @Inject constructor(
                     "sort" to mapOf("type" to "string", "enum" to listOf("newest", "oldest", "biggest", "smallest")),
                     "limit" to mapOf("type" to "integer", "description" to "How many to list, 1 to 200. Default 40."),
                 ),
+            ),
+            ToolSpec(
+                BUDGET,
+                "Their budget for a month: each line's budget and what was spent (or put aside), whether it's a limit, " +
+                    "an aim or money to put aside, the month's score, earlier months' scores and suggested changes. " +
+                    "Default: this month so far.",
+                mapOf("month" to mapOf("type" to "string", "description" to "The month, as YYYY-MM.")),
             ),
             ToolSpec(
                 BILLS,
