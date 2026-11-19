@@ -119,9 +119,8 @@ class VisionShotsTest {
     @Composable
     private fun Budget() {
         val maths = com.rhys.financetracker.domain.budget.BudgetMaths
-        val goal = com.rhys.financetracker.domain.budget.LineGoal
         fun line(id: Long, name: String, budget: Long, spent: Long, aim: Boolean = false, putAside: Boolean = false, cells: List<Pair<Long, Long>>): com.rhys.financetracker.data.repository.BudgetLineView {
-            val plan = com.rhys.financetracker.domain.budget.BudgetPlan(id, name, budget, aim = aim, goal = if (putAside) goal.PUT_ASIDE_AT_LEAST else goal.SPEND_AT_MOST)
+            val plan = com.rhys.financetracker.domain.budget.BudgetPlan(id, name, budget, aim = aim, goal = if (putAside) com.rhys.financetracker.domain.budget.LineGoal.PUT_ASIDE_AT_LEAST else com.rhys.financetracker.domain.budget.LineGoal.SPEND_AT_MOST)
             return com.rhys.financetracker.data.repository.BudgetLineView(
                 line = com.rhys.financetracker.data.local.entity.BudgetLineEntity(id = id, name = name, amountMinor = budget, isAim = aim, isPutAside = putAside, categoryId = id),
                 result = maths.result(plan, month, spent, null, emptyList(), inProgress = false),
